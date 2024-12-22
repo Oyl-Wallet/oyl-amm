@@ -1,5 +1,6 @@
 use crate::tests::std::{factory_build, pool_build};
 use alkanes::message::AlkaneMessageContext;
+use alkanes::precompiled::{alkanes_std_auth_token_build, alkanes_std_owned_token_build};
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::constants::{AMM_FACTORY_ID, AUTH_TOKEN_FACTORY_ID};
 use alkanes_support::id::AlkaneId;
@@ -18,12 +19,12 @@ use protorune_support::protostone::Protostone;
 use protorune_support::protostone::ProtostoneEdict;
 use protorune_support::utils::consensus_encode;
 
-use crate::view;
 use alkane_helpers::clear;
-use alkanes::index_block;
+use alkanes::indexer::index_block;
 use alkanes::tests::helpers::{
     self as alkane_helpers, assert_binary_deployed_to_id, assert_token_id_has_no_deployment,
 };
+use alkanes::view;
 #[allow(unused_imports)]
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use std::fmt::Write;
@@ -79,9 +80,9 @@ fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
     .into();
     let test_block = alkane_helpers::init_with_multiple_cellpacks_with_tx(
         [
-            alkanes_std_amm_pool_build::get_bytes(),
+            pool_build::get_bytes(),
             alkanes_std_auth_token_build::get_bytes(),
-            alkanes_std_amm_factory_build::get_bytes(),
+            factory_build::get_bytes(),
             alkanes_std_owned_token_build::get_bytes(),
             [].into(),
         ]
@@ -139,7 +140,7 @@ fn assert_contracts_correct_ids(deployment_ids: &AmmTestDeploymentIds) -> Result
     );
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_pool_deployment.clone(),
-        alkanes_std_amm_pool_build::get_bytes(),
+        pool_build::get_bytes(),
     );
     Ok(())
 }
