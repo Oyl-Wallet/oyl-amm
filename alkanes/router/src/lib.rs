@@ -7,18 +7,18 @@ use alkanes_runtime::{
 };
 use alkanes_support::{
     cellpack::Cellpack,
+    context::Context,
     id::AlkaneId,
-    parcel::{AlkaneTransfer, AlkaneTransferParcel},
+    parcel::AlkaneTransferParcel,
     response::CallResponse,
-    utils::{overflow_error, shift, shift_id_or_err, shift_or_err},
+    utils::{shift_id_or_err, shift_or_err},
 };
 use anyhow::{anyhow, Result};
 use metashrew_support::{
     compat::{to_arraybuffer_layout, to_ptr},
     index_pointer::KeyValuePointer,
-    utils::{consume_sized_int, consume_u128},
+    utils::consume_u128,
 };
-use ruint::Uint;
 use std::sync::Arc;
 
 // per uniswap docs, the first 1e3 wei of lp token minted are burned to mitigate attacks where the value of a lp token is raised too high easily
@@ -40,7 +40,7 @@ impl AMMRouter {
         ))
     }
 
-    fn get_pool_for(&self, alkane1: AlkaneId, alkane2: AlkaneId) -> Result<AlkaneId> {
+    fn get_pool_for(&self, alkane1: &AlkaneId, alkane2: &AlkaneId) -> Result<AlkaneId> {
         let factory = Self::factory()?;
         let response = self.call(
             &Cellpack {
@@ -56,16 +56,33 @@ impl AMMRouter {
         Ok(pool)
     }
 
-    fn add_liquidity(pool: AlkaneId, amount1: u128, amount2: u128) -> Result<(u128, u128)> {
-        Ok((amount1, amount2))
+    fn mint_or_burn(&self, input: u128, pool: AlkaneId, context: &Context) -> Result<CallResponse> {
+        let response = self.call(
+            &Cellpack {
+                target: pool,
+                inputs: vec![input],
+            },
+            &context.incoming_alkanes,
+            self.fuel(),
+        )?;
+        Ok(response)
     }
 
-    fn remove_liquidity(pool: AlkaneId, amount1: u128, amount2: u128) -> Result<(u128, u128)> {
-        Ok((amount1, amount2))
-    }
-
-    fn swap(pool: AlkaneId, token: AlkaneId, amount: u128, amountOutMin: u128) -> Result<(u128)> {
-        Ok(amountOutMin)
+    fn swap(
+        &self,
+        pool: AlkaneId,
+        context: &Context,
+        amount_predicate: u128,
+    ) -> Result<CallResponse> {
+        let response = self.call(
+            &Cellpack {
+                target: pool,
+                inputs: vec![3, amount_predicate],
+            },
+            &context.incoming_alkanes,
+            self.fuel(),
+        )?;
+        Ok(response)
     }
 }
 
@@ -89,19 +106,20 @@ impl AlkaneResponder for AMMRouter {
                 }
             }
             1..3 => {
-                let response = CallResponse::default();
-                let (alkane1, alkane2) =
-                    (shift_id_or_err(&mut inputs)?, shift_id_or_err(&mut inputs)?);
+                let mut response = CallResponse::default();
+                let (alkane1, alkane2) = (
+                    context.incoming_alkanes.0[0].id,
+                    context.incoming_alkanes.0[1].id,
+                );
+                let pool = self.get_pool_for(&alkane1, &alkane2)?;
                 match opcode {
-                    1 => {
+                    1..=2 => {
                         //add_liquidity
-                        let (amount1, amount2) =
-                            (shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?);
-                        Self::add_liquidity(
-                            self.get_pool_for(alkane1, alkane2)?,
-                            amount1,
-                            amount2,
-                        )?;
+                        response = self.mint_or_burn(opcode, pool, &context)?;
+                    }
+                    3 => {
+                        let amount = shift_or_err(&mut inputs)?;
+                        response = self.swap(pool, &context, amount)?;
                     }
                     _ => {}
                 }
