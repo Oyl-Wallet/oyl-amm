@@ -100,7 +100,7 @@ impl AlkaneResponder for AMMRouter {
                     factory.set(Arc::new(id.into()));
                     pointer.set(Arc::new(vec![0x01]));
                     //placeholder
-                    Ok(CallResponse::default())
+                    Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
                 } else {
                     Err(anyhow!("already initialized"))
                 }
