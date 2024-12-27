@@ -106,6 +106,9 @@ impl AlkaneResponder for AMMRouter {
                 }
             }
             1..3 => {
+                if context.incoming_alkanes.0.len() != 2 {
+                    panic!("must send two alkanes for routing");
+                }
                 let mut response = CallResponse::default();
                 let (alkane1, alkane2) = (
                     context.incoming_alkanes.0[0].id,
