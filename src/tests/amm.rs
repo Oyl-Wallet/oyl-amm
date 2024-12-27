@@ -49,12 +49,41 @@ fn test_amm_factory_double_init_fail() -> Result<()> {
         ),
     );
     index_block(&test_block, block_height)?;
-    let trace_result: Trace = view::trace(&OutPoint {
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
+    clear();
+    let block_height = 840_000;
+    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
+    let input_outpoint = OutPoint {
         txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-        vout: 3,
-    })?
-    .try_into()?;
-    println!("trace: {:?}", trace_result);
+        vout: 0,
+    };
+    insert_single_edict_split_tx(
+        // should fail since init pool requires two alkanes, this only creates a tx with one
+        1000000,
+        deployment_ids.amm_pool_deployment,
+        &mut test_block,
+        &deployment_ids,
+        input_outpoint,
+    );
+    test_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_factory_deployment,
+                inputs: vec![1],
+            }],
+            OutPoint {
+                txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+                vout: 0,
+            },
+            false,
+        ),
+    );
+    index_block(&test_block, block_height)?;
     Ok(())
 }
 

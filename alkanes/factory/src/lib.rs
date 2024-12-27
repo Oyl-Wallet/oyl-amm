@@ -95,7 +95,7 @@ impl AlkaneResponder for AMMFactory {
             }
             1 => {
                 if context.incoming_alkanes.0.len() != 2 {
-                    panic!("must send two runes to initialize a pool");
+                    Err(anyhow!("must send two runes to initialize a pool"))
                 } else {
                     let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
                     let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
