@@ -88,7 +88,7 @@ impl AlkaneResponder for AMMFactory {
                 let mut pointer = StoragePointer::from_keyword("/initialized");
                 if pointer.get().len() == 0 {
                     pointer.set(Arc::new(vec![0x01]));
-                    Ok(CallResponse::default())
+                    Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
                 } else {
                     Err(anyhow!("already initialized"))
                 }
