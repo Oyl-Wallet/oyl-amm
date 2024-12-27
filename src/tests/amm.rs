@@ -455,7 +455,6 @@ fn check_swap_lp_balance(
     swap_amount: u128,
     swap_target_token: AlkaneId,
     test_block: &Block,
-    deployment_ids: &AmmTestDeploymentIds,
 ) -> Result<()> {
     let sheet = get_last_outpoint_sheet(test_block)?;
     let expected_amount = calc_swapped_balance(swap_amount, prev_reserve_from, prev_reserve_to)?;
@@ -525,6 +524,35 @@ fn test_amm_pool_normal_init() -> Result<()> {
     let (block, _ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
     let trace_result: Trace = view::trace(&OutPoint {
         txid: block.txdata[block.txdata.len() - 1].compute_txid(),
+        vout: 3,
+    })?
+    .try_into()?;
+    println!("trace: {:?}", trace_result);
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_factory_double_init_fail() -> Result<()> {
+    clear();
+    let block_height = 840_000;
+    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
+    test_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_factory_deployment,
+                inputs: vec![0],
+            }],
+            OutPoint {
+                txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+                vout: 0,
+            },
+            false,
+        ),
+    );
+    index_block(&test_block, block_height)?;
+    let trace_result: Trace = view::trace(&OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
         vout: 3,
     })?
     .try_into()?;
@@ -647,7 +675,6 @@ fn test_amm_pool_swap() -> Result<()> {
         amount_to_swap,
         deployment_ids.owned_token_2_deployment,
         &swap_block,
-        &deployment_ids,
     )?;
     Ok(())
 }
@@ -681,7 +708,6 @@ fn test_amm_pool_swap_large() -> Result<()> {
         amount_to_swap,
         deployment_ids.owned_token_2_deployment,
         &swap_block,
-        &deployment_ids,
     )?;
     Ok(())
 }
