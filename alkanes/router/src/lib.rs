@@ -55,35 +55,6 @@ impl AMMRouter {
         let pool = AlkaneId::new(consume_u128(&mut cursor)?, consume_u128(&mut cursor)?);
         Ok(pool)
     }
-
-    fn mint_or_burn(&self, input: u128, pool: AlkaneId, context: &Context) -> Result<CallResponse> {
-        let response = self.call(
-            &Cellpack {
-                target: pool,
-                inputs: vec![input],
-            },
-            &context.incoming_alkanes,
-            self.fuel(),
-        )?;
-        Ok(response)
-    }
-
-    fn swap(
-        &self,
-        pool: AlkaneId,
-        context: &Context,
-        amount_predicate: u128,
-    ) -> Result<CallResponse> {
-        let response = self.call(
-            &Cellpack {
-                target: pool,
-                inputs: vec![3, amount_predicate],
-            },
-            &context.incoming_alkanes,
-            self.fuel(),
-        )?;
-        Ok(response)
-    }
 }
 
 impl AlkaneResponder for AMMRouter {
@@ -115,17 +86,15 @@ impl AlkaneResponder for AMMRouter {
                     context.incoming_alkanes.0[1].id,
                 );
                 let pool = self.get_pool_for(&alkane1, &alkane2)?;
-                match opcode {
-                    1..=2 => {
-                        //add_liquidity
-                        response = self.mint_or_burn(opcode, pool, &context)?;
-                    }
-                    3 => {
-                        let amount = shift_or_err(&mut inputs)?;
-                        response = self.swap(pool, &context, amount)?;
-                    }
-                    _ => {}
+                let mut cellpack = Cellpack {
+                    target: pool,
+                    inputs: vec![opcode],
+                };
+                if opcode == 3 {
+                    let amount = shift_or_err(&mut inputs)?;
+                    cellpack.inputs.push(amount);
                 }
+                let response = self.call(&cellpack, &context.incoming_alkanes, self.fuel())?;
                 Ok(response)
             }
             50 => Ok(CallResponse::forward(&context.incoming_alkanes)),

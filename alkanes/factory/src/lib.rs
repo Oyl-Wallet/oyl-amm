@@ -17,7 +17,7 @@ use anyhow::{anyhow, Result};
 use metashrew_support::{
     compat::{to_arraybuffer_layout, to_ptr},
     index_pointer::KeyValuePointer,
-    utils::consume_sized_int,
+    utils::{consume_sized_int, consume_u128},
 };
 use std::sync::Arc;
 
@@ -102,7 +102,7 @@ impl AlkaneResponder for AMMFactory {
                     let next_sequence = self.sequence();
                     self.pool_pointer(&a, &b)
                         .set(Arc::new(AlkaneId::new(2, next_sequence).into()));
-                    self.call(
+                    let response = self.call(
                         &Cellpack {
                             target: AlkaneId {
                                 block: 6,
@@ -115,7 +115,9 @@ impl AlkaneResponder for AMMFactory {
                             context.incoming_alkanes.0[1].clone(),
                         ]),
                         self.fuel(),
-                    )
+                    )?;
+                    println!("response: {:?}", response);
+                    Ok(response)
                 }
             }
             2 => {
