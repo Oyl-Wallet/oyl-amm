@@ -77,16 +77,25 @@ impl AlkaneResponder for AMMRouter {
                     Err(anyhow!("already initialized"))
                 }
             }
-            1..3 => {
-                if context.incoming_alkanes.0.len() != 2 {
-                    return Err(anyhow!("must send two alkanes for routing"));
+            1..4 => {
+                let num_alkanes_in_path = shift_or_err(&mut inputs)?;
+                if num_alkanes_in_path < 2 {
+                    return Err(anyhow!("Routing path must be at least two alkanes long"));
                 }
-                let mut response = CallResponse::default();
-                let (alkane1, alkane2) = (
-                    context.incoming_alkanes.0[0].id,
-                    context.incoming_alkanes.0[1].id,
-                );
-                let pool = self.get_pool_for(&alkane1, &alkane2)?;
+                if num_alkanes_in_path != 2 {
+                    return Err(anyhow!(
+                        "TODO: routing currently only supports direct routing using on pool."
+                    ));
+                }
+                let mut path: Vec<AlkaneId> = vec![];
+                for _ in 0..num_alkanes_in_path {
+                    path.push(AlkaneId::new(
+                        shift_or_err(&mut inputs)?,
+                        shift_or_err(&mut inputs)?,
+                    ));
+                }
+
+                let pool = self.get_pool_for(&path[0], &path[1])?;
                 let mut cellpack = Cellpack {
                     target: pool,
                     inputs: vec![opcode],
@@ -100,7 +109,7 @@ impl AlkaneResponder for AMMRouter {
             }
             50 => Ok(CallResponse::forward(&context.incoming_alkanes)),
 
-            _ => Err(anyhow!("unrecognized opcode")),
+            _ => Err(anyhow!("unrecognized opcode {}", opcode)),
         }
     }
 }
