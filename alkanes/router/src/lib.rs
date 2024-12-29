@@ -45,7 +45,7 @@ impl AMMRouter {
         let response = self.call(
             &Cellpack {
                 target: factory,
-                inputs: vec![1, alkane1.block, alkane1.tx, alkane2.block, alkane2.tx],
+                inputs: vec![2, alkane1.block, alkane1.tx, alkane2.block, alkane2.tx],
             },
             &AlkaneTransferParcel(vec![]),
             self.fuel(),
@@ -67,8 +67,9 @@ impl AlkaneResponder for AMMRouter {
                 let mut pointer = StoragePointer::from_keyword("/initialized");
                 let mut factory = StoragePointer::from_keyword("/factory");
                 if pointer.get().len() == 0 {
-                    let id = shift_id_or_err(&mut inputs)?;
-                    factory.set(Arc::new(id.into()));
+                    let factory_id =
+                        AlkaneId::new(shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?);
+                    factory.set(Arc::new(factory_id.into()));
                     pointer.set(Arc::new(vec![0x01]));
                     //placeholder
                     Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
