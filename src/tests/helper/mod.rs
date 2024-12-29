@@ -108,8 +108,8 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
         auth_token_1_deployment: AlkaneId { block: 2, tx: 3 },
         owned_token_2_deployment: AlkaneId { block: 2, tx: 4 },
         auth_token_2_deployment: AlkaneId { block: 2, tx: 5 },
-        amm_pool_deployment: AlkaneId { block: 2, tx: 6 },
-        amm_router_deployment: AlkaneId { block: 2, tx: 7 },
+        amm_router_deployment: AlkaneId { block: 2, tx: 6 },
+        amm_pool_deployment: AlkaneId { block: 2, tx: 7 },
     };
     return Ok((test_block, deployed_ids));
 }
