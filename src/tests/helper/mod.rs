@@ -267,7 +267,7 @@ pub fn insert_init_pool_liquidity_txs(
     );
 }
 
-pub fn _insert_add_liquidity_txs(
+fn _insert_add_liquidity_txs(
     amount1: u128,
     amount2: u128,
     test_block: &mut Block,
@@ -360,7 +360,7 @@ pub fn insert_add_liquidity_txs_with_router(
     );
 }
 
-pub fn _insert_remove_liquidity_txs(
+fn _insert_remove_liquidity_txs(
     amount: u128,
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
@@ -430,7 +430,7 @@ pub fn insert_remove_liquidity_txs_w_router(
     )
 }
 
-pub fn _insert_swap_txs(
+fn _insert_swap_txs(
     amount: u128,
     target: AlkaneId,
     min_out: u128,
