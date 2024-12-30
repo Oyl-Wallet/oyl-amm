@@ -1,4 +1,4 @@
-use crate::tests::std::{factory_build, pool_build};
+use crate::tests::std::{factory_build, pool_build, router_build};
 use alkanes::message::AlkaneMessageContext;
 use alkanes::precompiled::{alkanes_std_auth_token_build, alkanes_std_owned_token_build};
 use alkanes_support::cellpack::Cellpack;
@@ -39,11 +39,12 @@ pub struct AmmTestDeploymentIds {
     pub owned_token_2_deployment: AlkaneId,
     pub auth_token_2_deployment: AlkaneId,
     pub amm_pool_deployment: AlkaneId,
+    pub amm_router_deployment: AlkaneId,
 }
 
 pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
     let cellpacks: Vec<Cellpack> = [
-        //amm pool factory init
+        //amm pool init (in factory space so new pools can copy this code)
         Cellpack {
             target: AlkaneId {
                 block: 3,
@@ -59,6 +60,7 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
             },
             inputs: vec![100],
         },
+        //amm factory
         Cellpack {
             target: AlkaneId { block: 1, tx: 0 },
             inputs: vec![0],
@@ -73,6 +75,11 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
             target: AlkaneId { block: 5, tx: 2 }, // factory creation of owned token using {2, 1} as the factory. Then it deploys to {2,3}
             inputs: vec![0, 1, 1000000],
         },
+        // router
+        Cellpack {
+            target: AlkaneId { block: 1, tx: 0 },
+            inputs: vec![0, 2, 1],
+        },
     ]
     .into();
     let test_block = alkane_helpers::init_with_multiple_cellpacks_with_tx(
@@ -82,6 +89,7 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
             factory_build::get_bytes(),
             alkanes_std_owned_token_build::get_bytes(),
             [].into(),
+            router_build::get_bytes(),
         ]
         .into(),
         cellpacks,
@@ -100,7 +108,8 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
         auth_token_1_deployment: AlkaneId { block: 2, tx: 3 },
         owned_token_2_deployment: AlkaneId { block: 2, tx: 4 },
         auth_token_2_deployment: AlkaneId { block: 2, tx: 5 },
-        amm_pool_deployment: AlkaneId { block: 2, tx: 6 },
+        amm_router_deployment: AlkaneId { block: 2, tx: 6 },
+        amm_pool_deployment: AlkaneId { block: 2, tx: 7 },
     };
     return Ok((test_block, deployed_ids));
 }
@@ -282,6 +291,30 @@ pub fn insert_add_liquidity_txs(
     );
 }
 
+pub fn insert_add_liquidity_txs_with_router(
+    amount1: u128,
+    amount2: u128,
+    test_block: &mut Block,
+    deployment_ids: &AmmTestDeploymentIds,
+    input_outpoint: OutPoint,
+) {
+    insert_two_edict_split_tx(amount1, amount2, test_block, deployment_ids, input_outpoint);
+    test_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_pool_deployment,
+                inputs: vec![1],
+            }],
+            OutPoint {
+                txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+                vout: 0,
+            },
+            false,
+        ),
+    );
+}
+
 pub fn insert_remove_liquidity_txs(
     amount: u128,
     test_block: &mut Block,
@@ -326,6 +359,39 @@ pub fn insert_swap_txs(
             vec![Cellpack {
                 target: deployment_ids.amm_pool_deployment,
                 inputs: vec![3, min_out],
+            }],
+            OutPoint {
+                txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+                vout: 0,
+            },
+            false,
+        ),
+    );
+}
+
+pub fn insert_swap_txs_w_router(
+    amount: u128,
+    target: AlkaneId,
+    min_out: u128,
+    test_block: &mut Block,
+    deployment_ids: &AmmTestDeploymentIds,
+    input_outpoint: OutPoint,
+) {
+    insert_single_edict_split_tx(amount, target, test_block, deployment_ids, input_outpoint);
+    test_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_router_deployment,
+                inputs: vec![
+                    3,
+                    2, // 2 tokens in path
+                    deployment_ids.owned_token_1_deployment.block,
+                    deployment_ids.owned_token_1_deployment.tx,
+                    deployment_ids.owned_token_2_deployment.block,
+                    deployment_ids.owned_token_2_deployment.tx,
+                    min_out,
+                ],
             }],
             OutPoint {
                 txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
