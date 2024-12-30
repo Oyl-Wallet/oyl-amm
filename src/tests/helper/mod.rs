@@ -267,21 +267,19 @@ pub fn insert_init_pool_liquidity_txs(
     );
 }
 
-pub fn insert_add_liquidity_txs(
+pub fn _insert_add_liquidity_txs(
     amount1: u128,
     amount2: u128,
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
+    cellpack: Cellpack,
 ) {
     insert_two_edict_split_tx(amount1, amount2, test_block, deployment_ids, input_outpoint);
     test_block.txdata.push(
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
-            vec![Cellpack {
-                target: deployment_ids.amm_pool_deployment,
-                inputs: vec![1],
-            }],
+            vec![cellpack],
             OutPoint {
                 txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
                 vout: 0,
@@ -289,6 +287,53 @@ pub fn insert_add_liquidity_txs(
             false,
         ),
     );
+}
+
+pub fn insert_add_liquidity_txs(
+    amount1: u128,
+    amount2: u128,
+    test_block: &mut Block,
+    deployment_ids: &AmmTestDeploymentIds,
+    input_outpoint: OutPoint,
+) {
+    _insert_add_liquidity_txs(
+        amount1,
+        amount2,
+        test_block,
+        deployment_ids,
+        input_outpoint,
+        Cellpack {
+            target: deployment_ids.amm_pool_deployment,
+            inputs: vec![1],
+        },
+    )
+}
+
+pub fn insert_add_liquidity_txs_w_router(
+    amount1: u128,
+    amount2: u128,
+    test_block: &mut Block,
+    deployment_ids: &AmmTestDeploymentIds,
+    input_outpoint: OutPoint,
+) {
+    _insert_add_liquidity_txs(
+        amount1,
+        amount2,
+        test_block,
+        deployment_ids,
+        input_outpoint,
+        Cellpack {
+            target: deployment_ids.amm_router_deployment,
+            inputs: vec![
+                1,
+                2, // 2 tokens in path
+                deployment_ids.owned_token_1_deployment.block,
+                deployment_ids.owned_token_1_deployment.tx,
+                deployment_ids.owned_token_2_deployment.block,
+                deployment_ids.owned_token_2_deployment.tx,
+            ],
+        },
+    )
 }
 
 pub fn insert_add_liquidity_txs_with_router(
@@ -315,11 +360,12 @@ pub fn insert_add_liquidity_txs_with_router(
     );
 }
 
-pub fn insert_remove_liquidity_txs(
+pub fn _insert_remove_liquidity_txs(
     amount: u128,
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
+    cellpack: Cellpack,
 ) {
     insert_single_edict_split_tx(
         amount,
@@ -331,10 +377,7 @@ pub fn insert_remove_liquidity_txs(
     test_block.txdata.push(
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
-            vec![Cellpack {
-                target: deployment_ids.amm_pool_deployment,
-                inputs: vec![2],
-            }],
+            vec![cellpack],
             OutPoint {
                 txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
                 vout: 0,
@@ -344,13 +387,57 @@ pub fn insert_remove_liquidity_txs(
     );
 }
 
-pub fn insert_swap_txs(
+pub fn insert_remove_liquidity_txs(
+    amount: u128,
+    test_block: &mut Block,
+    deployment_ids: &AmmTestDeploymentIds,
+    input_outpoint: OutPoint,
+) {
+    _insert_remove_liquidity_txs(
+        amount,
+        test_block,
+        deployment_ids,
+        input_outpoint,
+        Cellpack {
+            target: deployment_ids.amm_pool_deployment,
+            inputs: vec![2],
+        },
+    )
+}
+
+pub fn insert_remove_liquidity_txs_w_router(
+    amount: u128,
+    test_block: &mut Block,
+    deployment_ids: &AmmTestDeploymentIds,
+    input_outpoint: OutPoint,
+) {
+    _insert_remove_liquidity_txs(
+        amount,
+        test_block,
+        deployment_ids,
+        input_outpoint,
+        Cellpack {
+            target: deployment_ids.amm_router_deployment,
+            inputs: vec![
+                2,
+                2, // 2 tokens in path
+                deployment_ids.owned_token_1_deployment.block,
+                deployment_ids.owned_token_1_deployment.tx,
+                deployment_ids.owned_token_2_deployment.block,
+                deployment_ids.owned_token_2_deployment.tx,
+            ],
+        },
+    )
+}
+
+pub fn _insert_swap_txs(
     amount: u128,
     target: AlkaneId,
     min_out: u128,
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
+    cellpack: Cellpack,
 ) {
     insert_single_edict_split_tx(amount, target, test_block, deployment_ids, input_outpoint);
     test_block.txdata.push(
@@ -369,6 +456,28 @@ pub fn insert_swap_txs(
     );
 }
 
+pub fn insert_swap_txs(
+    amount: u128,
+    target: AlkaneId,
+    min_out: u128,
+    test_block: &mut Block,
+    deployment_ids: &AmmTestDeploymentIds,
+    input_outpoint: OutPoint,
+) {
+    _insert_swap_txs(
+        amount,
+        target,
+        min_out,
+        test_block,
+        deployment_ids,
+        input_outpoint,
+        Cellpack {
+            target: deployment_ids.amm_pool_deployment,
+            inputs: vec![3, min_out],
+        },
+    )
+}
+
 pub fn insert_swap_txs_w_router(
     amount: u128,
     target: AlkaneId,
@@ -377,29 +486,26 @@ pub fn insert_swap_txs_w_router(
     deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
 ) {
-    insert_single_edict_split_tx(amount, target, test_block, deployment_ids, input_outpoint);
-    test_block.txdata.push(
-        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
-            Witness::new(),
-            vec![Cellpack {
-                target: deployment_ids.amm_router_deployment,
-                inputs: vec![
-                    3,
-                    2, // 2 tokens in path
-                    deployment_ids.owned_token_1_deployment.block,
-                    deployment_ids.owned_token_1_deployment.tx,
-                    deployment_ids.owned_token_2_deployment.block,
-                    deployment_ids.owned_token_2_deployment.tx,
-                    min_out,
-                ],
-            }],
-            OutPoint {
-                txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-                vout: 0,
-            },
-            false,
-        ),
-    );
+    _insert_swap_txs(
+        amount,
+        target,
+        min_out,
+        test_block,
+        deployment_ids,
+        input_outpoint,
+        Cellpack {
+            target: deployment_ids.amm_router_deployment,
+            inputs: vec![
+                3,
+                2, // 2 tokens in path
+                deployment_ids.owned_token_1_deployment.block,
+                deployment_ids.owned_token_1_deployment.tx,
+                deployment_ids.owned_token_2_deployment.block,
+                deployment_ids.owned_token_2_deployment.tx,
+                min_out,
+            ],
+        },
+    )
 }
 
 pub fn calc_lp_balance_from_pool_init(amount1: u128, amount2: u128) -> u128 {
@@ -539,7 +645,7 @@ pub fn test_amm_pool_init_fixture(
     Ok((test_block, deployment_ids))
 }
 
-pub fn test_amm_burn_fixture(amount_burn: u128) -> Result<()> {
+pub fn test_amm_burn_fixture(amount_burn: u128, use_router: bool) -> Result<()> {
     let (amount1, amount2) = (1000000, 1000000);
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
     let total_supply = (amount1 * amount2).sqrt();
@@ -551,12 +657,22 @@ pub fn test_amm_burn_fixture(amount_burn: u128) -> Result<()> {
         txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
         vout: 0,
     };
-    insert_remove_liquidity_txs(
-        amount_burn,
-        &mut test_block,
-        &deployment_ids,
-        input_outpoint,
-    );
+    if use_router {
+        insert_remove_liquidity_txs_w_router(
+            amount_burn,
+            &mut test_block,
+            &deployment_ids,
+            input_outpoint,
+        );
+    } else {
+        insert_remove_liquidity_txs(
+            amount_burn,
+            &mut test_block,
+            &deployment_ids,
+            input_outpoint,
+        );
+    }
+
     index_block(&test_block, block_height)?;
 
     println!("get sheet");
