@@ -326,7 +326,6 @@ pub fn insert_add_liquidity_txs_w_router(
             target: deployment_ids.amm_router_deployment,
             inputs: vec![
                 1,
-                2, // 2 tokens in path
                 deployment_ids.owned_token_1_deployment.block,
                 deployment_ids.owned_token_1_deployment.tx,
                 deployment_ids.owned_token_2_deployment.block,
@@ -420,7 +419,6 @@ pub fn insert_remove_liquidity_txs_w_router(
             target: deployment_ids.amm_router_deployment,
             inputs: vec![
                 2,
-                2, // 2 tokens in path
                 deployment_ids.owned_token_1_deployment.block,
                 deployment_ids.owned_token_1_deployment.tx,
                 deployment_ids.owned_token_2_deployment.block,
@@ -433,7 +431,6 @@ pub fn insert_remove_liquidity_txs_w_router(
 fn _insert_swap_txs(
     amount: u128,
     target: AlkaneId,
-    min_out: u128,
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
@@ -443,10 +440,7 @@ fn _insert_swap_txs(
     test_block.txdata.push(
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
-            vec![Cellpack {
-                target: deployment_ids.amm_pool_deployment,
-                inputs: vec![3, min_out],
-            }],
+            vec![cellpack],
             OutPoint {
                 txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
                 vout: 0,
@@ -467,7 +461,6 @@ pub fn insert_swap_txs(
     _insert_swap_txs(
         amount,
         target,
-        min_out,
         test_block,
         deployment_ids,
         input_outpoint,
@@ -489,7 +482,6 @@ pub fn insert_swap_txs_w_router(
     _insert_swap_txs(
         amount,
         target,
-        min_out,
         test_block,
         deployment_ids,
         input_outpoint,

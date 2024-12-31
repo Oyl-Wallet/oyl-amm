@@ -77,15 +77,24 @@ impl AlkaneResponder for AMMRouter {
                     Err(anyhow!("already initialized"))
                 }
             }
-            1..4 => {
-                let num_alkanes_in_path = shift_or_err(&mut inputs)?;
+            1..3 => {
+                // add and remove liquidity
+                let token1 = AlkaneId::new(shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?);
+                let token2 = AlkaneId::new(shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?);
+
+                let pool = self.get_pool_for(&token1, &token2)?;
+                let cellpack = Cellpack {
+                    target: pool,
+                    inputs: vec![opcode],
+                };
+                let response = self.call(&cellpack, &context.incoming_alkanes, self.fuel())?;
+                Ok(response)
+            }
+            3 => {
+                // swap
+                let num_alkanes_in_path: usize = shift_or_err(&mut inputs)? as usize;
                 if num_alkanes_in_path < 2 {
                     return Err(anyhow!("Routing path must be at least two alkanes long"));
-                }
-                if num_alkanes_in_path != 2 {
-                    return Err(anyhow!(
-                        "TODO: routing currently only supports direct routing using on pool."
-                    ));
                 }
                 let mut path: Vec<AlkaneId> = vec![];
                 for _ in 0..num_alkanes_in_path {
@@ -94,18 +103,28 @@ impl AlkaneResponder for AMMRouter {
                         shift_or_err(&mut inputs)?,
                     ));
                 }
-
-                let pool = self.get_pool_for(&path[0], &path[1])?;
-                let mut cellpack = Cellpack {
-                    target: pool,
-                    inputs: vec![opcode],
+                let amount = shift_or_err(&mut inputs)?;
+                let mut this_response = CallResponse {
+                    alkanes: context.incoming_alkanes.clone(),
+                    data: vec![],
                 };
-                if opcode == 3 {
-                    let amount = shift_or_err(&mut inputs)?;
-                    cellpack.inputs.push(amount);
+
+                for i in 1..num_alkanes_in_path {
+                    let pool = self.get_pool_for(&path[i - 1], &path[i])?;
+                    let this_amount = if i == num_alkanes_in_path - 1 {
+                        amount
+                    } else {
+                        0
+                    };
+                    let cellpack = Cellpack {
+                        target: pool,
+                        inputs: vec![opcode, this_amount],
+                    };
+                    this_response = self.call(&cellpack, &this_response.alkanes, self.fuel())?;
+                    println!("This response for pair {}: {:?}", i, this_response);
                 }
-                let response = self.call(&cellpack, &context.incoming_alkanes, self.fuel())?;
-                Ok(response)
+
+                Ok(this_response)
             }
             50 => Ok(CallResponse::forward(&context.incoming_alkanes)),
 

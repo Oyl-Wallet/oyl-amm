@@ -205,6 +205,7 @@ impl AMMPool {
                 value: self.get_amount_out(transfer.value, previous_b.value, previous_a.value)?,
             }
         };
+        println!("DEBUG: amount out: {}", amount_out_predicate);
         if output.value < amount_out_predicate {
             return Err(anyhow!("predicate failed: insufficient output"));
         }
