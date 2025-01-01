@@ -38,7 +38,10 @@ pub struct AmmTestDeploymentIds {
     pub auth_token_1_deployment: AlkaneId,
     pub owned_token_2_deployment: AlkaneId,
     pub auth_token_2_deployment: AlkaneId,
-    pub amm_pool_deployment: AlkaneId,
+    pub owned_token_3_deployment: AlkaneId,
+    pub auth_token_3_deployment: AlkaneId,
+    pub amm_pool_1_deployment: AlkaneId,
+    pub amm_pool_2_deployment: AlkaneId,
     pub amm_router_deployment: AlkaneId,
 }
 
@@ -72,7 +75,12 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
         },
         // token 2 init 1 auth token and mint 1000000 owned tokens
         Cellpack {
-            target: AlkaneId { block: 5, tx: 2 }, // factory creation of owned token using {2, 1} as the factory. Then it deploys to {2,3}
+            target: AlkaneId { block: 5, tx: 2 }, // factory creation of owned token using {2, 2} as the factory. Then it deploys to {2,4}
+            inputs: vec![0, 1, 2000000],
+        },
+        // token 2 init 1 auth token and mint 1000000 owned tokens
+        Cellpack {
+            target: AlkaneId { block: 5, tx: 2 }, // factory creation of owned token using {2, 2} as the factory. Then it deploys to {2,6}
             inputs: vec![0, 1, 1000000],
         },
         // router
@@ -88,6 +96,7 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
             alkanes_std_auth_token_build::get_bytes(),
             factory_build::get_bytes(),
             alkanes_std_owned_token_build::get_bytes(),
+            [].into(),
             [].into(),
             router_build::get_bytes(),
         ]
@@ -108,8 +117,11 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
         auth_token_1_deployment: AlkaneId { block: 2, tx: 3 },
         owned_token_2_deployment: AlkaneId { block: 2, tx: 4 },
         auth_token_2_deployment: AlkaneId { block: 2, tx: 5 },
-        amm_router_deployment: AlkaneId { block: 2, tx: 6 },
-        amm_pool_deployment: AlkaneId { block: 2, tx: 7 },
+        owned_token_3_deployment: AlkaneId { block: 2, tx: 6 },
+        auth_token_3_deployment: AlkaneId { block: 2, tx: 7 },
+        amm_router_deployment: AlkaneId { block: 2, tx: 8 },
+        amm_pool_1_deployment: AlkaneId { block: 2, tx: 9 },
+        amm_pool_2_deployment: AlkaneId { block: 2, tx: 10 },
     };
     return Ok((test_block, deployed_ids));
 }
@@ -145,15 +157,30 @@ pub fn assert_contracts_correct_ids(deployment_ids: &AmmTestDeploymentIds) -> Re
         alkanes_std_auth_token_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.amm_pool_deployment.clone(),
+        deployment_ids.auth_token_3_deployment.clone(),
+        alkanes_std_auth_token_build::get_bytes(),
+    );
+    let _ = assert_binary_deployed_to_id(
+        deployment_ids.auth_token_3_deployment.clone(),
+        alkanes_std_auth_token_build::get_bytes(),
+    );
+    let _ = assert_binary_deployed_to_id(
+        deployment_ids.amm_pool_1_deployment.clone(),
         pool_build::get_bytes(),
+    );
+    let _ = assert_binary_deployed_to_id(
+        deployment_ids.amm_pool_2_deployment.clone(),
+        pool_build::get_bytes(),
+    );
+    let _ = assert_binary_deployed_to_id(
+        deployment_ids.amm_router_deployment.clone(),
+        router_build::get_bytes(),
     );
     Ok(())
 }
 
 pub fn insert_split_tx(
     test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
     protostone_edicts: Vec<ProtostoneEdict>,
 ) {
@@ -194,12 +221,10 @@ pub fn insert_single_edict_split_tx(
     amount: u128,
     target: AlkaneId,
     test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
 ) {
     insert_split_tx(
         test_block,
-        deployment_ids,
         input_outpoint,
         vec![ProtostoneEdict {
             id: target.into(),
@@ -212,22 +237,22 @@ pub fn insert_single_edict_split_tx(
 pub fn insert_two_edict_split_tx(
     amount1: u128,
     amount2: u128,
+    token1_address: AlkaneId,
+    token2_address: AlkaneId,
     test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
 ) {
     insert_split_tx(
         test_block,
-        deployment_ids,
         input_outpoint,
         vec![
             ProtostoneEdict {
-                id: deployment_ids.owned_token_1_deployment.into(),
+                id: token1_address.into(),
                 amount: amount1,
                 output: 0,
             },
             ProtostoneEdict {
-                id: deployment_ids.owned_token_2_deployment.into(),
+                id: token2_address.into(),
                 amount: amount2,
                 output: 0,
             },
@@ -244,11 +269,37 @@ pub fn insert_init_pool_liquidity_txs(
     insert_two_edict_split_tx(
         amount1,
         amount2,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
         test_block,
-        deployment_ids,
         OutPoint {
             txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
             vout: 0,
+        },
+    );
+    test_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_factory_deployment,
+                inputs: vec![1],
+            }],
+            OutPoint {
+                txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+                vout: 0,
+            },
+            false,
+        ),
+    );
+    insert_two_edict_split_tx(
+        amount1,
+        amount2,
+        deployment_ids.owned_token_2_deployment,
+        deployment_ids.owned_token_3_deployment,
+        test_block,
+        OutPoint {
+            txid: test_block.txdata[test_block.txdata.len() - 2].compute_txid(),
+            vout: 1,
         },
     );
     test_block.txdata.push(
@@ -270,12 +321,20 @@ pub fn insert_init_pool_liquidity_txs(
 fn _insert_add_liquidity_txs(
     amount1: u128,
     amount2: u128,
+    token1_address: AlkaneId,
+    token2_address: AlkaneId,
     test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
     cellpack: Cellpack,
 ) {
-    insert_two_edict_split_tx(amount1, amount2, test_block, deployment_ids, input_outpoint);
+    insert_two_edict_split_tx(
+        amount1,
+        amount2,
+        token1_address,
+        token2_address,
+        test_block,
+        input_outpoint,
+    );
     test_block.txdata.push(
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
@@ -292,18 +351,21 @@ fn _insert_add_liquidity_txs(
 pub fn insert_add_liquidity_txs(
     amount1: u128,
     amount2: u128,
+    token1_address: AlkaneId,
+    token2_address: AlkaneId,
+    pool_address: AlkaneId,
     test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
 ) {
     _insert_add_liquidity_txs(
         amount1,
         amount2,
+        token1_address,
+        token2_address,
         test_block,
-        deployment_ids,
         input_outpoint,
         Cellpack {
-            target: deployment_ids.amm_pool_deployment,
+            target: pool_address,
             inputs: vec![1],
         },
     )
@@ -312,6 +374,8 @@ pub fn insert_add_liquidity_txs(
 pub fn insert_add_liquidity_txs_w_router(
     amount1: u128,
     amount2: u128,
+    token1_address: AlkaneId,
+    token2_address: AlkaneId,
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
@@ -319,60 +383,31 @@ pub fn insert_add_liquidity_txs_w_router(
     _insert_add_liquidity_txs(
         amount1,
         amount2,
+        token1_address,
+        token2_address,
         test_block,
-        deployment_ids,
         input_outpoint,
         Cellpack {
             target: deployment_ids.amm_router_deployment,
             inputs: vec![
                 1,
-                deployment_ids.owned_token_1_deployment.block,
-                deployment_ids.owned_token_1_deployment.tx,
-                deployment_ids.owned_token_2_deployment.block,
-                deployment_ids.owned_token_2_deployment.tx,
+                token1_address.block,
+                token1_address.tx,
+                token2_address.block,
+                token2_address.tx,
             ],
         },
     )
 }
 
-pub fn insert_add_liquidity_txs_with_router(
-    amount1: u128,
-    amount2: u128,
-    test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
-    input_outpoint: OutPoint,
-) {
-    insert_two_edict_split_tx(amount1, amount2, test_block, deployment_ids, input_outpoint);
-    test_block.txdata.push(
-        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
-            Witness::new(),
-            vec![Cellpack {
-                target: deployment_ids.amm_pool_deployment,
-                inputs: vec![1],
-            }],
-            OutPoint {
-                txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-                vout: 0,
-            },
-            false,
-        ),
-    );
-}
-
 fn _insert_remove_liquidity_txs(
     amount: u128,
     test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
+    pool_address: AlkaneId,
     input_outpoint: OutPoint,
     cellpack: Cellpack,
 ) {
-    insert_single_edict_split_tx(
-        amount,
-        deployment_ids.amm_pool_deployment,
-        test_block,
-        deployment_ids,
-        input_outpoint,
-    );
+    insert_single_edict_split_tx(amount, pool_address, test_block, input_outpoint);
     test_block.txdata.push(
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
@@ -389,16 +424,16 @@ fn _insert_remove_liquidity_txs(
 pub fn insert_remove_liquidity_txs(
     amount: u128,
     test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
+    pool_address: AlkaneId,
 ) {
     _insert_remove_liquidity_txs(
         amount,
         test_block,
-        deployment_ids,
+        pool_address,
         input_outpoint,
         Cellpack {
-            target: deployment_ids.amm_pool_deployment,
+            target: pool_address,
             inputs: vec![2],
         },
     )
@@ -409,20 +444,23 @@ pub fn insert_remove_liquidity_txs_w_router(
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
+    pool_address: AlkaneId,
+    token1_address: AlkaneId,
+    token2_address: AlkaneId,
 ) {
     _insert_remove_liquidity_txs(
         amount,
         test_block,
-        deployment_ids,
+        pool_address,
         input_outpoint,
         Cellpack {
             target: deployment_ids.amm_router_deployment,
             inputs: vec![
                 2,
-                deployment_ids.owned_token_1_deployment.block,
-                deployment_ids.owned_token_1_deployment.tx,
-                deployment_ids.owned_token_2_deployment.block,
-                deployment_ids.owned_token_2_deployment.tx,
+                token1_address.block,
+                token1_address.tx,
+                token2_address.block,
+                token2_address.tx,
             ],
         },
     )
@@ -430,13 +468,12 @@ pub fn insert_remove_liquidity_txs_w_router(
 
 fn _insert_swap_txs(
     amount: u128,
-    target: AlkaneId,
+    swap_from_token: AlkaneId,
     test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
     cellpack: Cellpack,
 ) {
-    insert_single_edict_split_tx(amount, target, test_block, deployment_ids, input_outpoint);
+    insert_single_edict_split_tx(amount, swap_from_token, test_block, input_outpoint);
     test_block.txdata.push(
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
@@ -452,20 +489,19 @@ fn _insert_swap_txs(
 
 pub fn insert_swap_txs(
     amount: u128,
-    target: AlkaneId,
+    swap_from_token: AlkaneId,
     min_out: u128,
     test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
+    pool_address: AlkaneId,
 ) {
     _insert_swap_txs(
         amount,
-        target,
+        swap_from_token,
         test_block,
-        deployment_ids,
         input_outpoint,
         Cellpack {
-            target: deployment_ids.amm_pool_deployment,
+            target: pool_address,
             inputs: vec![3, min_out],
         },
     )
@@ -473,7 +509,8 @@ pub fn insert_swap_txs(
 
 pub fn insert_swap_txs_w_router(
     amount: u128,
-    target: AlkaneId,
+    swap_from_token: AlkaneId,
+    swap_to_token: AlkaneId,
     min_out: u128,
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
@@ -481,19 +518,18 @@ pub fn insert_swap_txs_w_router(
 ) {
     _insert_swap_txs(
         amount,
-        target,
+        swap_from_token,
         test_block,
-        deployment_ids,
         input_outpoint,
         Cellpack {
             target: deployment_ids.amm_router_deployment,
             inputs: vec![
                 3,
                 2, // 2 tokens in path
-                deployment_ids.owned_token_1_deployment.block,
-                deployment_ids.owned_token_1_deployment.tx,
-                deployment_ids.owned_token_2_deployment.block,
-                deployment_ids.owned_token_2_deployment.tx,
+                swap_from_token.block,
+                swap_from_token.tx,
+                swap_to_token.block,
+                swap_to_token.tx,
                 min_out,
             ],
         },
@@ -560,6 +596,11 @@ pub fn get_last_outpoint_sheet(test_block: &Block) -> Result<BalanceSheet> {
     get_sheet_for_outpoint(test_block, len - 1, 0)
 }
 
+pub fn get_sheet_with_pool_1_init(test_block: &Block) -> Result<BalanceSheet> {
+    let len = test_block.txdata.len();
+    get_sheet_for_outpoint(test_block, len - 3, 0)
+}
+
 pub fn get_sheet_with_remaining_lp_after_burn(test_block: &Block) -> Result<BalanceSheet> {
     let len = test_block.txdata.len();
     get_sheet_for_outpoint(test_block, len - 2, 1)
@@ -569,7 +610,23 @@ pub fn get_trace_after_burn(test_block: &Block) -> Result<Vec<u8>> {
     get_trace_for_outpoint(test_block, len - 2, 3)
 }
 
-pub fn check_init_liquidity_lp_balance(
+pub fn check_init_liquidity_lp_1_balance(
+    amount1: u128,
+    amount2: u128,
+    test_block: &Block,
+    deployment_ids: &AmmTestDeploymentIds,
+) -> Result<()> {
+    let sheet = get_sheet_with_pool_1_init(test_block)?;
+    let expected_amount = calc_lp_balance_from_pool_init(amount1, amount2);
+    println!("expected amt from init {:?}", expected_amount);
+    assert_eq!(
+        sheet.get(&deployment_ids.amm_pool_1_deployment.into()),
+        expected_amount
+    );
+    Ok(())
+}
+
+pub fn check_init_liquidity_lp_2_balance(
     amount1: u128,
     amount2: u128,
     test_block: &Block,
@@ -579,7 +636,7 @@ pub fn check_init_liquidity_lp_balance(
     let expected_amount = calc_lp_balance_from_pool_init(amount1, amount2);
     println!("expected amt from init {:?}", expected_amount);
     assert_eq!(
-        sheet.get(&deployment_ids.amm_pool_deployment.into()),
+        sheet.get(&deployment_ids.amm_pool_2_deployment.into()),
         expected_amount
     );
     Ok(())
@@ -592,7 +649,7 @@ pub fn check_add_liquidity_lp_balance(
     added_amount2: u128,
     total_supply: u128,
     test_block: &Block,
-    deployment_ids: &AmmTestDeploymentIds,
+    pool_address: AlkaneId,
 ) -> Result<()> {
     let sheet = get_last_outpoint_sheet(test_block)?;
     let expected_amount = calc_lp_balance_from_add_liquidity(
@@ -603,10 +660,7 @@ pub fn check_add_liquidity_lp_balance(
         total_supply,
     );
     println!("expected amt from adding liquidity {:?}", expected_amount);
-    assert_eq!(
-        sheet.get(&deployment_ids.amm_pool_deployment.into()),
-        expected_amount
-    );
+    assert_eq!(sheet.get(&pool_address.into()), expected_amount);
     Ok(())
 }
 
@@ -633,7 +687,8 @@ pub fn test_amm_pool_init_fixture(
     insert_init_pool_liquidity_txs(amount1, amount2, &mut test_block, &deployment_ids);
     index_block(&test_block, block_height)?;
     assert_contracts_correct_ids(&deployment_ids)?;
-    check_init_liquidity_lp_balance(amount1, amount2, &test_block, &deployment_ids)?;
+    check_init_liquidity_lp_1_balance(amount1, amount2, &test_block, &deployment_ids)?;
+    check_init_liquidity_lp_2_balance(amount1, amount2, &test_block, &deployment_ids)?;
     Ok((test_block, deployment_ids))
 }
 
@@ -646,7 +701,7 @@ pub fn test_amm_burn_fixture(amount_burn: u128, use_router: bool) -> Result<()> 
     let block_height = 840_001;
     let mut test_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        txid: init_block.txdata[init_block.txdata.len() - 3].compute_txid(),
         vout: 0,
     };
     if use_router {
@@ -655,25 +710,25 @@ pub fn test_amm_burn_fixture(amount_burn: u128, use_router: bool) -> Result<()> 
             &mut test_block,
             &deployment_ids,
             input_outpoint,
+            deployment_ids.amm_pool_1_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
         );
     } else {
         insert_remove_liquidity_txs(
             amount_burn,
             &mut test_block,
-            &deployment_ids,
             input_outpoint,
+            deployment_ids.amm_pool_1_deployment,
         );
     }
 
     index_block(&test_block, block_height)?;
 
-    println!("get sheet");
     let sheet = get_sheet_with_remaining_lp_after_burn(&test_block)?;
-    println!("sheet: {:?}", sheet);
-    // get_trace_after_burn(&test_block)?;
     let amount_burned_true = std::cmp::min(amount_burn, total_lp);
     assert_eq!(
-        sheet.get(&deployment_ids.amm_pool_deployment.into()),
+        sheet.get(&deployment_ids.amm_pool_1_deployment.into()),
         total_lp - amount_burned_true
     );
 

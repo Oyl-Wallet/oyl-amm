@@ -64,9 +64,8 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
     insert_single_edict_split_tx(
         // should fail since init pool requires two alkanes, this only creates a tx with one
         1000000,
-        deployment_ids.amm_pool_deployment,
+        deployment_ids.amm_pool_1_deployment.clone(),
         &mut test_block,
-        &deployment_ids,
         input_outpoint,
     );
     test_block.txdata.push(
@@ -108,9 +107,9 @@ fn test_amm_pool_bad_init() -> Result<()> {
     let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
     insert_init_pool_liquidity_txs(10000, 1, &mut test_block, &deployment_ids);
     index_block(&test_block, block_height)?;
-    assert_token_id_has_no_deployment(deployment_ids.amm_pool_deployment);
+    assert_token_id_has_no_deployment(deployment_ids.amm_pool_1_deployment);
     let sheet = get_last_outpoint_sheet(&test_block)?;
-    assert_eq!(sheet.get(&deployment_ids.amm_pool_deployment.into()), 0);
+    assert_eq!(sheet.get(&deployment_ids.amm_pool_1_deployment.into()), 0);
     Ok(())
 }
 
@@ -163,8 +162,10 @@ fn test_amm_pool_add_more_liquidity() -> Result<()> {
     insert_add_liquidity_txs(
         amount1,
         amount2,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
+        deployment_ids.amm_pool_1_deployment,
         &mut add_liquidity_block,
-        &deployment_ids,
         input_outpoint,
     );
     index_block(&add_liquidity_block, block_height)?;
@@ -176,7 +177,43 @@ fn test_amm_pool_add_more_liquidity() -> Result<()> {
         amount2,
         total_supply,
         &add_liquidity_block,
-        &deployment_ids,
+        deployment_ids.amm_pool_1_deployment,
+    )?;
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_pool_add_more_liquidity_to_wrong_pool() -> Result<()> {
+    clear();
+    let (amount1, amount2) = (500000, 500000);
+    let total_supply = (amount1 * amount2).sqrt();
+    let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let block_height = 840_001;
+    let mut add_liquidity_block = create_block_with_coinbase_tx(block_height);
+    // split init tx puts 1000000 / 2 in vout 0, and the other is unspent at vout 1. The split tx is now 2 from the tail
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 2].compute_txid(),
+        vout: 1,
+    };
+    insert_add_liquidity_txs(
+        amount1,
+        amount2,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
+        deployment_ids.amm_pool_2_deployment,
+        &mut add_liquidity_block,
+        input_outpoint,
+    );
+    index_block(&add_liquidity_block, block_height)?;
+
+    check_add_liquidity_lp_balance(
+        amount1,
+        amount2,
+        0,
+        0,
+        total_supply,
+        &add_liquidity_block,
+        deployment_ids.amm_pool_2_deployment,
     )?;
     Ok(())
 }
@@ -197,6 +234,8 @@ fn test_amm_pool_add_more_liquidity_w_router() -> Result<()> {
     insert_add_liquidity_txs_w_router(
         amount1,
         amount2,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
         &mut add_liquidity_block,
         &deployment_ids,
         input_outpoint,
@@ -210,7 +249,7 @@ fn test_amm_pool_add_more_liquidity_w_router() -> Result<()> {
         amount2,
         total_supply,
         &add_liquidity_block,
-        &deployment_ids,
+        deployment_ids.amm_pool_1_deployment,
     )?;
     Ok(())
 }
@@ -233,8 +272,8 @@ fn test_amm_pool_swap() -> Result<()> {
         deployment_ids.owned_token_1_deployment,
         0,
         &mut swap_block,
-        &deployment_ids,
         input_outpoint,
+        deployment_ids.amm_pool_1_deployment,
     );
     index_block(&swap_block, block_height)?;
 
@@ -264,6 +303,7 @@ fn test_amm_pool_swap_w_router() -> Result<()> {
     insert_swap_txs_w_router(
         amount_to_swap,
         deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
         0,
         &mut swap_block,
         &deployment_ids,
@@ -299,8 +339,8 @@ fn test_amm_pool_swap_large() -> Result<()> {
         deployment_ids.owned_token_1_deployment,
         0,
         &mut swap_block,
-        &deployment_ids,
         input_outpoint,
+        deployment_ids.amm_pool_1_deployment,
     );
     index_block(&swap_block, block_height)?;
 
