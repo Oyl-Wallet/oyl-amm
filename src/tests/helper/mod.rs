@@ -263,44 +263,19 @@ pub fn insert_two_edict_split_tx(
 pub fn insert_init_pool_liquidity_txs(
     amount1: u128,
     amount2: u128,
+    token1_address: AlkaneId,
+    token2_address: AlkaneId,
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
+    input_outpoint_for_split: OutPoint,
 ) {
     insert_two_edict_split_tx(
         amount1,
         amount2,
-        deployment_ids.owned_token_1_deployment,
-        deployment_ids.owned_token_2_deployment,
+        token1_address,
+        token2_address,
         test_block,
-        OutPoint {
-            txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-            vout: 0,
-        },
-    );
-    test_block.txdata.push(
-        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
-            Witness::new(),
-            vec![Cellpack {
-                target: deployment_ids.amm_factory_deployment,
-                inputs: vec![1],
-            }],
-            OutPoint {
-                txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-                vout: 0,
-            },
-            false,
-        ),
-    );
-    insert_two_edict_split_tx(
-        amount1,
-        amount2,
-        deployment_ids.owned_token_2_deployment,
-        deployment_ids.owned_token_3_deployment,
-        test_block,
-        OutPoint {
-            txid: test_block.txdata[test_block.txdata.len() - 2].compute_txid(),
-            vout: 1,
-        },
+        input_outpoint_for_split,
     );
     test_block.txdata.push(
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
@@ -685,7 +660,32 @@ pub fn test_amm_pool_init_fixture(
 ) -> Result<(Block, AmmTestDeploymentIds)> {
     let block_height = 840_000;
     let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
-    insert_init_pool_liquidity_txs(amount1, amount2, &mut test_block, &deployment_ids);
+    let input_output_pool1 = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    insert_init_pool_liquidity_txs(
+        amount1,
+        amount2,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
+        &mut test_block,
+        &deployment_ids,
+        input_output_pool1,
+    );
+    let input_output_pool2 = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 2].compute_txid(),
+        vout: 1,
+    };
+    insert_init_pool_liquidity_txs(
+        amount1,
+        amount2,
+        deployment_ids.owned_token_2_deployment,
+        deployment_ids.owned_token_3_deployment,
+        &mut test_block,
+        &deployment_ids,
+        input_output_pool2,
+    );
     index_block(&test_block, block_height)?;
     assert_contracts_correct_ids(&deployment_ids)?;
     check_init_liquidity_lp_1_balance(amount1, amount2, &test_block, &deployment_ids)?;

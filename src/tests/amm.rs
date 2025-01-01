@@ -105,7 +105,19 @@ fn test_amm_pool_bad_init() -> Result<()> {
     clear();
     let block_height = 840_000;
     let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
-    insert_init_pool_liquidity_txs(10000, 1, &mut test_block, &deployment_ids);
+    let input_output = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    insert_init_pool_liquidity_txs(
+        10000,
+        1,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
+        &mut test_block,
+        &deployment_ids,
+        input_output,
+    );
     index_block(&test_block, block_height)?;
     assert_token_id_has_no_deployment(deployment_ids.amm_pool_1_deployment);
     let sheet = get_last_outpoint_sheet(&test_block)?;
