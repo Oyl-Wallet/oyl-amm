@@ -509,31 +509,25 @@ pub fn insert_swap_txs(
 
 pub fn insert_swap_txs_w_router(
     amount: u128,
-    swap_from_token: AlkaneId,
-    swap_to_token: AlkaneId,
+    swap_path: Vec<AlkaneId>,
     min_out: u128,
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
 ) {
-    _insert_swap_txs(
-        amount,
-        swap_from_token,
-        test_block,
-        input_outpoint,
-        Cellpack {
-            target: deployment_ids.amm_router_deployment,
-            inputs: vec![
-                3,
-                2, // 2 tokens in path
-                swap_from_token.block,
-                swap_from_token.tx,
-                swap_to_token.block,
-                swap_to_token.tx,
-                min_out,
-            ],
-        },
-    )
+    if swap_path.len() < 2 {
+        panic!("Swap path must be at least two alkanes long");
+    }
+    let mut cellpack = Cellpack {
+        target: deployment_ids.amm_router_deployment,
+        inputs: vec![3, swap_path.len() as u128],
+    };
+    cellpack
+        .inputs
+        .extend(swap_path.iter().flat_map(|s| vec![s.block, s.tx]));
+    cellpack.inputs.push(min_out);
+
+    _insert_swap_txs(amount, swap_path[0], test_block, input_outpoint, cellpack)
 }
 
 pub fn calc_lp_balance_from_pool_init(amount1: u128, amount2: u128) -> u128 {
@@ -665,16 +659,23 @@ pub fn check_add_liquidity_lp_balance(
 }
 
 pub fn check_swap_lp_balance(
-    prev_reserve_from: u128,
-    prev_reserve_to: u128,
+    prev_reserve_amount_in_path: Vec<u128>,
     swap_amount: u128,
     swap_target_token: AlkaneId,
     test_block: &Block,
 ) -> Result<()> {
     let sheet = get_last_outpoint_sheet(test_block)?;
-    let expected_amount = calc_swapped_balance(swap_amount, prev_reserve_from, prev_reserve_to)?;
-    println!("expected amt from swapping {:?}", expected_amount);
-    assert_eq!(sheet.get(&swap_target_token.into()), expected_amount);
+    let mut current_swapped_amount = swap_amount;
+    for i in 1..prev_reserve_amount_in_path.len() {
+        current_swapped_amount = calc_swapped_balance(
+            current_swapped_amount,
+            prev_reserve_amount_in_path[i - 1],
+            prev_reserve_amount_in_path[i],
+        )?;
+    }
+
+    println!("expected amt from swapping {:?}", current_swapped_amount);
+    assert_eq!(sheet.get(&swap_target_token.into()), current_swapped_amount);
     Ok(())
 }
 
