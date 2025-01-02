@@ -1,4 +1,4 @@
-use alkanes_runtime::{runtime::AlkaneResponder, storage::StoragePointer};
+use alkanes_runtime::{declare_alkane, runtime::AlkaneResponder, storage::StoragePointer};
 
 #[allow(unused_imports)]
 use alkanes_runtime::{
@@ -15,7 +15,7 @@ use alkanes_support::{
 };
 use anyhow::{anyhow, Result};
 use metashrew_support::{
-    compat::{to_arraybuffer_layout, to_ptr},
+    compat::{to_arraybuffer_layout, to_passback_ptr},
     index_pointer::KeyValuePointer,
     utils::consume_u128,
 };
@@ -133,8 +133,4 @@ impl AlkaneResponder for AMMRouter {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn __execute() -> i32 {
-    let mut response = to_arraybuffer_layout(&AMMRouter::default().run());
-    to_ptr(&mut response) + 4
-}
+declare_alkane! {AMMRouter}

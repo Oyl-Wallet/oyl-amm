@@ -1,9 +1,9 @@
+use alkanes_runtime::{declare_alkane, runtime::AlkaneResponder, storage::StoragePointer};
 #[allow(unused_imports)]
 use alkanes_runtime::{
     println,
     stdio::{stdout, Write},
 };
-use alkanes_runtime::{runtime::AlkaneResponder, storage::StoragePointer};
 use alkanes_support::{
     cellpack::Cellpack,
     constants::AMM_FACTORY_ID,
@@ -15,7 +15,7 @@ use alkanes_support::{
 };
 use anyhow::{anyhow, Result};
 use metashrew_support::{
-    compat::{to_arraybuffer_layout, to_ptr},
+    compat::{to_arraybuffer_layout, to_passback_ptr},
     index_pointer::KeyValuePointer,
     utils::consume_sized_int,
 };
@@ -140,9 +140,4 @@ impl AlkaneResponder for AMMFactory {
         }
     }
 }
-
-#[no_mangle]
-pub extern "C" fn __execute() -> i32 {
-    let mut response = to_arraybuffer_layout(&AMMFactory::default().run());
-    to_ptr(&mut response) + 4
-}
+declare_alkane! {AMMFactory}
