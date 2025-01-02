@@ -26,11 +26,8 @@ pub const MINIMUM_LIQUIDITY: u128 = 1000;
 
 type U256 = Uint<256, 4>;
 
-#[derive(Default)]
-struct AMMPool(());
-
-impl AMMPool {
-    pub fn alkanes_for_self(&self) -> Result<(AlkaneId, AlkaneId)> {
+pub trait AMMPoolBase: AlkaneResponder {
+    fn alkanes_for_self(&self) -> Result<(AlkaneId, AlkaneId)> {
         Ok((
             StoragePointer::from_keyword("/alkane/0")
                 .get()
@@ -44,7 +41,7 @@ impl AMMPool {
                 .try_into()?,
         ))
     }
-    pub fn check_inputs(
+    fn check_inputs(
         &self,
         myself: &AlkaneId,
         parcel: &AlkaneTransferParcel,
@@ -69,13 +66,13 @@ impl AMMPool {
             }
         }
     }
-    pub fn total_supply(&self) -> u128 {
+    fn total_supply(&self) -> u128 {
         StoragePointer::from_keyword("/totalsupply").get_value::<u128>()
     }
-    pub fn set_total_supply(&self, v: u128) {
+    fn set_total_supply(&self, v: u128) {
         StoragePointer::from_keyword("/totalsupply").set_value::<u128>(v);
     }
-    pub fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
+    fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
         let (a, b) = self.alkanes_for_self().unwrap();
         let context = self.context().unwrap();
         (
@@ -89,10 +86,7 @@ impl AMMPool {
             },
         )
     }
-    pub fn previous_reserves(
-        &self,
-        parcel: &AlkaneTransferParcel,
-    ) -> (AlkaneTransfer, AlkaneTransfer) {
+    fn previous_reserves(&self, parcel: &AlkaneTransferParcel) -> (AlkaneTransfer, AlkaneTransfer) {
         let (reserve_a, reserve_b) = self.reserves();
         let mut reserve_sheet: BalanceSheet =
             AlkaneTransferParcel(vec![reserve_a.clone(), reserve_b.clone()]).into();
@@ -109,7 +103,7 @@ impl AMMPool {
             },
         )
     }
-    pub fn mint(&self, myself: AlkaneId, parcel: AlkaneTransferParcel) -> Result<CallResponse> {
+    fn mint(&self, myself: AlkaneId, parcel: AlkaneTransferParcel) -> Result<CallResponse> {
         self.check_inputs(&myself, &parcel, 2)?;
         let mut total_supply = self.total_supply();
         let (reserve_a, reserve_b) = self.reserves();
@@ -141,7 +135,7 @@ impl AMMPool {
             Err(anyhow!("root k is less than previous root k"))
         }
     }
-    pub fn burn(&self, myself: AlkaneId, parcel: AlkaneTransferParcel) -> Result<CallResponse> {
+    fn burn(&self, myself: AlkaneId, parcel: AlkaneTransferParcel) -> Result<CallResponse> {
         self.check_inputs(&myself, &parcel, 1)?;
         let incoming = parcel.0[0].clone();
         if incoming.id != myself {
@@ -169,18 +163,13 @@ impl AMMPool {
         ]);
         Ok(response)
     }
-    pub fn get_amount_out(
-        &self,
-        amount: u128,
-        reserve_from: u128,
-        reserve_to: u128,
-    ) -> Result<u128> {
+    fn get_amount_out(&self, amount: u128, reserve_from: u128, reserve_to: u128) -> Result<u128> {
         let amount_in_with_fee = U256::from(997) * U256::from(amount);
         let numerator = amount_in_with_fee * U256::from(reserve_to);
         let denominator = U256::from(1000) * U256::from(reserve_from) + amount_in_with_fee;
         Ok((numerator / denominator).try_into()?)
     }
-    pub fn swap(
+    fn swap(
         &self,
         parcel: AlkaneTransferParcel,
         amount_out_predicate: u128,
@@ -213,19 +202,24 @@ impl AMMPool {
         response.alkanes = AlkaneTransferParcel(vec![output]);
         Ok(response)
     }
-    pub fn pull_ids(&self, v: &mut Vec<u128>) -> Option<(AlkaneId, AlkaneId)> {
+    fn pull_ids(&self, v: &mut Vec<u128>) -> Option<(AlkaneId, AlkaneId)> {
         let a_block = shift(v)?;
         let a_tx = shift(v)?;
         let b_block = shift(v)?;
         let b_tx = shift(v)?;
         Some((AlkaneId::new(a_block, a_tx), AlkaneId::new(b_block, b_tx)))
     }
-    pub fn pull_ids_or_err(&self, v: &mut Vec<u128>) -> Result<(AlkaneId, AlkaneId)> {
+    fn pull_ids_or_err(&self, v: &mut Vec<u128>) -> Result<(AlkaneId, AlkaneId)> {
         self.pull_ids(v)
             .ok_or("")
             .map_err(|_| anyhow!("AlkaneId values for pair missing from list"))
     }
 }
+
+#[derive(Default)]
+struct AMMPool(());
+
+impl AMMPoolBase for AMMPool {}
 
 impl AlkaneResponder for AMMPool {
     fn execute(&self) -> Result<CallResponse> {
