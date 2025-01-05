@@ -9,7 +9,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 alkanes-support = { git = "https:/github.com/kungfuflex/alkanes-rs" }
 alkanes-runtime = { git = "https://github.com/kungfuflex/alkanes-rs" }
-alkanes-pool = { path = "../pool" }
+alkanes-runtime-pool = { path = "../alkanes-runtime-pool" }
 metashrew-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
 protorune-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
 anyhow = "1.0.91"
