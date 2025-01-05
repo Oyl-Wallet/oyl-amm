@@ -217,7 +217,7 @@ pub trait AMMPoolBase: AlkaneResponder {
 }
 
 #[derive(Default)]
-struct AMMPool(());
+pub struct AMMPool(());
 
 impl AMMPoolBase for AMMPool {}
 

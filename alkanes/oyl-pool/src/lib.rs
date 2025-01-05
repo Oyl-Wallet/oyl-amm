@@ -1,31 +1,16 @@
-use alkanes_runtime::{declare_alkane, runtime::AlkaneResponder, storage::StoragePointer};
+use alkanes_runtime::{declare_alkane, runtime::AlkaneResponder};
 
+use alkanes_pool::{AMMPool, AMMPoolBase};
 #[allow(unused_imports)]
 use alkanes_runtime::{
     println,
     stdio::{stdout, Write},
 };
-use alkanes_support::{
-    id::AlkaneId,
-    parcel::{AlkaneTransfer, AlkaneTransferParcel},
-    response::CallResponse,
-    utils::{overflow_error, shift, shift_or_err},
-};
-use anyhow::{anyhow, Result};
-use metashrew_support::{
-    compat::{to_arraybuffer_layout, to_passback_ptr},
-    index_pointer::KeyValuePointer,
-};
-use num::integer::Roots;
-use protorune_support::balance_sheet::BalanceSheet;
-use ruint::Uint;
-use std::sync::Arc;
+use alkanes_support::response::CallResponse;
+use anyhow::Result;
+use metashrew_support::compat::{to_arraybuffer_layout, to_passback_ptr};
 
-// per uniswap docs, the first 1e3 wei of lp token minted are burned to mitigate attacks where the value of a lp token is raised too high easily
-pub const MINIMUM_LIQUIDITY: u128 = 1000;
-
-type U256 = Uint<256, 4>;
-
+#[derive(Default)]
 struct OylAMMPool {
     inner: AMMPool,
 }

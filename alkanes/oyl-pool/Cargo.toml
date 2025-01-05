@@ -9,10 +9,9 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 alkanes-support = { git = "https:/github.com/kungfuflex/alkanes-rs" }
 alkanes-runtime = { git = "https://github.com/kungfuflex/alkanes-rs" }
-alkanes-pool = { git = "https://github.com/sandshrewmetaprotocols/swap.oyl.io" }
+alkanes-pool = { path = "../pool" }
 metashrew-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
 protorune-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
-alkanes-support = { git = "https:/github.com/kungfuflex/alkanes-rs" }
 anyhow = "1.0.91"
 bitcoin = { version = "0.32.4", features = ["rand"] }
 num = "0.4.3"
