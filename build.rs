@@ -108,19 +108,8 @@ fn main() {
                     .join("release")
                     .join(subbed.clone() + ".wasm"),
             )?;
-
-            eprintln!(
-                "read wasm release: {:?}",
-                Path::new(&wasm_str)
-                    .join("wasm32-unknown-unknown")
-                    .join("release")
-                    .join(subbed.clone() + ".wasm")
-            );
             let compressed: Vec<u8> = compress(f.clone())?;
             fs::write(&Path::new(&wasm_str).join("wasm32-unknown-unknown").join("release").join(subbed.clone() + ".wasm.gz"), &compressed)?;
-            eprintln!(
-                "wrote compressed"
-            );
             let data: String = hex::encode(&f);
             fs::write(
                 &write_dir.join("std").join(subbed.clone() + "_build.rs"),
