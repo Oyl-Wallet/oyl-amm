@@ -1,17 +1,13 @@
-use crate::tests::std::{factory_build, pool_build, router_build};
+use crate::tests::std::{factory_build, oyl_pool_build, pool_build, router_build};
 use alkanes::indexer::index_block;
-use alkanes::message::AlkaneMessageContext;
 use alkanes::precompiled::{alkanes_std_auth_token_build, alkanes_std_owned_token_build};
 use alkanes::tests::helpers::{self as alkane_helpers, assert_binary_deployed_to_id};
-use alkanes::view;
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::constants::{AMM_FACTORY_ID, AUTH_TOKEN_FACTORY_ID};
 use alkanes_support::id::AlkaneId;
-use alkanes_support::trace::Trace;
 use anyhow::Result;
-use bitcoin::address::NetworkChecked;
 use bitcoin::blockdata::transaction::OutPoint;
-use bitcoin::{Address, Amount, Block, Witness};
+use bitcoin::{Block, Witness};
 #[allow(unused_imports)]
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use num::integer::Roots;
@@ -19,13 +15,27 @@ use std::fmt::Write;
 
 use super::common::*;
 
-pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
+pub const OYL_AMM_POOL_FACTORY_ID: u128 = 0xf041;
+
+pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeploymentIds)> {
+    let pool_id = if use_oyl {
+        OYL_AMM_POOL_FACTORY_ID
+    } else {
+        AMM_FACTORY_ID
+    };
     let cellpacks: Vec<Cellpack> = [
         //amm pool init (in factory space so new pools can copy this code)
         Cellpack {
             target: AlkaneId {
                 block: 3,
                 tx: AMM_FACTORY_ID,
+            },
+            inputs: vec![50],
+        },
+        Cellpack {
+            target: AlkaneId {
+                block: 3,
+                tx: OYL_AMM_POOL_FACTORY_ID,
             },
             inputs: vec![50],
         },
@@ -40,7 +50,7 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
         //amm factory
         Cellpack {
             target: AlkaneId { block: 1, tx: 0 },
-            inputs: vec![0],
+            inputs: vec![0, pool_id],
         },
         // token 1 init 1 auth token and mint 1000000 owned tokens
         Cellpack {
@@ -67,6 +77,7 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
     let test_block = alkane_helpers::init_with_multiple_cellpacks_with_tx(
         [
             pool_build::get_bytes(),
+            oyl_pool_build::get_bytes(),
             alkanes_std_auth_token_build::get_bytes(),
             factory_build::get_bytes(),
             alkanes_std_owned_token_build::get_bytes(),
@@ -81,6 +92,10 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
         amm_pool_factory: AlkaneId {
             block: 4,
             tx: AMM_FACTORY_ID,
+        },
+        oyl_amm_pool_factory: AlkaneId {
+            block: 4,
+            tx: OYL_AMM_POOL_FACTORY_ID,
         },
         auth_token_factory: AlkaneId {
             block: 4,
@@ -104,6 +119,10 @@ pub fn assert_contracts_correct_ids(deployment_ids: &AmmTestDeploymentIds) -> Re
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_pool_factory.clone(),
         pool_build::get_bytes(),
+    );
+    let _ = assert_binary_deployed_to_id(
+        deployment_ids.oyl_amm_pool_factory.clone(),
+        oyl_pool_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
         deployment_ids.auth_token_factory.clone(),
@@ -228,9 +247,10 @@ pub fn check_init_liquidity_lp_2_balance(
 pub fn test_amm_pool_init_fixture(
     amount1: u128,
     amount2: u128,
+    use_oyl: bool,
 ) -> Result<(Block, AmmTestDeploymentIds)> {
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
+    let (mut test_block, deployment_ids) = init_block_with_amm_pool(use_oyl)?;
     let input_output_pool1 = OutPoint {
         txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
         vout: 0,

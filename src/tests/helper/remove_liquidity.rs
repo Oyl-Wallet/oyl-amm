@@ -82,11 +82,11 @@ pub fn insert_remove_liquidity_txs_w_router(
     )
 }
 
-pub fn test_amm_burn_fixture(amount_burn: u128, use_router: bool) -> Result<()> {
+pub fn test_amm_burn_fixture(amount_burn: u128, use_router: bool, use_oyl: bool) -> Result<()> {
     let (amount1, amount2) = (1000000, 1000000);
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
     let total_supply = (amount1 * amount2).sqrt();
-    let (mut init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (mut init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, use_oyl)?;
 
     let block_height = 840_001;
     let mut test_block = create_block_with_coinbase_tx(block_height);

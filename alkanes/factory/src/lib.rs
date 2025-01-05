@@ -15,9 +15,10 @@ use alkanes_support::{
 };
 use anyhow::{anyhow, Result};
 use metashrew_support::{
+    byte_view::ByteView,
     compat::{to_arraybuffer_layout, to_passback_ptr},
     index_pointer::KeyValuePointer,
-    utils::consume_sized_int,
+    utils::{consume_sized_int, consume_u128},
 };
 use std::sync::Arc;
 
@@ -48,6 +49,15 @@ pub fn join_ids_from_tuple(v: (AlkaneId, AlkaneId)) -> Vec<u8> {
 }
 
 impl AMMFactory {
+    pub fn pool_id(&self) -> Result<u128> {
+        let ptr = StoragePointer::from_keyword("/pool_factory_id")
+            .get()
+            .as_ref()
+            .clone();
+        let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
+        Ok(consume_u128(&mut cursor)?)
+    }
+
     pub fn pool_pointer(&self, a: &AlkaneId, b: &AlkaneId) -> StoragePointer {
         StoragePointer::from_keyword("/pools/")
             .select(&a.clone().into())
@@ -86,8 +96,12 @@ impl AlkaneResponder for AMMFactory {
         match shift_or_err(&mut inputs)? {
             0 => {
                 let mut pointer = StoragePointer::from_keyword("/initialized");
+                let mut pool_factory_id_pointer = StoragePointer::from_keyword("/pool_factory_id");
                 if pointer.get().len() == 0 {
                     pointer.set(Arc::new(vec![0x01]));
+                    // set the address for the implementation for AMM pool
+                    let pool_factory_id = shift_or_err(&mut inputs)?;
+                    pool_factory_id_pointer.set(Arc::new(pool_factory_id.to_bytes()));
                     Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
                 } else {
                     Err(anyhow!("already initialized"))
@@ -95,28 +109,28 @@ impl AlkaneResponder for AMMFactory {
             }
             1 => {
                 if context.incoming_alkanes.0.len() != 2 {
-                    Err(anyhow!("must send two runes to initialize a pool"))
-                } else {
-                    let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
-                    let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
-                    let next_sequence = self.sequence();
-                    self.pool_pointer(&a, &b)
-                        .set(Arc::new(AlkaneId::new(2, next_sequence).into()));
-                    self.call(
-                        &Cellpack {
-                            target: AlkaneId {
-                                block: 6,
-                                tx: AMM_FACTORY_ID,
-                            },
-                            inputs: vec![0, a.block, a.tx, b.block, b.tx],
-                        },
-                        &AlkaneTransferParcel(vec![
-                            context.incoming_alkanes.0[0].clone(),
-                            context.incoming_alkanes.0[1].clone(),
-                        ]),
-                        self.fuel(),
-                    )
+                    return Err(anyhow!("must send two runes to initialize a pool"));
                 }
+                // check that
+                let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
+                let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
+                let next_sequence = self.sequence();
+                self.pool_pointer(&a, &b)
+                    .set(Arc::new(AlkaneId::new(2, next_sequence).into()));
+                self.call(
+                    &Cellpack {
+                        target: AlkaneId {
+                            block: 6,
+                            tx: self.pool_id()?,
+                        },
+                        inputs: vec![0, a.block, a.tx, b.block, b.tx],
+                    },
+                    &AlkaneTransferParcel(vec![
+                        context.incoming_alkanes.0[0].clone(),
+                        context.incoming_alkanes.0[1].clone(),
+                    ]),
+                    self.fuel(),
+                )
             }
             2 => {
                 let mut response = CallResponse::default();
@@ -136,6 +150,7 @@ impl AlkaneResponder for AMMFactory {
                 response.data = id.into();
                 Ok(response)
             }
+            // TODO: add a function to change the implementation of the AMM pool for upgradeability. Need to check that the caller is the owner of this contract
             _ => Err(anyhow!("unrecognized opcode")),
         }
     }
