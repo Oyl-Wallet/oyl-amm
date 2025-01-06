@@ -115,7 +115,15 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
     return Ok((test_block, deployed_ids));
 }
 
-pub fn assert_contracts_correct_ids(deployment_ids: &AmmTestDeploymentIds) -> Result<()> {
+pub fn assert_contracts_correct_ids(
+    deployment_ids: &AmmTestDeploymentIds,
+    use_oyl: bool,
+) -> Result<()> {
+    let pool_binary = if use_oyl {
+        oyl_pool_build::get_bytes()
+    } else {
+        pool_build::get_bytes()
+    };
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_pool_factory.clone(),
         pool_build::get_bytes(),
@@ -159,11 +167,11 @@ pub fn assert_contracts_correct_ids(deployment_ids: &AmmTestDeploymentIds) -> Re
     );
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_pool_1_deployment.clone(),
-        pool_build::get_bytes(),
+        pool_binary.clone(),
     );
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_pool_2_deployment.clone(),
-        pool_build::get_bytes(),
+        pool_binary.clone(),
     );
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_router_deployment.clone(),
@@ -278,7 +286,7 @@ pub fn test_amm_pool_init_fixture(
         input_output_pool2,
     );
     index_block(&test_block, block_height)?;
-    assert_contracts_correct_ids(&deployment_ids)?;
+    assert_contracts_correct_ids(&deployment_ids, use_oyl)?;
     check_init_liquidity_lp_1_balance(amount1, amount2, &test_block, &deployment_ids)?;
     check_init_liquidity_lp_2_balance(amount1, amount2, &test_block, &deployment_ids)?;
     Ok((test_block, deployment_ids))
