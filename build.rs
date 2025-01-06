@@ -41,6 +41,7 @@ fn build_alkane(wasm_str: &str, features: Vec<&'static str>) -> Result<()> {
 }
 
 fn main() {
+    println!("cargo:rerun-if-changed=alkanes/");
     let env_var = env::var_os("OUT_DIR").unwrap();
     let base_dir = Path::new(&env_var)
         .parent()
