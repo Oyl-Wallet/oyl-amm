@@ -23,7 +23,7 @@ pub const MINIMUM_LIQUIDITY: u128 = 1000;
 
 type U256 = Uint<256, 4>;
 
-pub trait AMMPoolBase: AlkaneResponder {
+pub trait AMMPoolBase {
     fn alkanes_for_self(&self) -> Result<(AlkaneId, AlkaneId)> {
         Ok((
             StoragePointer::from_keyword("/alkane/0")
@@ -69,20 +69,7 @@ pub trait AMMPoolBase: AlkaneResponder {
     fn set_total_supply(&self, v: u128) {
         StoragePointer::from_keyword("/totalsupply").set_value::<u128>(v);
     }
-    fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
-        let (a, b) = self.alkanes_for_self().unwrap();
-        let context = self.context().unwrap();
-        (
-            AlkaneTransfer {
-                id: a,
-                value: self.balance(&context.myself, &a),
-            },
-            AlkaneTransfer {
-                id: b,
-                value: self.balance(&context.myself, &b),
-            },
-        )
-    }
+    fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer);
     fn previous_reserves(&self, parcel: &AlkaneTransferParcel) -> (AlkaneTransfer, AlkaneTransfer) {
         let (reserve_a, reserve_b) = self.reserves();
         let mut reserve_sheet: BalanceSheet =
@@ -212,34 +199,72 @@ pub trait AMMPoolBase: AlkaneResponder {
     }
 }
 
-#[derive(Default)]
-pub struct AMMPool(());
+pub struct AMMPool {
+    delegate: Option<Box<dyn AMMPoolBase>>,
+}
 
-impl AMMPoolBase for AMMPool {}
+impl Clone for AMMPool {
+    fn clone(&self) -> Self {
+        AMMPool { delegate: None }
+    }
+}
+
+impl AMMPool {
+    pub fn default() -> Self {
+        let mut pool = AMMPool { delegate: None };
+        pool.set_delegate(Box::new(pool.clone()));
+        pool
+    }
+
+    pub fn set_delegate(&mut self, delegate: Box<dyn AMMPoolBase>) {
+        self.delegate = Some(delegate);
+    }
+}
+
+impl AMMPoolBase for AMMPool {
+    fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
+        let (a, b) = self.alkanes_for_self().unwrap();
+        let context = self.context().unwrap();
+        (
+            AlkaneTransfer {
+                id: a,
+                value: self.balance(&context.myself, &a),
+            },
+            AlkaneTransfer {
+                id: b,
+                value: self.balance(&context.myself, &b),
+            },
+        )
+    }
+}
 
 impl AlkaneResponder for AMMPool {
     fn execute(&self) -> Result<CallResponse> {
-        let context = self.context()?;
-        let mut inputs = context.inputs.clone();
-        match shift_or_err(&mut inputs)? {
-            0 => {
-                let mut pointer = StoragePointer::from_keyword("/initialized");
-                if pointer.get().len() == 0 {
-                    pointer.set(Arc::new(vec![0x01]));
-                    let (a, b) = self.pull_ids_or_err(&mut inputs)?;
-                    StoragePointer::from_keyword("/alkane/0").set(Arc::new(a.into()));
-                    StoragePointer::from_keyword("/alkane/1").set(Arc::new(b.into()));
-                    self.mint(context.myself, context.incoming_alkanes)
-                } else {
-                    Err(anyhow!("already initialized"))
+        if let Some(delegate) = &self.delegate {
+            let context = self.context()?;
+            let mut inputs = context.inputs.clone();
+            match shift_or_err(&mut inputs)? {
+                0 => {
+                    let mut pointer = StoragePointer::from_keyword("/initialized");
+                    if pointer.get().len() == 0 {
+                        pointer.set(Arc::new(vec![0x01]));
+                        let (a, b) = delegate.pull_ids_or_err(&mut inputs)?;
+                        StoragePointer::from_keyword("/alkane/0").set(Arc::new(a.into()));
+                        StoragePointer::from_keyword("/alkane/1").set(Arc::new(b.into()));
+                        delegate.mint(context.myself, context.incoming_alkanes)
+                    } else {
+                        Err(anyhow!("already initialized"))
+                    }
                 }
-            }
-            1 => self.mint(context.myself, context.incoming_alkanes),
-            2 => self.burn(context.myself, context.incoming_alkanes),
-            3 => self.swap(context.incoming_alkanes, shift_or_err(&mut inputs)?),
-            50 => Ok(CallResponse::forward(&context.incoming_alkanes)),
+                1 => delegate.mint(context.myself, context.incoming_alkanes),
+                2 => delegate.burn(context.myself, context.incoming_alkanes),
+                3 => delegate.swap(context.incoming_alkanes, shift_or_err(&mut inputs)?),
+                50 => Ok(CallResponse::forward(&context.incoming_alkanes)),
 
-            _ => Err(anyhow!("unrecognized opcode")),
+                _ => Err(anyhow!("unrecognized opcode")),
+            }
+        } else {
+            Err(anyhow!("No delegate set"))
         }
     }
 }
