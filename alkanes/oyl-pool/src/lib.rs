@@ -51,7 +51,6 @@ impl AMMPoolBase for OylAMMPool {
 
 impl AlkaneResponder for OylAMMPool {
     fn execute(&self) -> Result<CallResponse> {
-        println!("special execute for oyl");
         self.inner.execute()
     }
 }

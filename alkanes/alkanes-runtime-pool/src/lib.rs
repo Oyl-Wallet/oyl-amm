@@ -6,6 +6,7 @@ use alkanes_runtime::{
     stdio::{stdout, Write},
 };
 use alkanes_support::{
+    context::Context,
     id::AlkaneId,
     parcel::{AlkaneTransfer, AlkaneTransferParcel},
     response::CallResponse,
@@ -20,10 +21,23 @@ use std::sync::Arc;
 
 // per uniswap docs, the first 1e3 wei of lp token minted are burned to mitigate attacks where the value of a lp token is raised too high easily
 pub const MINIMUM_LIQUIDITY: u128 = 1000;
+pub const DEFAULT_FEE_AMOUNT_PER_1000: u128 = 4;
 
 type U256 = Uint<256, 4>;
 
 pub trait AMMPoolBase {
+    fn init_pool(&self, mut inputs: Vec<u128>, context: Context) -> Result<CallResponse> {
+        let mut pointer = StoragePointer::from_keyword("/initialized");
+        if pointer.get().len() == 0 {
+            pointer.set(Arc::new(vec![0x01]));
+            let (a, b) = self.pull_ids_or_err(&mut inputs)?;
+            StoragePointer::from_keyword("/alkane/0").set(Arc::new(a.into()));
+            StoragePointer::from_keyword("/alkane/1").set(Arc::new(b.into()));
+            self.mint(context.myself, context.incoming_alkanes)
+        } else {
+            Err(anyhow!("already initialized"))
+        }
+    }
     fn alkanes_for_self(&self) -> Result<(AlkaneId, AlkaneId)> {
         Ok((
             StoragePointer::from_keyword("/alkane/0")
@@ -148,7 +162,8 @@ pub trait AMMPoolBase {
         Ok(response)
     }
     fn get_amount_out(&self, amount: u128, reserve_from: u128, reserve_to: u128) -> Result<u128> {
-        let amount_in_with_fee = U256::from(997) * U256::from(amount);
+        let amount_in_with_fee =
+            U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(amount);
         let numerator = amount_in_with_fee * U256::from(reserve_to);
         let denominator = U256::from(1000) * U256::from(reserve_from) + amount_in_with_fee;
         Ok((numerator / denominator).try_into()?)
@@ -251,18 +266,7 @@ impl AlkaneResponder for AMMPool {
             let context = self.context()?;
             let mut inputs = context.inputs.clone();
             match shift_or_err(&mut inputs)? {
-                0 => {
-                    let mut pointer = StoragePointer::from_keyword("/initialized");
-                    if pointer.get().len() == 0 {
-                        pointer.set(Arc::new(vec![0x01]));
-                        let (a, b) = delegate.pull_ids_or_err(&mut inputs)?;
-                        StoragePointer::from_keyword("/alkane/0").set(Arc::new(a.into()));
-                        StoragePointer::from_keyword("/alkane/1").set(Arc::new(b.into()));
-                        delegate.mint(context.myself, context.incoming_alkanes)
-                    } else {
-                        Err(anyhow!("already initialized"))
-                    }
-                }
+                0 => delegate.init_pool(inputs, context),
                 1 => delegate.mint(context.myself, context.incoming_alkanes),
                 2 => delegate.burn(context.myself, context.incoming_alkanes),
                 3 => delegate.swap(context.incoming_alkanes, shift_or_err(&mut inputs)?),
