@@ -221,7 +221,7 @@ impl AMMPool {
     }
 }
 
-impl AMMPoolBase for AMMPool {
+pub trait AMMReserves: AlkaneResponder + AMMPoolBase {
     fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
         let (a, b) = self.alkanes_for_self().unwrap();
         let context = self.context().unwrap();
@@ -235,6 +235,13 @@ impl AMMPoolBase for AMMPool {
                 value: self.balance(&context.myself, &b),
             },
         )
+    }
+}
+
+impl AMMReserves for AMMPool {}
+impl AMMPoolBase for AMMPool {
+    fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
+        AMMReserves::reserves(self)
     }
 }
 

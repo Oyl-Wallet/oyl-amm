@@ -5,7 +5,7 @@ use alkanes_runtime::{
     println,
     stdio::{stdout, Write},
 };
-use alkanes_runtime_pool::{AMMPool, AMMPoolBase};
+use alkanes_runtime_pool::{AMMPool, AMMPoolBase, AMMReserves};
 use alkanes_support::{
     parcel::{AlkaneTransfer, AlkaneTransferParcel},
     response::CallResponse,
@@ -34,20 +34,10 @@ impl OylAMMPool {
     }
 }
 
+impl AMMReserves for OylAMMPool {}
 impl AMMPoolBase for OylAMMPool {
     fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
-        let (a, b) = self.alkanes_for_self().unwrap();
-        let context = self.context().unwrap();
-        (
-            AlkaneTransfer {
-                id: a,
-                value: self.balance(&context.myself, &a),
-            },
-            AlkaneTransfer {
-                id: b,
-                value: self.balance(&context.myself, &b),
-            },
-        )
+        AMMReserves::reserves(self)
     }
     fn swap(
         &self,
