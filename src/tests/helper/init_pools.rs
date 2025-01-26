@@ -1,4 +1,6 @@
-use crate::tests::std::{factory_build, oyl_pool_build, pool_build, router_build};
+use crate::tests::std::{
+    factory_build, oyl_factory_build, oyl_pool_build, pool_build, router_build,
+};
 use alkanes::indexer::index_block;
 use alkanes::precompiled::{alkanes_std_auth_token_build, alkanes_std_owned_token_build};
 use alkanes::tests::helpers::{self as alkane_helpers, assert_binary_deployed_to_id};
@@ -18,12 +20,7 @@ use super::common::*;
 
 pub const OYL_AMM_POOL_FACTORY_ID: u128 = 0xf041;
 
-pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeploymentIds)> {
-    let pool_id = if use_oyl {
-        OYL_AMM_POOL_FACTORY_ID
-    } else {
-        AMM_FACTORY_ID
-    };
+pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
     let cellpacks: Vec<Cellpack> = [
         //amm pool init (in factory space so new pools can copy this code)
         Cellpack {
@@ -51,7 +48,7 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
         //amm factory
         Cellpack {
             target: AlkaneId { block: 1, tx: 0 },
-            inputs: vec![0, pool_id],
+            inputs: vec![0, AMM_FACTORY_ID],
         },
         // token 1 init 1 auth token and mint 1000000 owned tokens
         Cellpack {
@@ -73,6 +70,11 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
             target: AlkaneId { block: 1, tx: 0 },
             inputs: vec![0, 2, 1],
         },
+        //oyl amm factory
+        Cellpack {
+            target: AlkaneId { block: 1, tx: 0 },
+            inputs: vec![0, OYL_AMM_POOL_FACTORY_ID],
+        },
     ]
     .into();
     let test_block = alkane_helpers::init_with_multiple_cellpacks_with_tx(
@@ -85,10 +87,13 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
             [].into(),
             [].into(),
             router_build::get_bytes(),
+            oyl_factory_build::get_bytes(),
         ]
         .into(),
         cellpacks,
     );
+    let mut tx_iterator = (1..).into_iter();
+    // note: the order that these are defined matters, since the tx_terator will increment by one
     let deployed_ids = AmmTestDeploymentIds {
         amm_pool_factory: AlkaneId {
             block: 4,
@@ -102,16 +107,50 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
             block: 4,
             tx: AUTH_TOKEN_FACTORY_ID,
         },
-        amm_factory_deployment: AlkaneId { block: 2, tx: 1 },
-        owned_token_1_deployment: AlkaneId { block: 2, tx: 2 },
-        auth_token_1_deployment: AlkaneId { block: 2, tx: 3 },
-        owned_token_2_deployment: AlkaneId { block: 2, tx: 4 },
-        auth_token_2_deployment: AlkaneId { block: 2, tx: 5 },
-        owned_token_3_deployment: AlkaneId { block: 2, tx: 6 },
-        auth_token_3_deployment: AlkaneId { block: 2, tx: 7 },
-        amm_router_deployment: AlkaneId { block: 2, tx: 8 },
-        amm_pool_1_deployment: AlkaneId { block: 2, tx: 9 },
-        amm_pool_2_deployment: AlkaneId { block: 2, tx: 10 },
+        amm_factory_deployment: AlkaneId {
+            block: 2,
+            tx: tx_iterator.next().unwrap(),
+        },
+        owned_token_1_deployment: AlkaneId {
+            block: 2,
+            tx: tx_iterator.next().unwrap(),
+        },
+        auth_token_1_deployment: AlkaneId {
+            block: 2,
+            tx: tx_iterator.next().unwrap(),
+        },
+        owned_token_2_deployment: AlkaneId {
+            block: 2,
+            tx: tx_iterator.next().unwrap(),
+        },
+        auth_token_2_deployment: AlkaneId {
+            block: 2,
+            tx: tx_iterator.next().unwrap(),
+        },
+        owned_token_3_deployment: AlkaneId {
+            block: 2,
+            tx: tx_iterator.next().unwrap(),
+        },
+        auth_token_3_deployment: AlkaneId {
+            block: 2,
+            tx: tx_iterator.next().unwrap(),
+        },
+        amm_router_deployment: AlkaneId {
+            block: 2,
+            tx: tx_iterator.next().unwrap(),
+        },
+        oyl_amm_factory_deployment: AlkaneId {
+            block: 2,
+            tx: tx_iterator.next().unwrap(),
+        },
+        amm_pool_1_deployment: AlkaneId {
+            block: 2,
+            tx: tx_iterator.next().unwrap(),
+        },
+        amm_pool_2_deployment: AlkaneId {
+            block: 2,
+            tx: tx_iterator.next().unwrap(),
+        },
     };
     return Ok((test_block, deployed_ids));
 }
@@ -177,6 +216,10 @@ pub fn assert_contracts_correct_ids(
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_router_deployment.clone(),
         router_build::get_bytes(),
+    );
+    let _ = assert_binary_deployed_to_id(
+        deployment_ids.oyl_amm_factory_deployment.clone(),
+        oyl_factory_build::get_bytes(),
     );
     Ok(())
 }
@@ -259,7 +302,7 @@ pub fn test_amm_pool_init_fixture(
     use_oyl: bool,
 ) -> Result<(Block, AmmTestDeploymentIds)> {
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool(use_oyl)?;
+    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
     let input_output_pool1 = OutPoint {
         txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
         vout: 0,

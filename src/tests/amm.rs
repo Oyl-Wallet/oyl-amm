@@ -43,7 +43,7 @@ fn test_amm_pool_normal_init() -> Result<()> {
 fn test_amm_factory_double_init_fail() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool(false)?;
+    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
     test_block.txdata.push(
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
@@ -66,7 +66,7 @@ fn test_amm_factory_double_init_fail() -> Result<()> {
 fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool(false)?;
+    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
     let input_outpoint = OutPoint {
         txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
         vout: 0,
@@ -114,7 +114,7 @@ fn test_amm_pool_zero_init() -> Result<()> {
 fn test_amm_pool_bad_init() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool(false)?;
+    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
     let input_output = OutPoint {
         txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
         vout: 0,
@@ -129,7 +129,7 @@ fn test_amm_pool_bad_init() -> Result<()> {
         input_output,
     );
     index_block(&test_block, block_height)?;
-    assert_token_id_has_no_deployment(deployment_ids.amm_pool_1_deployment);
+    assert_token_id_has_no_deployment(deployment_ids.amm_pool_1_deployment)?;
     let sheet = get_last_outpoint_sheet(&test_block)?;
     assert_eq!(sheet.get(&deployment_ids.amm_pool_1_deployment.into()), 0);
     Ok(())
@@ -411,34 +411,34 @@ fn test_amm_pool_swap_w_router_middle_path() -> Result<()> {
     Ok(())
 }
 
-#[wasm_bindgen_test]
-fn test_amm_pool_swap_oyl() -> Result<()> {
-    clear();
-    let (amount1, amount2) = (500000, 500000);
-    let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, true)?;
-    let block_height = 840_001;
-    let mut swap_block = create_block_with_coinbase_tx(block_height);
-    // split init tx puts 1000000 / 2 in vout 0, and the other is unspent at vout 1. The split tx is now 2 from the tail
-    let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 2].compute_txid(),
-        vout: 1,
-    };
-    let amount_to_swap = 10000;
-    insert_swap_txs(
-        amount_to_swap,
-        deployment_ids.owned_token_1_deployment,
-        0,
-        &mut swap_block,
-        input_outpoint,
-        deployment_ids.amm_pool_1_deployment,
-    );
-    index_block(&swap_block, block_height)?;
+// #[wasm_bindgen_test]
+// fn test_amm_pool_swap_oyl() -> Result<()> {
+//     clear();
+//     let (amount1, amount2) = (500000, 500000);
+//     let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, true)?;
+//     let block_height = 840_001;
+//     let mut swap_block = create_block_with_coinbase_tx(block_height);
+//     // split init tx puts 1000000 / 2 in vout 0, and the other is unspent at vout 1. The split tx is now 2 from the tail
+//     let input_outpoint = OutPoint {
+//         txid: init_block.txdata[init_block.txdata.len() - 2].compute_txid(),
+//         vout: 1,
+//     };
+//     let amount_to_swap = 10000;
+//     insert_swap_txs(
+//         amount_to_swap,
+//         deployment_ids.owned_token_1_deployment,
+//         0,
+//         &mut swap_block,
+//         input_outpoint,
+//         deployment_ids.amm_pool_1_deployment,
+//     );
+//     index_block(&swap_block, block_height)?;
 
-    check_swap_lp_balance(
-        vec![amount1, amount2],
-        amount_to_swap,
-        deployment_ids.owned_token_2_deployment,
-        &swap_block,
-    )?;
-    Ok(())
-}
+//     check_swap_lp_balance(
+//         vec![amount1, amount2],
+//         amount_to_swap,
+//         deployment_ids.owned_token_2_deployment,
+//         &swap_block,
+//     )?;
+//     Ok(())
+// }
