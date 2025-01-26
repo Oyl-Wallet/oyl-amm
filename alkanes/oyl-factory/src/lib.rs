@@ -36,6 +36,15 @@ impl Clone for OylAMMFactory {
 }
 
 impl OylAMMFactory {
+    fn oyl_token(&self) -> Result<AlkaneId> {
+        let ptr = StoragePointer::from_keyword("/oyl_token")
+            .get()
+            .as_ref()
+            .clone();
+        let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
+        Ok(AlkaneId::parse(&mut cursor)?)
+    }
+
     pub fn default() -> Self {
         let inner = AMMFactory::default();
         let mut oyl_pool = OylAMMFactory { inner };
@@ -52,23 +61,58 @@ impl AMMFactoryBase for OylAMMFactory {
         // check that
         let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
         let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
+        let oyl_token = self.oyl_token()?;
+        let (a_oyl, b_oyl) = sort_alkanes((alkane_a.id.clone(), oyl_token.clone()));
         let next_sequence = self.sequence();
-        self.pool_pointer(&a, &b)
+        self.pool_pointer(&a_oyl, &b_oyl)
             .set(Arc::new(AlkaneId::new(2, next_sequence).into()));
-        self.call(
+        let oyl_pool_deployment_response = self.call(
             &Cellpack {
                 target: AlkaneId {
                     block: 6,
                     tx: self.pool_id()?,
                 },
-                inputs: vec![0, a.block, a.tx, b.block, b.tx],
+                inputs: vec![
+                    0,
+                    a_oyl.block,
+                    a_oyl.tx,
+                    b_oyl.block,
+                    b_oyl.tx,
+                    2,
+                    next_sequence,
+                ],
             },
             &AlkaneTransferParcel(vec![
                 context.incoming_alkanes.0[0].clone(),
                 context.incoming_alkanes.0[1].clone(),
             ]),
             self.fuel(),
-        )
+        )?;
+        self.pool_pointer(&a, &b)
+            .set(Arc::new(AlkaneId::new(2, next_sequence + 1).into()));
+        let pool_deployment_response = self.call(
+            &Cellpack {
+                target: AlkaneId {
+                    block: 6,
+                    tx: self.pool_id()?,
+                },
+                inputs: vec![0, a.block, a.tx, b.block, b.tx, 2, next_sequence],
+            },
+            &AlkaneTransferParcel(vec![
+                context.incoming_alkanes.0[0].clone(),
+                context.incoming_alkanes.0[1].clone(),
+            ]),
+            self.fuel(),
+        )?;
+        let mut response = CallResponse::default();
+        response.alkanes = AlkaneTransferParcel(
+            [
+                oyl_pool_deployment_response.alkanes.0,
+                pool_deployment_response.alkanes.0,
+            ]
+            .concat(),
+        );
+        Ok(response)
     }
 }
 
