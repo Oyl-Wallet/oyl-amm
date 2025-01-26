@@ -2,6 +2,7 @@ use crate::tests::std::{factory_build, oyl_pool_build, pool_build, router_build}
 use alkanes::indexer::index_block;
 use alkanes::precompiled::{alkanes_std_auth_token_build, alkanes_std_owned_token_build};
 use alkanes::tests::helpers::{self as alkane_helpers, assert_binary_deployed_to_id};
+use alkanes_runtime_pool::MINIMUM_LIQUIDITY;
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::constants::{AMM_FACTORY_ID, AUTH_TOKEN_FACTORY_ID};
 use alkanes_support::id::AlkaneId;

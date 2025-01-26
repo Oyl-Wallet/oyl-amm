@@ -1,5 +1,5 @@
 [package]
-name = "factory"
+name = "alkanes-runtime-factory"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,7 +11,6 @@ alkanes-support = { git = "https:/github.com/kungfuflex/alkanes-rs" }
 alkanes-runtime = { git = "https://github.com/kungfuflex/alkanes-rs" }
 metashrew-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
 protorune-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
-alkanes-runtime-factory = { path = "../alkanes-runtime-factory" }
 anyhow = "1.0.91"
 bitcoin = { version = "0.32.4", features = ["rand"] }
 hex = "0.4.3"

@@ -26,17 +26,29 @@ pub const DEFAULT_FEE_AMOUNT_PER_1000: u128 = 4;
 type U256 = Uint<256, 4>;
 
 pub trait AMMPoolBase {
-    fn init_pool(&self, mut inputs: Vec<u128>, context: Context) -> Result<CallResponse> {
+    fn init_pool(
+        &self,
+        alkane_a: AlkaneId,
+        alkane_b: AlkaneId,
+        context: Context,
+    ) -> Result<CallResponse> {
         let mut pointer = StoragePointer::from_keyword("/initialized");
         if pointer.get().len() == 0 {
             pointer.set(Arc::new(vec![0x01]));
-            let (a, b) = self.pull_ids_or_err(&mut inputs)?;
-            StoragePointer::from_keyword("/alkane/0").set(Arc::new(a.into()));
-            StoragePointer::from_keyword("/alkane/1").set(Arc::new(b.into()));
+            StoragePointer::from_keyword("/alkane/0").set(Arc::new(alkane_a.into()));
+            StoragePointer::from_keyword("/alkane/1").set(Arc::new(alkane_b.into()));
             self.mint(context.myself, context.incoming_alkanes)
         } else {
             Err(anyhow!("already initialized"))
         }
+    }
+    fn process_inputs_and_init_pool(
+        &self,
+        mut inputs: Vec<u128>,
+        context: Context,
+    ) -> Result<CallResponse> {
+        let (a, b) = self.pull_ids_or_err(&mut inputs)?;
+        self.init_pool(a, b, context)
     }
     fn alkanes_for_self(&self) -> Result<(AlkaneId, AlkaneId)> {
         Ok((
@@ -266,7 +278,7 @@ impl AlkaneResponder for AMMPool {
             let context = self.context()?;
             let mut inputs = context.inputs.clone();
             match shift_or_err(&mut inputs)? {
-                0 => delegate.init_pool(inputs, context),
+                0 => delegate.process_inputs_and_init_pool(inputs, context),
                 1 => delegate.mint(context.myself, context.incoming_alkanes),
                 2 => delegate.burn(context.myself, context.incoming_alkanes),
                 3 => delegate.swap(context.incoming_alkanes, shift_or_err(&mut inputs)?),

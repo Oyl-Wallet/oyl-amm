@@ -17,9 +17,6 @@ use protorune_support::protostone::ProtostoneEdict;
 use protorune_support::utils::consensus_encode;
 use std::fmt::Write;
 
-// per uniswap docs, the first 1e3 wei of lp token minted are burned to mitigate attacks where the value of a lp token is raised too high easily
-pub const MINIMUM_LIQUIDITY: u128 = 1000;
-
 pub struct AmmTestDeploymentIds {
     pub amm_pool_factory: AlkaneId,
     pub oyl_amm_pool_factory: AlkaneId,

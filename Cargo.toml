@@ -24,6 +24,7 @@ alkanes-runtime = { git = "https://github.com/kungfuflex/alkanes-rs" }
 metashrew-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
 protorune-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
 ordinals = { git = "https://github.com/kungfuflex/alkanes-rs" }
+alkanes-runtime-pool = { path = "./alkanes/alkanes-runtime-pool" }
 anyhow = "1.0.94"
 bitcoin = { version = "0.32.4", features = ["rand"] }
 hex = "0.4.3"

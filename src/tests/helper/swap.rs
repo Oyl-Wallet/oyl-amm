@@ -1,4 +1,5 @@
 use alkanes::tests::helpers::{self as alkane_helpers};
+use alkanes_runtime_pool::DEFAULT_FEE_AMOUNT_PER_1000;
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::id::AlkaneId;
 use anyhow::Result;
@@ -75,7 +76,8 @@ pub fn insert_swap_txs_w_router(
 }
 
 fn calc_swapped_balance(amount: u128, reserve_from: u128, reserve_to: u128) -> Result<u128> {
-    Ok(997 * amount * reserve_to / (1000 * reserve_from + 997 * amount))
+    let amount_in_with_fee = (1000 - DEFAULT_FEE_AMOUNT_PER_1000) * amount;
+    Ok(amount_in_with_fee * reserve_to / (1000 * reserve_from + amount_in_with_fee))
 }
 
 pub fn check_swap_lp_balance(

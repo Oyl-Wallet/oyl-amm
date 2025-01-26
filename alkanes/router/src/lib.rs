@@ -21,9 +21,6 @@ use metashrew_support::{
 };
 use std::sync::Arc;
 
-// per uniswap docs, the first 1e3 wei of lp token minted are burned to mitigate attacks where the value of a lp token is raised too high easily
-pub const MINIMUM_LIQUIDITY: u128 = 1000;
-
 #[derive(Default)]
 struct AMMRouter(());
 
