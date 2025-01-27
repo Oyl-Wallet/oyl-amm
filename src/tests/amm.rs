@@ -411,34 +411,34 @@ fn test_amm_pool_swap_w_router_middle_path() -> Result<()> {
     Ok(())
 }
 
-// #[wasm_bindgen_test]
-// fn test_amm_pool_swap_oyl() -> Result<()> {
-//     clear();
-//     let (amount1, amount2) = (500000, 500000);
-//     let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, true)?;
-//     let block_height = 840_001;
-//     let mut swap_block = create_block_with_coinbase_tx(block_height);
-//     // split init tx puts 1000000 / 2 in vout 0, and the other is unspent at vout 1. The split tx is now 2 from the tail
-//     let input_outpoint = OutPoint {
-//         txid: init_block.txdata[init_block.txdata.len() - 2].compute_txid(),
-//         vout: 1,
-//     };
-//     let amount_to_swap = 10000;
-//     insert_swap_txs(
-//         amount_to_swap,
-//         deployment_ids.owned_token_1_deployment,
-//         0,
-//         &mut swap_block,
-//         input_outpoint,
-//         deployment_ids.amm_pool_1_deployment,
-//     );
-//     index_block(&swap_block, block_height)?;
+#[wasm_bindgen_test]
+fn test_amm_pool_swap_oyl() -> Result<()> {
+    clear();
+    let (amount1, amount2) = (500000, 500000);
+    let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, true)?;
+    let block_height = 840_001;
+    let mut swap_block = create_block_with_coinbase_tx(block_height);
+    // split init tx puts 1000000 / 2 in vout 0, and the other is unspent at vout 1. The split tx is now 2 from the tail
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 2].compute_txid(),
+        vout: 1,
+    };
+    let amount_to_swap = 10000;
+    insert_swap_txs(
+        amount_to_swap,
+        deployment_ids.owned_token_1_deployment,
+        0,
+        &mut swap_block,
+        input_outpoint,
+        deployment_ids.amm_pool_1_deployment,
+    );
+    index_block(&swap_block, block_height)?;
 
-//     check_swap_lp_balance(
-//         vec![amount1, amount2],
-//         amount_to_swap,
-//         deployment_ids.owned_token_2_deployment,
-//         &swap_block,
-//     )?;
-//     Ok(())
-// }
+    check_swap_lp_balance(
+        vec![amount1, amount2],
+        amount_to_swap,
+        deployment_ids.owned_token_2_deployment,
+        &swap_block,
+    )?;
+    Ok(())
+}

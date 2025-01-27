@@ -84,18 +84,25 @@ pub trait AMMFactoryBase {
             ))
         }
     }
-    fn init_factory(&self, mut inputs: Vec<u128>, context: Context) -> Result<CallResponse> {
+    fn init_factory(&self, pool_factory_id: u128, context: Context) -> Result<CallResponse> {
         let mut pointer = StoragePointer::from_keyword("/initialized");
         let mut pool_factory_id_pointer = StoragePointer::from_keyword("/pool_factory_id");
         if pointer.get().len() == 0 {
             pointer.set(Arc::new(vec![0x01]));
             // set the address for the implementation for AMM pool
-            let pool_factory_id = shift_or_err(&mut inputs)?;
             pool_factory_id_pointer.set(Arc::new(pool_factory_id.to_bytes()));
             Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
         } else {
             Err(anyhow!("already initialized"))
         }
+    }
+    fn process_inputs_and_init_factory(
+        &self,
+        mut inputs: Vec<u128>,
+        context: Context,
+    ) -> Result<CallResponse> {
+        let pool_factory_id = shift_or_err(&mut inputs)?;
+        self.init_factory(pool_factory_id, context)
     }
     fn create_new_pool(&self, context: Context) -> Result<CallResponse>;
 
@@ -179,7 +186,7 @@ impl AlkaneResponder for AMMFactory {
             let context = self.context()?;
             let mut inputs = context.inputs.clone();
             match shift_or_err(&mut inputs)? {
-                0 => delegate.init_factory(inputs, context),
+                0 => delegate.process_inputs_and_init_factory(inputs, context),
                 1 => delegate.create_new_pool(context),
                 2 => delegate.find_existing_pool_id(inputs, context),
                 // TODO: add a function to change the implementation of the AMM pool for upgradeability. Need to check that the caller is the owner of this contract

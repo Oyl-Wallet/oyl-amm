@@ -15,7 +15,7 @@ use alkanes_support::{
     id::AlkaneId,
     parcel::{AlkaneTransfer, AlkaneTransferParcel},
     response::CallResponse,
-    utils::shift_id_or_err,
+    utils::{shift_id_or_err, shift_or_err},
 };
 use anyhow::{anyhow, Result};
 use metashrew_support::{
@@ -54,7 +54,23 @@ impl OylAMMFactory {
 }
 
 impl AMMFactoryBase for OylAMMFactory {
+    fn process_inputs_and_init_factory(
+        &self,
+        mut inputs: Vec<u128>,
+        context: Context,
+    ) -> Result<CallResponse> {
+        println!("special process_inputs_and_init_factory for oyl");
+        let pool_factory_id = shift_or_err(&mut inputs)?;
+        let response = self.init_factory(pool_factory_id, context)?;
+
+        let mut oyl_token_storage = StoragePointer::from_keyword("/oyl_token");
+        let oyl_token: AlkaneId = shift_id_or_err(&mut inputs)?;
+        oyl_token_storage.set(Arc::new(oyl_token.into()));
+        println!("set oyl token storage");
+        Ok(response)
+    }
     fn create_new_pool(&self, context: Context) -> Result<CallResponse> {
+        println!("special create_new_pool for oyl");
         if context.incoming_alkanes.0.len() != 2 {
             return Err(anyhow!("must send two runes to initialize a pool"));
         }
