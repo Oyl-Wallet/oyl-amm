@@ -98,7 +98,6 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
         .into(),
         cellpacks,
     );
-    let mut tx_iterator = (1..).into_iter();
     // note: the order that these are defined matters, since the tx_terator will increment by one
     let deployed_ids = AmmTestDeploymentIds {
         amm_pool_factory: AlkaneId {
@@ -113,58 +112,19 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
             block: 4,
             tx: AUTH_TOKEN_FACTORY_ID,
         },
-        amm_factory_deployment: AlkaneId {
-            block: 2,
-            tx: tx_iterator.next().unwrap(),
-        },
-        owned_token_1_deployment: AlkaneId {
-            block: 2,
-            tx: tx_iterator.next().unwrap(),
-        },
-        auth_token_1_deployment: AlkaneId {
-            block: 2,
-            tx: tx_iterator.next().unwrap(),
-        },
-        owned_token_2_deployment: AlkaneId {
-            block: 2,
-            tx: tx_iterator.next().unwrap(),
-        },
-        auth_token_2_deployment: AlkaneId {
-            block: 2,
-            tx: tx_iterator.next().unwrap(),
-        },
-        owned_token_3_deployment: AlkaneId {
-            block: 2,
-            tx: tx_iterator.next().unwrap(),
-        },
-        auth_token_3_deployment: AlkaneId {
-            block: 2,
-            tx: tx_iterator.next().unwrap(),
-        },
-        oyl_token_deployment: AlkaneId {
-            block: 2,
-            tx: tx_iterator.next().unwrap(),
-        },
-        oyl_auth_token_deployment: AlkaneId {
-            block: 2,
-            tx: tx_iterator.next().unwrap(),
-        },
-        amm_router_deployment: AlkaneId {
-            block: 2,
-            tx: tx_iterator.next().unwrap(),
-        },
-        oyl_amm_factory_deployment: AlkaneId {
-            block: 2,
-            tx: tx_iterator.next().unwrap(),
-        },
-        amm_pool_1_deployment: AlkaneId {
-            block: 2,
-            tx: tx_iterator.next().unwrap(),
-        },
-        amm_pool_2_deployment: AlkaneId {
-            block: 2,
-            tx: tx_iterator.next().unwrap(),
-        },
+        amm_factory_deployment: AlkaneId { block: 2, tx: 1 },
+        owned_token_1_deployment: AlkaneId { block: 2, tx: 2 },
+        auth_token_1_deployment: AlkaneId { block: 2, tx: 3 },
+        owned_token_2_deployment: AlkaneId { block: 2, tx: 4 },
+        auth_token_2_deployment: AlkaneId { block: 2, tx: 5 },
+        owned_token_3_deployment: AlkaneId { block: 2, tx: 6 },
+        auth_token_3_deployment: AlkaneId { block: 2, tx: 7 },
+        oyl_token_deployment: AlkaneId { block: 2, tx: 8 },
+        oyl_auth_token_deployment: AlkaneId { block: 2, tx: 9 },
+        amm_router_deployment: AlkaneId { block: 2, tx: 10 },
+        oyl_amm_factory_deployment: AlkaneId { block: 2, tx: 11 },
+        amm_pool_1_deployment: AlkaneId { block: 2, tx: 12 },
+        amm_pool_2_deployment: AlkaneId { block: 2, tx: 13 },
     };
 
     return Ok((test_block, deployed_ids));
