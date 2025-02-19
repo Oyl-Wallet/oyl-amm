@@ -29,6 +29,7 @@ anyhow = "1.0.94"
 bitcoin = { version = "0.32.4", features = ["rand"] }
 hex = "0.4.3"
 num = "0.4.3"
+ruint = "1.13.1"
 
 [dev-dependencies]
 alkanes = { git = "https://github.com/kungfuflex/alkanes-rs", features = [

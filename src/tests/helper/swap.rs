@@ -1,22 +1,37 @@
-use alkanes::tests::helpers::{self as alkane_helpers};
-use alkanes_runtime_pool::DEFAULT_FEE_AMOUNT_PER_1000;
+use alkanes::tests::helpers::{ self as alkane_helpers };
+use alkanes_runtime_pool::{ AMMPoolBase, DEFAULT_FEE_AMOUNT_PER_1000 };
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::id::AlkaneId;
+use alkanes_support::parcel::AlkaneTransfer;
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
-use bitcoin::{Block, Witness};
+use bitcoin::{ Block, Witness };
 #[allow(unused_imports)]
-use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
+use metashrew::{ get_cache, index_pointer::IndexPointer, println, stdio::stdout };
 use std::fmt::Write;
+use ruint::Uint;
 
-use super::common::{get_last_outpoint_sheet, insert_single_edict_split_tx, AmmTestDeploymentIds};
+use super::common::{ get_last_outpoint_sheet, insert_single_edict_split_tx, AmmTestDeploymentIds };
+
+type U256 = Uint<256, 4>;
+
+struct TestAMMPool {
+    reserve_a: AlkaneTransfer,
+    reserve_b: AlkaneTransfer,
+}
+
+impl AMMPoolBase for TestAMMPool {
+    fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
+        (self.reserve_a.clone(), self.reserve_b.clone())
+    }
+}
 
 fn _insert_swap_txs(
     amount: u128,
     swap_from_token: AlkaneId,
     test_block: &mut Block,
     input_outpoint: OutPoint,
-    cellpack: Cellpack,
+    cellpack: Cellpack
 ) {
     insert_single_edict_split_tx(amount, swap_from_token, test_block, input_outpoint);
     test_block.txdata.push(
@@ -27,9 +42,59 @@ fn _insert_swap_txs(
                 txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
                 vout: 0,
             },
-            false,
-        ),
+            false
+        )
     );
+}
+
+pub fn test_simulate_amount_out() -> Result<()> {
+    // Set up test pool with initial reserves
+    let token_a = AlkaneId::new(1, 1);
+    let token_b = AlkaneId::new(2, 1);
+
+    let test_pool = TestAMMPool {
+        reserve_a: AlkaneTransfer {
+            id: token_a.clone(),
+            value: 1_000_000, // 1M tokens
+        },
+        reserve_b: AlkaneTransfer {
+            id: token_b.clone(),
+            value: 2_000_000, // 2M tokens
+        },
+    };
+
+    // Test case 1: Swap token A for token B
+    let input_amount_a = 100_000u128; // 100K tokens
+    let result = test_pool.simulate_amount_out(vec![token_a.block, token_a.tx, input_amount_a])?;
+
+    // Calculate expected output with 0.4% fee
+    let amount_with_fee = U256::from(996) * U256::from(input_amount_a); // 0.4% fee
+    let numerator = amount_with_fee * U256::from(2_000_000);
+    let denominator = U256::from(1000) * U256::from(1_000_000) + amount_with_fee;
+    let expected_output = (numerator / denominator).to_le_bytes_vec();
+
+    assert_eq!(result.data, expected_output);
+
+    // Test case 2: Swap token B for token A
+    let input_amount_b = 200_000u128; // 200K tokens
+    let result = test_pool.simulate_amount_out(vec![token_b.block, token_b.tx, input_amount_b])?;
+
+    let amount_with_fee = U256::from(996) * U256::from(input_amount_b);
+    let numerator = amount_with_fee * U256::from(1_000_000);
+    let denominator = U256::from(1000) * U256::from(2_000_000) + amount_with_fee;
+    let expected_output = (numerator / denominator).to_le_bytes_vec();
+
+    assert_eq!(result.data, expected_output);
+
+    // Test case 3: Invalid input length
+    let result = test_pool.simulate_amount_out(vec![1, 1]);
+    assert!(result.is_err());
+
+    // Test case 4: Invalid token (not in pool)
+    let result = test_pool.simulate_amount_out(vec![3, 1, 100_000]);
+    assert!(result.is_err());
+
+    Ok(())
 }
 
 pub fn insert_swap_txs(
@@ -38,18 +103,12 @@ pub fn insert_swap_txs(
     min_out: u128,
     test_block: &mut Block,
     input_outpoint: OutPoint,
-    pool_address: AlkaneId,
+    pool_address: AlkaneId
 ) {
-    _insert_swap_txs(
-        amount,
-        swap_from_token,
-        test_block,
-        input_outpoint,
-        Cellpack {
-            target: pool_address,
-            inputs: vec![3, min_out],
-        },
-    )
+    _insert_swap_txs(amount, swap_from_token, test_block, input_outpoint, Cellpack {
+        target: pool_address,
+        inputs: vec![3, min_out],
+    })
 }
 
 pub fn insert_swap_txs_w_router(
@@ -58,7 +117,7 @@ pub fn insert_swap_txs_w_router(
     min_out: u128,
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
-    input_outpoint: OutPoint,
+    input_outpoint: OutPoint
 ) {
     if swap_path.len() < 2 {
         panic!("Swap path must be at least two alkanes long");
@@ -67,9 +126,7 @@ pub fn insert_swap_txs_w_router(
         target: deployment_ids.amm_router_deployment,
         inputs: vec![3, swap_path.len() as u128],
     };
-    cellpack
-        .inputs
-        .extend(swap_path.iter().flat_map(|s| vec![s.block, s.tx]));
+    cellpack.inputs.extend(swap_path.iter().flat_map(|s| vec![s.block, s.tx]));
     cellpack.inputs.push(min_out);
 
     _insert_swap_txs(amount, swap_path[0], test_block, input_outpoint, cellpack)
@@ -77,14 +134,14 @@ pub fn insert_swap_txs_w_router(
 
 fn calc_swapped_balance(amount: u128, reserve_from: u128, reserve_to: u128) -> Result<u128> {
     let amount_in_with_fee = (1000 - DEFAULT_FEE_AMOUNT_PER_1000) * amount;
-    Ok(amount_in_with_fee * reserve_to / (1000 * reserve_from + amount_in_with_fee))
+    Ok((amount_in_with_fee * reserve_to) / (1000 * reserve_from + amount_in_with_fee))
 }
 
 pub fn check_swap_lp_balance(
     prev_reserve_amount_in_path: Vec<u128>,
     swap_amount: u128,
     swap_target_token: AlkaneId,
-    test_block: &Block,
+    test_block: &Block
 ) -> Result<()> {
     let sheet = get_last_outpoint_sheet(test_block)?;
     let mut current_swapped_amount = swap_amount;
@@ -92,7 +149,7 @@ pub fn check_swap_lp_balance(
         current_swapped_amount = calc_swapped_balance(
             current_swapped_amount,
             prev_reserve_amount_in_path[i - 1],
-            prev_reserve_amount_in_path[i],
+            prev_reserve_amount_in_path[i]
         )?;
     }
 
