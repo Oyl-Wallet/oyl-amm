@@ -1,28 +1,37 @@
 use add_liquidity::{
-    check_add_liquidity_lp_balance, insert_add_liquidity_txs, insert_add_liquidity_txs_w_router,
+    check_add_liquidity_lp_balance,
+    insert_add_liquidity_txs,
+    insert_add_liquidity_txs_w_router,
 };
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::trace::Trace;
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::Witness;
-use common::{get_last_outpoint_sheet, insert_single_edict_split_tx};
+use common::{ get_last_outpoint_sheet, insert_single_edict_split_tx };
 use init_pools::{
-    calc_lp_balance_from_pool_init, init_block_with_amm_pool, insert_init_pool_liquidity_txs,
+    calc_lp_balance_from_pool_init,
+    init_block_with_amm_pool,
+    insert_init_pool_liquidity_txs,
     test_amm_pool_init_fixture,
 };
 use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use remove_liquidity::test_amm_burn_fixture;
-use swap::{check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_router};
+use swap::{
+    check_swap_lp_balance,
+    insert_swap_txs,
+    insert_swap_txs_w_router,
+    test_simulate_amount_out,
+};
 
 use crate::tests::helper::*;
 use alkane_helpers::clear;
 use alkanes::indexer::index_block;
-use alkanes::tests::helpers::{self as alkane_helpers, assert_token_id_has_no_deployment};
+use alkanes::tests::helpers::{ self as alkane_helpers, assert_token_id_has_no_deployment };
 use alkanes::view;
 #[allow(unused_imports)]
-use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
+use metashrew::{ get_cache, index_pointer::IndexPointer, println, stdio::stdout };
 use std::fmt::Write;
 use wasm_bindgen_test::wasm_bindgen_test;
 
@@ -30,11 +39,14 @@ use wasm_bindgen_test::wasm_bindgen_test;
 fn test_amm_pool_normal_init() -> Result<()> {
     clear();
     let (block, _ids) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
-    let trace_result: Trace = view::trace(&OutPoint {
-        txid: block.txdata[block.txdata.len() - 1].compute_txid(),
-        vout: 3,
-    })?
-    .try_into()?;
+    let trace_result: Trace = view
+        ::trace(
+            &(OutPoint {
+                txid: block.txdata[block.txdata.len() - 1].compute_txid(),
+                vout: 3,
+            })
+        )?
+        .try_into()?;
     println!("trace: {:?}", trace_result);
     Ok(())
 }
@@ -55,8 +67,8 @@ fn test_amm_factory_double_init_fail() -> Result<()> {
                 txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
                 vout: 0,
             },
-            false,
-        ),
+            false
+        )
     );
     index_block(&test_block, block_height)?;
     Ok(())
@@ -76,7 +88,7 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
         1000000,
         deployment_ids.amm_pool_1_deployment.clone(),
         &mut test_block,
-        input_outpoint,
+        input_outpoint
     );
     test_block.txdata.push(
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
@@ -89,8 +101,8 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
                 txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
                 vout: 0,
             },
-            false,
-        ),
+            false
+        )
     );
     index_block(&test_block, block_height)?;
     Ok(())
@@ -111,6 +123,13 @@ fn test_amm_pool_zero_init() -> Result<()> {
 }
 
 #[wasm_bindgen_test]
+fn test_amm_pool_simulate_amount_out() -> Result<()> {
+    clear();
+    test_simulate_amount_out()?;
+    Ok(())
+}
+
+#[wasm_bindgen_test]
 fn test_amm_pool_bad_init() -> Result<()> {
     clear();
     let block_height = 840_000;
@@ -126,7 +145,7 @@ fn test_amm_pool_bad_init() -> Result<()> {
         deployment_ids.owned_token_2_deployment,
         &mut test_block,
         &deployment_ids,
-        input_output,
+        input_output
     );
     index_block(&test_block, block_height)?;
     assert_token_id_has_no_deployment(deployment_ids.amm_pool_1_deployment)?;
@@ -188,7 +207,7 @@ fn test_amm_pool_add_more_liquidity() -> Result<()> {
         deployment_ids.owned_token_2_deployment,
         deployment_ids.amm_pool_1_deployment,
         &mut add_liquidity_block,
-        input_outpoint,
+        input_outpoint
     );
     index_block(&add_liquidity_block, block_height)?;
 
@@ -199,7 +218,7 @@ fn test_amm_pool_add_more_liquidity() -> Result<()> {
         amount2,
         total_supply,
         &add_liquidity_block,
-        deployment_ids.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment
     )?;
     Ok(())
 }
@@ -224,7 +243,7 @@ fn test_amm_pool_add_more_liquidity_to_wrong_pool() -> Result<()> {
         deployment_ids.owned_token_2_deployment,
         deployment_ids.amm_pool_2_deployment,
         &mut add_liquidity_block,
-        input_outpoint,
+        input_outpoint
     );
     index_block(&add_liquidity_block, block_height)?;
 
@@ -235,7 +254,7 @@ fn test_amm_pool_add_more_liquidity_to_wrong_pool() -> Result<()> {
         0,
         total_supply,
         &add_liquidity_block,
-        deployment_ids.amm_pool_2_deployment,
+        deployment_ids.amm_pool_2_deployment
     )?;
     Ok(())
 }
@@ -260,7 +279,7 @@ fn test_amm_pool_add_more_liquidity_w_router() -> Result<()> {
         deployment_ids.owned_token_2_deployment,
         &mut add_liquidity_block,
         &deployment_ids,
-        input_outpoint,
+        input_outpoint
     );
     index_block(&add_liquidity_block, block_height)?;
 
@@ -271,7 +290,7 @@ fn test_amm_pool_add_more_liquidity_w_router() -> Result<()> {
         amount2,
         total_supply,
         &add_liquidity_block,
-        deployment_ids.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment
     )?;
     Ok(())
 }
@@ -295,7 +314,7 @@ fn test_amm_pool_swap() -> Result<()> {
         0,
         &mut swap_block,
         input_outpoint,
-        deployment_ids.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment
     );
     index_block(&swap_block, block_height)?;
 
@@ -303,7 +322,7 @@ fn test_amm_pool_swap() -> Result<()> {
         vec![amount1, amount2],
         amount_to_swap,
         deployment_ids.owned_token_2_deployment,
-        &swap_block,
+        &swap_block
     )?;
     Ok(())
 }
@@ -327,7 +346,7 @@ fn test_amm_pool_swap_large() -> Result<()> {
         0,
         &mut swap_block,
         input_outpoint,
-        deployment_ids.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment
     );
     index_block(&swap_block, block_height)?;
 
@@ -335,7 +354,7 @@ fn test_amm_pool_swap_large() -> Result<()> {
         vec![amount1, amount2],
         amount_to_swap,
         deployment_ids.owned_token_2_deployment,
-        &swap_block,
+        &swap_block
     )?;
     Ok(())
 }
@@ -355,14 +374,11 @@ fn test_amm_pool_swap_w_router() -> Result<()> {
     let amount_to_swap = 10000;
     insert_swap_txs_w_router(
         amount_to_swap,
-        vec![
-            deployment_ids.owned_token_1_deployment,
-            deployment_ids.owned_token_2_deployment,
-        ],
+        vec![deployment_ids.owned_token_1_deployment, deployment_ids.owned_token_2_deployment],
         0,
         &mut swap_block,
         &deployment_ids,
-        input_outpoint,
+        input_outpoint
     );
     index_block(&swap_block, block_height)?;
 
@@ -370,7 +386,7 @@ fn test_amm_pool_swap_w_router() -> Result<()> {
         vec![amount1, amount2],
         amount_to_swap,
         deployment_ids.owned_token_2_deployment,
-        &swap_block,
+        &swap_block
     )?;
     Ok(())
 }
@@ -393,12 +409,12 @@ fn test_amm_pool_swap_w_router_middle_path() -> Result<()> {
         vec![
             deployment_ids.owned_token_1_deployment,
             deployment_ids.owned_token_2_deployment,
-            deployment_ids.owned_token_3_deployment,
+            deployment_ids.owned_token_3_deployment
         ],
         0,
         &mut swap_block,
         &deployment_ids,
-        input_outpoint,
+        input_outpoint
     );
     index_block(&swap_block, block_height)?;
 
@@ -406,7 +422,7 @@ fn test_amm_pool_swap_w_router_middle_path() -> Result<()> {
         vec![amount1, amount2, amount2],
         amount_to_swap,
         deployment_ids.owned_token_3_deployment,
-        &swap_block,
+        &swap_block
     )?;
     Ok(())
 }
@@ -430,7 +446,7 @@ fn test_amm_pool_swap_oyl() -> Result<()> {
         0,
         &mut swap_block,
         input_outpoint,
-        deployment_ids.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment
     );
     index_block(&swap_block, block_height)?;
 
@@ -438,7 +454,7 @@ fn test_amm_pool_swap_oyl() -> Result<()> {
         vec![amount1, amount2],
         amount_to_swap,
         deployment_ids.owned_token_2_deployment,
-        &swap_block,
+        &swap_block
     )?;
     Ok(())
 }
