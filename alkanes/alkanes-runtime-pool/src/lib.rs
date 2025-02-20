@@ -22,6 +22,40 @@ pub const DEFAULT_FEE_AMOUNT_PER_1000: u128 = 4;
 
 type U256 = Uint<256, 4>;
 
+#[derive(Default)]
+pub struct PoolInfo {
+    pub token_a: AlkaneId,
+    pub token_b: AlkaneId,
+    pub reserve_a: u128,
+    pub reserve_b: u128,
+}
+
+pub fn to_bytes(alkane: AlkaneId) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(32);
+    bytes.extend(&alkane.block.to_le_bytes());
+    bytes.extend(&alkane.tx.to_le_bytes());
+    bytes
+}
+
+impl PoolInfo {
+    pub fn try_to_vec(&self) -> Result<Vec<u8>> {
+        let mut bytes = Vec::new();
+
+        bytes.extend_from_slice(&to_bytes(self.token_a));
+
+        // Add token_b bytes
+        bytes.extend_from_slice(&to_bytes(self.token_b));
+
+        // Add reserve_a bytes (u128 -> 16 bytes)
+        bytes.extend_from_slice(&self.reserve_a.to_le_bytes());
+
+        // Add reserve_b bytes (u128 -> 16 bytes)
+        bytes.extend_from_slice(&self.reserve_b.to_le_bytes());
+
+        Ok(bytes)
+    }
+}
+
 pub trait AMMPoolBase {
     fn init_pool(
         &self,
@@ -94,6 +128,22 @@ pub trait AMMPoolBase {
                 value: reserve_sheet.get(&reserve_b.id.clone().into()),
             },
         )
+    }
+
+    fn pool_details(&self) -> Result<CallResponse> {
+        let (reserve_a, reserve_b) = self.reserves();
+        let (token_a, token_b) = self.alkanes_for_self().unwrap();
+        let pool_info = PoolInfo {
+            token_a,
+            token_b,
+            reserve_a: reserve_a.value,
+            reserve_b: reserve_b.value,
+        };
+
+        let mut response = CallResponse::default();
+        response.data = pool_info.try_to_vec()?;
+
+        Ok(response)
     }
 
     fn mint(&self, myself: AlkaneId, parcel: AlkaneTransferParcel) -> Result<CallResponse> {
@@ -178,17 +228,24 @@ pub trait AMMPoolBase {
         );
         let (previous_a, previous_b) = self.previous_reserves(&input);
 
+        println!("previous a {}", previous_a.value);
+        println!("previous b{}", previous_b.value);
+
         let amount_in_with_fee =
             U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(amount);
+
+        println!("{}", amount_in_with_fee);
 
         let mut response = CallResponse::default();
 
         if &token == &previous_a.id {
+            println!("passed token a");
             let numerator = amount_in_with_fee * U256::from(previous_b.value);
             let denominator = U256::from(1000) * U256::from(previous_a.value) + amount_in_with_fee;
             response.data = (numerator / denominator).to_le_bytes_vec();
             return Ok(response);
         } else {
+            println!("passed token b");
             let numerator = amount_in_with_fee * U256::from(previous_a.value);
             let denominator = U256::from(1000) * U256::from(previous_b.value) + amount_in_with_fee;
             response.data = (numerator / denominator).to_le_bytes_vec();
@@ -208,6 +265,15 @@ pub trait AMMPoolBase {
         let transfer = parcel.0[0].clone();
         let (previous_a, previous_b) = self.previous_reserves(&parcel);
         let (reserve_a, reserve_b) = self.reserves();
+
+        println!(
+            "amount out for b {}",
+            self.get_amount_out(transfer.value, previous_a.value, previous_b.value)?
+        );
+        println!(
+            "amount out fot a, {}",
+            self.get_amount_out(transfer.value, previous_b.value, previous_a.value)?
+        );
         let output = if &transfer.id == &reserve_a.id {
             AlkaneTransfer {
                 id: reserve_b.id,
@@ -297,6 +363,7 @@ impl AlkaneResponder for AMMPool {
                 2 => delegate.burn(context.myself, context.incoming_alkanes),
                 3 => delegate.swap(context.incoming_alkanes, shift_or_err(&mut inputs)?),
                 4 => delegate.simulate_amount_out(inputs),
+                5 => delegate.pool_details(),
                 50 => Ok(CallResponse::forward(&context.incoming_alkanes)),
 
                 _ => Err(anyhow!("unrecognized opcode")),
