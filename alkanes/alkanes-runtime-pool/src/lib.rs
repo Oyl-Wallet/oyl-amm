@@ -44,13 +44,10 @@ impl PoolInfo {
 
         bytes.extend_from_slice(&token_a_bytes);
 
-        // Add token_b bytes
         bytes.extend_from_slice(&token_b_bytes);
 
-        // Add reserve_a bytes (u128 -> 16 bytes)
         bytes.extend_from_slice(&self.reserve_a.to_le_bytes());
 
-        // Add reserve_b bytes (u128 -> 16 bytes)
         bytes.extend_from_slice(&self.reserve_b.to_le_bytes());
 
         Ok(bytes)
