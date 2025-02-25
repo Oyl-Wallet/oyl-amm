@@ -31,7 +31,7 @@ pub struct PoolInfo {
 }
 
 impl PoolInfo {
-    pub fn try_to_vec(&self) -> Result<Vec<u8>> {
+    pub fn try_to_vec(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
 
         let mut token_a_bytes: Vec<u8> = Vec::with_capacity(32);
@@ -50,7 +50,7 @@ impl PoolInfo {
 
         bytes.extend_from_slice(&self.reserve_b.to_le_bytes());
 
-        Ok(bytes)
+        bytes
     }
 }
 
@@ -139,7 +139,7 @@ pub trait AMMPoolBase {
         };
 
         let mut response = CallResponse::default();
-        response.data = pool_info.try_to_vec()?;
+        response.data = pool_info.try_to_vec();
 
         Ok(response)
     }
