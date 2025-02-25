@@ -22,6 +22,38 @@ pub const DEFAULT_FEE_AMOUNT_PER_1000: u128 = 4;
 
 type U256 = Uint<256, 4>;
 
+#[derive(Default)]
+pub struct PoolInfo {
+    pub token_a: AlkaneId,
+    pub token_b: AlkaneId,
+    pub reserve_a: u128,
+    pub reserve_b: u128,
+}
+
+impl PoolInfo {
+    pub fn try_to_vec(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+
+        let mut token_a_bytes: Vec<u8> = Vec::with_capacity(32);
+        token_a_bytes.extend(&self.token_a.block.to_le_bytes());
+        token_a_bytes.extend(&self.token_a.tx.to_le_bytes());
+
+        let mut token_b_bytes: Vec<u8> = Vec::with_capacity(32);
+        token_b_bytes.extend(&self.token_b.block.to_le_bytes());
+        token_b_bytes.extend(&self.token_b.tx.to_le_bytes());
+
+        bytes.extend_from_slice(&token_a_bytes);
+
+        bytes.extend_from_slice(&token_b_bytes);
+
+        bytes.extend_from_slice(&self.reserve_a.to_le_bytes());
+
+        bytes.extend_from_slice(&self.reserve_b.to_le_bytes());
+
+        bytes
+    }
+}
+
 pub trait AMMPoolBase {
     fn init_pool(
         &self,
@@ -94,6 +126,22 @@ pub trait AMMPoolBase {
                 value: reserve_sheet.get(&reserve_b.id.clone().into()),
             },
         )
+    }
+
+    fn pool_details(&self) -> Result<CallResponse> {
+        let (reserve_a, reserve_b) = self.reserves();
+        let (token_a, token_b) = self.alkanes_for_self()?;
+        let pool_info = PoolInfo {
+            token_a,
+            token_b,
+            reserve_a: reserve_a.value,
+            reserve_b: reserve_b.value,
+        };
+
+        let mut response = CallResponse::default();
+        response.data = pool_info.try_to_vec();
+
+        Ok(response)
     }
 
     fn mint(&self, myself: AlkaneId, parcel: AlkaneTransferParcel) -> Result<CallResponse> {
@@ -208,6 +256,7 @@ pub trait AMMPoolBase {
         let transfer = parcel.0[0].clone();
         let (previous_a, previous_b) = self.previous_reserves(&parcel);
         let (reserve_a, reserve_b) = self.reserves();
+
         let output = if &transfer.id == &reserve_a.id {
             AlkaneTransfer {
                 id: reserve_b.id,
@@ -297,6 +346,7 @@ impl AlkaneResponder for AMMPool {
                 2 => delegate.burn(context.myself, context.incoming_alkanes),
                 3 => delegate.swap(context.incoming_alkanes, shift_or_err(&mut inputs)?),
                 4 => delegate.simulate_amount_out(inputs),
+                5 => delegate.pool_details(),
                 50 => Ok(CallResponse::forward(&context.incoming_alkanes)),
 
                 _ => Err(anyhow!("unrecognized opcode")),
