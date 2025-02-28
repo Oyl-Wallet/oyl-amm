@@ -28,6 +28,7 @@ pub struct PoolInfo {
     pub token_b: AlkaneId,
     pub reserve_a: u128,
     pub reserve_b: u128,
+    pub total_supply: u128,
 }
 
 impl PoolInfo {
@@ -49,7 +50,7 @@ impl PoolInfo {
         bytes.extend_from_slice(&self.reserve_a.to_le_bytes());
 
         bytes.extend_from_slice(&self.reserve_b.to_le_bytes());
-
+        bytes.extend_from_slice(&self.total_supply.to_le_bytes());
         bytes
     }
 }
@@ -136,6 +137,7 @@ pub trait AMMPoolBase {
             token_b,
             reserve_a: reserve_a.value,
             reserve_b: reserve_b.value,
+            total_supply: self.total_supply(),
         };
 
         let mut response = CallResponse::default();
