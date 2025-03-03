@@ -41,7 +41,7 @@ metashrew = { git = "https://github.com/kungfuflex/alkanes-rs", features = [
 protorune = { git = "https://github.com/kungfuflex/alkanes-rs", features = [
     "test-utils",
 ] }
-wasm-bindgen = "0.2.99"
+wasm-bindgen = "0.2.100"
 wasm-bindgen-test = "0.3.49"
 hex_lit = "0.1.1"
 
