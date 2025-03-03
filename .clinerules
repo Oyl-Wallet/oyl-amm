@@ -1,0 +1,139 @@
+# Cline Rules for swap.oyl.io
+
+## Project Patterns
+
+### Code Organization
+- The project follows a modular architecture with clear separation of concerns
+- Each component (Router, Factory, Pool) is implemented in its own crate
+- Standard and OYL-specific implementations are separated
+- Tests are organized by functionality (amm, add_liquidity, remove_liquidity, swap)
+
+### Naming Conventions
+- Use `AMM` prefix for core automated market maker components
+- Use `Oyl` prefix for OYL-specific implementations
+- Use descriptive function names that clearly indicate their purpose
+- Follow Rust naming conventions (snake_case for functions, CamelCase for types)
+
+### Implementation Patterns
+- Use the delegate pattern for extending functionality
+- Use traits to define interfaces and compose functionality
+- Use checked arithmetic operations to prevent integer overflows
+- Use the constant product formula (x * y = k) for swap pricing
+
+## Critical Implementation Paths
+
+### Pool Creation
+1. User sends two tokens to the Factory
+2. Factory creates a new Pool for the token pair
+3. Pool initializes with the provided tokens as reserves
+4. Factory returns LP tokens to the user
+
+### Swapping
+1. User sends tokens to the Router with a specified path
+2. Router identifies the appropriate pools for each hop in the path
+3. Router executes the swap through each pool
+4. Pools calculate the output amount based on the constant product formula
+5. Router returns the final output tokens to the user
+
+### Adding Liquidity
+1. User sends tokens to the Router
+2. Router identifies the appropriate pool
+3. Pool calculates the LP tokens to mint based on the provided liquidity
+4. Pool mints LP tokens and sends them to the user
+
+### Removing Liquidity
+1. User sends LP tokens to the Router
+2. Router identifies the appropriate pool
+3. Pool burns the LP tokens and calculates the tokens to return
+4. Pool sends the underlying tokens back to the user
+
+## Known Challenges
+
+### Integer Arithmetic
+- The implementation uses fixed-point arithmetic with 128-bit and 256-bit integers
+- Be careful with precision loss in division operations
+- Use checked arithmetic operations to prevent overflows
+- Be aware of the limitations of integer arithmetic for very small or very large values
+
+### Zero-Sum Logic
+- The system enforces zero-sum logic to ensure tokens cannot be created or destroyed
+- All token transfers must be accounted for
+- The sum of tokens in the system must remain constant (minus fees)
+- Be careful when implementing new features to maintain this invariant
+
+### Delegate Pattern
+- The delegate pattern is used extensively for extending functionality
+- Be aware of the potential for infinite recursion if delegates are not set up correctly
+- Ensure that delegates are properly initialized before use
+- Be careful when modifying delegate behavior to avoid breaking existing functionality
+
+## Project-Specific Patterns
+
+### OYL Token Buyback
+- The OYL-specific implementations redirect a portion of fees to buy back the OYL token
+- This is implemented in the OylAMMPool and OylAMMFactory classes
+- The buyback mechanism is still being refined
+- Be careful when modifying this functionality to maintain the intended tokenomics
+
+### Fee Structure
+- The system uses a fixed 0.4% fee on all swaps (DEFAULT_FEE_AMOUNT_PER_1000 = 4)
+- This fee is split between liquidity providers and (in the OYL variant) the OYL buyback
+- The fee structure is a critical aspect of the system's economics
+- Be careful when modifying the fee structure to maintain the intended incentives
+
+### Minimum Liquidity
+- The system locks a minimum amount of liquidity (1000 wei) in each pool
+- This is to prevent manipulation of pool prices and ensure a minimum level of liquidity
+- This value is defined as MINIMUM_LIQUIDITY in the AMMPool implementation
+- Be careful when modifying this value as it affects the security of the system
+
+## Evolution of Project Decisions
+
+### Fee Structure
+- Initially considered variable fees based on token pair volatility
+- Decided on a fixed 0.4% fee for simplicity and predictability
+- May revisit this decision in the future based on market conditions and user feedback
+
+### OYL Token Buyback
+- Initially considered a simple fee redirection mechanism
+- Evolved to a more sophisticated buyback mechanism
+- Still being refined to optimize the portion of fees redirected to buybacks
+
+### Routing Algorithm
+- Started with a simple path-based routing algorithm
+- Considering more sophisticated algorithms for finding optimal paths
+- May implement a Uniswap V3-like router in the future
+
+## Tool Usage Patterns
+
+### Testing
+- Use the `wasm_bindgen_test` framework for testing
+- Create helper functions for common test operations
+- Test both happy paths and edge cases
+- Use clear assertions to document expected behavior
+
+### Error Handling
+- Use the `anyhow` crate for error handling
+- Provide descriptive error messages
+- Use the `?` operator for propagating errors
+- Handle expected errors gracefully
+
+### Documentation
+- Document public interfaces with clear descriptions
+- Include examples where appropriate
+- Document complex algorithms and calculations
+- Keep documentation up to date with code changes
+
+## User Preferences
+
+### Code Style
+- Follow Rust style guidelines
+- Use descriptive variable names
+- Keep functions focused on a single responsibility
+- Use comments to explain complex logic
+
+### Development Workflow
+- Write tests before implementing new features
+- Review code changes carefully
+- Document changes in the appropriate Memory Bank files
+- Keep the Memory Bank up to date with the latest project status
