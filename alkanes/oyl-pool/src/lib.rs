@@ -40,34 +40,12 @@ impl OylAMMPool {
         oyl_pool.inner.set_delegate(Box::new(oyl_pool.clone())); // Override delegate with self
         oyl_pool
     }
-
-    fn oyl_swap_contract(&self) -> Result<AlkaneId> {
-        let ptr = StoragePointer::from_keyword("/oyl_swap_contract")
-            .get()
-            .as_ref()
-            .clone();
-        let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
-        Ok(AlkaneId::parse(&mut cursor)?)
-    }
 }
 
 impl AMMReserves for OylAMMPool {}
 impl AMMPoolBase for OylAMMPool {
     fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
         AMMReserves::reserves(self)
-    }
-    fn process_inputs_and_init_pool(
-        &self,
-        mut inputs: Vec<u128>,
-        context: Context,
-    ) -> Result<CallResponse> {
-        let (a, b) = self.pull_ids_or_err(&mut inputs)?;
-        let response = self.init_pool(a, b, context)?;
-
-        let mut oyl_swap_storage = StoragePointer::from_keyword("/oyl_swap_contract");
-        let oyl_swap_contract = shift_id_or_err(&mut inputs)?;
-        oyl_swap_storage.set(Arc::new(oyl_swap_contract.into()));
-        Ok(response)
     }
     fn swap(
         &self,
