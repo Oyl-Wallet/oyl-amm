@@ -25,3 +25,5 @@ Cargo.lock
 /target
 
 src/tests/std
+.clinerules
+memory-bank/

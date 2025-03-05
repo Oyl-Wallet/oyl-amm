@@ -52,6 +52,42 @@ impl AMMRouter {
         let pool = AlkaneId::new(consume_u128(&mut cursor)?, consume_u128(&mut cursor)?);
         Ok(pool)
     }
+
+    fn get_all_pools(&self) -> Result<CallResponse> {
+        let factory = Self::factory()?;
+        self.call(
+            &Cellpack {
+                target: factory,
+                inputs: vec![3], // Opcode for get_all_pools
+            },
+            &AlkaneTransferParcel(vec![]),
+            self.fuel(),
+        )
+    }
+    
+    fn get_all_pools_details(&self) -> Result<CallResponse> {
+        let factory = Self::factory()?;
+        self.call(
+            &Cellpack {
+                target: factory,
+                inputs: vec![4], // Opcode for get_all_pools_details
+            },
+            &AlkaneTransferParcel(vec![]),
+            self.fuel(),
+        )
+    }
+    
+    fn get_paginated_pools(&self, start_index: u128, limit: u128) -> Result<CallResponse> {
+        let factory = Self::factory()?;
+        self.call(
+            &Cellpack {
+                target: factory,
+                inputs: vec![5, start_index, limit], // Opcode for get_paginated_pools
+            },
+            &AlkaneTransferParcel(vec![]),
+            self.fuel(),
+        )
+    }
 }
 
 impl AlkaneResponder for AMMRouter {
@@ -122,6 +158,13 @@ impl AlkaneResponder for AMMRouter {
                 }
 
                 Ok(this_response)
+            }
+            4 => self.get_all_pools(), // New opcode for get_all_pools
+            5 => self.get_all_pools_details(), // New opcode for get_all_pools_details
+            6 => {
+                let start_index = shift_or_err(&mut inputs)?;
+                let limit = shift_or_err(&mut inputs)?;
+                self.get_paginated_pools(start_index, limit) // New opcode for get_paginated_pools
             }
             50 => Ok(CallResponse::forward(&context.incoming_alkanes)),
 
