@@ -64,30 +64,6 @@ impl AMMRouter {
             self.fuel(),
         )
     }
-    
-    fn get_all_pools_details(&self) -> Result<CallResponse> {
-        let factory = Self::factory()?;
-        self.call(
-            &Cellpack {
-                target: factory,
-                inputs: vec![4], // Opcode for get_all_pools_details
-            },
-            &AlkaneTransferParcel(vec![]),
-            self.fuel(),
-        )
-    }
-    
-    fn get_paginated_pools(&self, start_index: u128, limit: u128) -> Result<CallResponse> {
-        let factory = Self::factory()?;
-        self.call(
-            &Cellpack {
-                target: factory,
-                inputs: vec![5, start_index, limit], // Opcode for get_paginated_pools
-            },
-            &AlkaneTransferParcel(vec![]),
-            self.fuel(),
-        )
-    }
 }
 
 impl AlkaneResponder for AMMRouter {
