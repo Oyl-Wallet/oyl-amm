@@ -170,7 +170,7 @@ pub trait AMMFactoryBase {
         // Add the total count as the first element
         all_pools_data.extend_from_slice(&length.to_le_bytes());
         
-        // Add each pool ID
+
         for i in 0..length {
             match self.all_pools(i) {
                 Ok(pool_id) => {
@@ -178,7 +178,6 @@ pub trait AMMFactoryBase {
                     all_pools_data.extend_from_slice(&pool_id.tx.to_le_bytes());
                 }
                 Err(_) => {
-                    // Skip any errors and continue
                     continue;
                 }
             }
