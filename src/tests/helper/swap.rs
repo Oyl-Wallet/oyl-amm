@@ -73,6 +73,9 @@ pub fn test_simulate_amount_out() -> Result<()> {
     let denominator = U256::from(1000) * U256::from(1_000_000) + amount_with_fee;
     let expected_output = (numerator / denominator).to_le_bytes_vec();
 
+    println!("result amt out {:?}", result.data);
+    println!("expected output {:?}", expected_output);
+
     assert_eq!(result.data, expected_output);
 
     // Test case 2: Swap token B for token A

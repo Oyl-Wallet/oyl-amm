@@ -218,29 +218,31 @@ pub trait AMMPoolBase {
         Ok((numerator / denominator).try_into()?)
     }
     fn simulate_amount_out(&self, mut inputs: Vec<u128>) -> Result<CallResponse> {
+        if inputs.len() != 3 {
+            return Err(anyhow!("Invalid input length"));
+        }
+
         let token: AlkaneId = AlkaneId::new(shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?);
         let amount: u128 = shift_or_err(&mut inputs)?;
-        let input = AlkaneTransferParcel(
-            vec![AlkaneTransfer {
-                id: token,
-                value: amount,
-            }]
-        );
-        let (previous_a, previous_b) = self.previous_reserves(&input);
+        let (reserve_a, reserve_b) = self.reserves();
+
+        if token != reserve_a.id && token != reserve_b.id {
+            return Err(anyhow!("Token not found in pool"));
+        }
 
         let amount_in_with_fee =
             U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(amount);
 
         let mut response = CallResponse::default();
 
-        if &token == &previous_a.id {
-            let numerator = amount_in_with_fee * U256::from(previous_b.value);
-            let denominator = U256::from(1000) * U256::from(previous_a.value) + amount_in_with_fee;
+        if &token == &reserve_a.id {
+            let numerator = amount_in_with_fee * U256::from(reserve_b.value);
+            let denominator = U256::from(1000) * U256::from(reserve_a.value) + amount_in_with_fee;
             response.data = (numerator / denominator).to_le_bytes_vec();
             return Ok(response);
         } else {
-            let numerator = amount_in_with_fee * U256::from(previous_a.value);
-            let denominator = U256::from(1000) * U256::from(previous_b.value) + amount_in_with_fee;
+            let numerator = amount_in_with_fee * U256::from(reserve_a.value);
+            let denominator = U256::from(1000) * U256::from(reserve_b.value) + amount_in_with_fee;
             response.data = (numerator / denominator).to_le_bytes_vec();
             return Ok(response);
         }
