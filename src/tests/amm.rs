@@ -471,7 +471,7 @@ fn test_get_all_pools() -> Result<()> {
             Witness::new(),
             vec![Cellpack {
                 target: deployment_ids.amm_factory_deployment,
-                inputs: vec![3], // Opcode 3 for get_all_pools
+                inputs: vec![3], 
             }],
             OutPoint {
                 txid: block.txdata[block.txdata.len() - 1].compute_txid(),
@@ -507,13 +507,13 @@ fn test_get_all_pools() -> Result<()> {
     for i in 0..pool_count {
         let offset = POOL_DATA_OFFSET + 16 + (i as usize * 32); // 16 bytes for count, then 32 bytes per pool
         
-        // Read block ID (16 bytes)
+       
         let block_bytes: [u8; 16] = trace_data[offset..offset+16]
             .try_into()
             .map_err(|_| anyhow::anyhow!("Failed to read block ID"))?;
         let block = u128::from_le_bytes(block_bytes);
         
-        // Read tx ID (16 bytes)
+       
         let tx_bytes: [u8; 16] = trace_data[offset+16..offset+32]
             .try_into()
             .map_err(|_| anyhow::anyhow!("Failed to read tx ID"))?;
@@ -523,10 +523,10 @@ fn test_get_all_pools() -> Result<()> {
         pools.push(AlkaneId::new(block, tx));
     }
     
-    // Verify we have the expected number of pools
+    
     assert_eq!(pools.len() as u128, pool_count, "Expected {} pool IDs, but got {}", pool_count, pools.len());
     
-    // Verify the pool IDs match what we expect
+
     if pools.len() >= 1 {
         assert_eq!(pools[0].block, 2, "First pool block ID should be 2");
         assert_eq!(pools[0].tx, 11, "First pool tx ID should be 11");

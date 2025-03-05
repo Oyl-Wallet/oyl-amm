@@ -58,7 +58,7 @@ impl AMMRouter {
         self.call(
             &Cellpack {
                 target: factory,
-                inputs: vec![3], // Opcode for get_all_pools
+                inputs: vec![3],
             },
             &AlkaneTransferParcel(vec![]),
             self.fuel(),
@@ -135,7 +135,7 @@ impl AlkaneResponder for AMMRouter {
 
                 Ok(this_response)
             }
-            4 => self.get_all_pools(), // New opcode for get_all_pools
+            4 => self.get_all_pools(),
             50 => Ok(CallResponse::forward(&context.incoming_alkanes)),
 
             _ => Err(anyhow!("unrecognized opcode {}", opcode)),

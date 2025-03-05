@@ -263,7 +263,7 @@ impl AlkaneResponder for AMMFactory {
                 0 => delegate.process_inputs_and_init_factory(inputs, context),
                 1 => delegate.create_new_pool(context),
                 2 => delegate.find_existing_pool_id(inputs, context),
-                3 => delegate.get_all_pools(), // New opcode for getting all pools
+                3 => delegate.get_all_pools(),
                 // TODO: add a function to change the implementation of the AMM pool for upgradeability. Need to check that the caller is the owner of this contract
                 _ => Err(anyhow!("unrecognized opcode")),
             }
