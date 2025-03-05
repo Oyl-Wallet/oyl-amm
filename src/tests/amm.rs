@@ -462,96 +462,80 @@ fn test_get_all_pools() -> Result<()> {
     clear();
     let (block, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
     
-    // // Now that we have the pools initialized, let's call the get_all_pools function
-    // let block_height = 840_000;
+    let block_height = 840_000;
     
-    // // Create a new block for the get_all_pools call
-    // let mut test_block = protorune::test_helpers::create_block_with_coinbase_tx(block_height + 1);
+    let mut test_block = protorune::test_helpers::create_block_with_coinbase_tx(block_height + 1);
     
-    // // Add a transaction that calls the get_all_pools function (opcode 3)
-    // test_block.txdata.push(
-    //     alkane_helpers::create_multiple_cellpack_with_witness_and_in(
-    //         Witness::new(),
-    //         vec![Cellpack {
-    //             target: deployment_ids.amm_factory_deployment,
-    //             inputs: vec![3], // Opcode 3 for get_all_pools
-    //         }],
-    //         OutPoint {
-    //             txid: block.txdata[block.txdata.len() - 1].compute_txid(),
-    //             vout: 0,
-    //         },
-    //         false
-    //     )
-    // );
+    test_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_factory_deployment,
+                inputs: vec![3], // Opcode 3 for get_all_pools
+            }],
+            OutPoint {
+                txid: block.txdata[block.txdata.len() - 1].compute_txid(),
+                vout: 0,
+            },
+            false
+        )
+    );
     
-    // // Index the block to execute the get_all_pools function
-    // index_block(&test_block, block_height + 1)?;
+    index_block(&test_block, block_height + 1)?;
     
-    // // Get the trace result from vout 3 (as we confirmed this is where the data is)
-    // let outpoint_3 = OutPoint {
-    //     txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-    //     vout: 3,
-    // };
+    let outpoint_3 = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        vout: 3,
+    };
+  
+    let trace_data = view::trace(&outpoint_3)?;
+    println!("Trace data length from vout 3: {}", trace_data.len());
     
-    // // Get the trace data
-    // let trace_data = view::trace(&outpoint_3)?;
-    // println!("Trace data length from vout 3: {}", trace_data.len());
+    // The pool data starts at offset 87 in the trace data
+    // This is where the actual return data from get_all_pools() begins
+    const POOL_DATA_OFFSET: usize = 87;
     
-    // // Convert the trace to a Trace struct
-    // let trace_result: Trace = view::trace(&outpoint_3)?.try_into()?;
-    // println!("Trace result from vout 3: {:?}", trace_result);
+    // Parse the pool count (first 16 bytes of the pool data)
+    let pool_count_bytes: [u8; 16] = trace_data[POOL_DATA_OFFSET..POOL_DATA_OFFSET+16]
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("Failed to read pool count"))?;
+    let pool_count = u128::from_le_bytes(pool_count_bytes);
+    println!("Pool count: {}", pool_count);
     
-    // // Now let's parse the data from the trace
-    // // Based on the logs, the data starts at index 16 (after the count)
-    // // The count is 2 (as expected, we have 2 pools)
+    // Parse each pool ID
+    let mut pools = Vec::new();
+    for i in 0..pool_count {
+        let offset = POOL_DATA_OFFSET + 16 + (i as usize * 32); // 16 bytes for count, then 32 bytes per pool
+        
+        // Read block ID (16 bytes)
+        let block_bytes: [u8; 16] = trace_data[offset..offset+16]
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Failed to read block ID"))?;
+        let block = u128::from_le_bytes(block_bytes);
+        
+        // Read tx ID (16 bytes)
+        let tx_bytes: [u8; 16] = trace_data[offset+16..offset+32]
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Failed to read tx ID"))?;
+        let tx = u128::from_le_bytes(tx_bytes);
+        
+        println!("Pool ID {}: ({}, {})", i, block, tx);
+        pools.push(AlkaneId::new(block, tx));
+    }
     
-    // // Extract the data from the trace
-    // // We need to access the data from the ReturnContext
-    // // From the logs, we can see the data starts at index 16 (after the count)
-    // // The count is 2 (as expected, we have 2 pools)
+    // Verify we have the expected number of pools
+    assert_eq!(pools.len() as u128, pool_count, "Expected {} pool IDs, but got {}", pool_count, pools.len());
     
-    // // Let's manually parse the data bytes
-    // // The first 16 bytes represent the count (2)
-    // let mut cursor = std::io::Cursor::new(trace_data);
+    // Verify the pool IDs match what we expect
+    if pools.len() >= 1 {
+        assert_eq!(pools[0].block, 2, "First pool block ID should be 2");
+        assert_eq!(pools[0].tx, 11, "First pool tx ID should be 11");
+    }
     
-    // // Skip to the data section (after the trace header)
-    // // This is a bit of a hack, but we know from the logs that the data starts after some headers
-    // // We'll skip to where the actual pool data begins
-    // cursor.set_position(80); // Skip to where the data begins
-    
-    // // Read the count (first 16 bytes)
-    // let pool_count = consume_sized_int::<u128>(&mut cursor)?;
-    // println!("Pool count from trace data: {}", pool_count);
-    
-    // // Log the current position
-    // println!("Cursor position after reading count: {}", cursor.position());
-    
-    // // Parse the pool IDs
-    // let mut pool_ids = Vec::new();
-    // for i in 0..pool_count {
-    //     let block = consume_sized_int::<u128>(&mut cursor)?;
-    //     let tx = consume_sized_int::<u128>(&mut cursor)?;
-    //     let pool_id = AlkaneId::new(block, tx);
-    //     println!("Read pool ID {}: {:?} at position {}", i, pool_id, cursor.position());
-    //     pool_ids.push(pool_id);
-    // }
-    
-    // // Print the pool IDs for debugging
-    // println!("Pool IDs: {:?}", pool_ids);
-    // println!("Number of pool IDs: {}", pool_ids.len());
-    
-    // // Verify we have the expected number of pools
-    // assert_eq!(pool_ids.len() as u128, pool_count, "Expected {} pool IDs, but got {}", pool_count, pool_ids.len());
-    
-    // // Verify the pool IDs match what we expect
-    // // From the logs, we can see the pool IDs are {2, 12} and {2, 13}
-    // if pool_ids.len() >= 1 {
-    //     assert_eq!(pool_ids[0], AlkaneId::new(2, 12), "First pool ID should be {{2, 12}}");
-    // }
-    
-    // if pool_ids.len() >= 2 {
-    //     assert_eq!(pool_ids[1], AlkaneId::new(2, 13), "Second pool ID should be {{2, 13}}");
-    // }
+    if pools.len() >= 2 {
+        assert_eq!(pools[1].block, 2, "Second pool block ID should be 2");
+        assert_eq!(pools[1].tx, 12, "Second pool tx ID should be 12");
+    }
     
     Ok(())
 }

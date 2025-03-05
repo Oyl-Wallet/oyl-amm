@@ -160,12 +160,6 @@ impl AlkaneResponder for AMMRouter {
                 Ok(this_response)
             }
             4 => self.get_all_pools(), // New opcode for get_all_pools
-            5 => self.get_all_pools_details(), // New opcode for get_all_pools_details
-            6 => {
-                let start_index = shift_or_err(&mut inputs)?;
-                let limit = shift_or_err(&mut inputs)?;
-                self.get_paginated_pools(start_index, limit) // New opcode for get_paginated_pools
-            }
             50 => Ok(CallResponse::forward(&context.incoming_alkanes)),
 
             _ => Err(anyhow!("unrecognized opcode {}", opcode)),

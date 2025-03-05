@@ -187,66 +187,6 @@ pub trait AMMFactoryBase {
         response.data = all_pools_data;
         Ok(response)
     }
-
-    // Get pool details for a specific pool
-    fn get_pool_details(&self, pool_id: AlkaneId) -> Result<CallResponse> {
-        // This is a placeholder implementation that will be overridden in the actual implementation
-        // The actual implementation will use the AlkaneResponder trait's call method
-        Err(anyhow!("Not implemented"))
-    }
-
-    // Get details for all pools
-    fn get_all_pools_details(&self) -> Result<CallResponse> {
-        let length = self.all_pools_length()?;
-        let mut response = CallResponse::default();
-        let mut all_pools_details = Vec::new();
-        
-        // Add the total count as the first element
-        all_pools_details.extend_from_slice(&length.to_le_bytes());
-        
-        // In the actual implementation, we would get details for each pool
-        // For now, we'll just return the count
-        
-        response.data = all_pools_details;
-        Ok(response)
-    }
-
-    // Get paginated pools (with start index and limit)
-    fn get_paginated_pools(&self, mut inputs: Vec<u128>) -> Result<CallResponse> {
-        let start_index = shift_or_err(&mut inputs)?;
-        let limit = shift_or_err(&mut inputs)?;
-        
-        let length = self.all_pools_length()?;
-        let mut response = CallResponse::default();
-        let mut paginated_pools_data = Vec::new();
-        
-        // Add the total count as the first element
-        paginated_pools_data.extend_from_slice(&length.to_le_bytes());
-        
-        // Calculate end index (exclusive)
-        let end_index = std::cmp::min(start_index + limit, length);
-        
-        // Add the number of pools in this page
-        let page_count = end_index.saturating_sub(start_index);
-        paginated_pools_data.extend_from_slice(&page_count.to_le_bytes());
-        
-        // Add each pool ID in the page
-        for i in start_index..end_index {
-            match self.all_pools(i) {
-                Ok(pool_id) => {
-                    paginated_pools_data.extend_from_slice(&pool_id.block.to_le_bytes());
-                    paginated_pools_data.extend_from_slice(&pool_id.tx.to_le_bytes());
-                }
-                Err(_) => {
-                    // Skip any errors and continue
-                    continue;
-                }
-            }
-        }
-        
-        response.data = paginated_pools_data;
-        Ok(response)
-    }
 }
 
 #[derive(Default)]
@@ -325,8 +265,6 @@ impl AlkaneResponder for AMMFactory {
                 1 => delegate.create_new_pool(context),
                 2 => delegate.find_existing_pool_id(inputs, context),
                 3 => delegate.get_all_pools(), // New opcode for getting all pools
-                4 => delegate.get_all_pools_details(), // New opcode for getting all pool details
-                5 => delegate.get_paginated_pools(inputs), // New opcode for getting paginated pools
                 // TODO: add a function to change the implementation of the AMM pool for upgradeability. Need to check that the caller is the owner of this contract
                 _ => Err(anyhow!("unrecognized opcode")),
             }
