@@ -163,7 +163,7 @@ pub fn get_last_outpoint_sheet(test_block: &Block) -> Result<BalanceSheet> {
 
 pub fn get_sheet_with_pool_1_init(test_block: &Block) -> Result<BalanceSheet> {
     let len = test_block.txdata.len();
-    get_sheet_for_outpoint(test_block, len - 3, 0)
+    get_sheet_for_outpoint(test_block, len - 1, 0)
 }
 
 pub fn get_sheet_with_remaining_lp_after_burn(test_block: &Block) -> Result<BalanceSheet> {
@@ -175,11 +175,12 @@ pub fn get_trace_after_burn(test_block: &Block) -> Result<Vec<u8>> {
     get_trace_for_outpoint(test_block, len - 2, 3)
 }
 
-pub fn create_multiple_cellpack_with_witness_and_in_with_edicts(
+pub fn create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers(
     witness: Witness,
     cellpacks: Vec<CellpackOrEdict>,
     previous_output: OutPoint,
     etch: bool,
+    with_leftovers_to_separate: bool,
 ) -> Transaction {
     let protocol_id = 1;
     let input_script = ScriptBuf::new();
@@ -194,7 +195,7 @@ pub fn create_multiple_cellpack_with_witness_and_in_with_edicts(
             true => vec![Protostone {
                 burn: Some(protocol_id),
                 edicts: vec![],
-                pointer: Some(4),
+                pointer: Some(5),
                 refund: None,
                 from: None,
                 protocol_tag: 13, // this value must be 13 if protoburn
@@ -217,15 +218,25 @@ pub fn create_multiple_cellpack_with_witness_and_in_with_edicts(
                 },
                 CellpackOrEdict::Edict(edicts) => Protostone {
                     message: vec![],
-                    //pass it to the next protomessage
-                    pointer: Some(0),
-                    refund: Some(0),
+                    pointer: if with_leftovers_to_separate {
+                        Some(2)
+                    } else {
+                        Some(0)
+                    },
+                    refund: if with_leftovers_to_separate {
+                        Some(2)
+                    } else {
+                        Some(0)
+                    },
                     //lazy way of mapping edicts onto next protomessage
                     edicts: edicts
                         .into_iter()
                         .map(|edict| {
                             let mut edict = edict;
                             edict.output = if etch { 5 + i as u128 } else { 4 + i as u128 };
+                            if with_leftovers_to_separate {
+                                edict.output += 1;
+                            }
                             edict
                         })
                         .collect(),
@@ -272,12 +283,39 @@ pub fn create_multiple_cellpack_with_witness_and_in_with_edicts(
     let script_pubkey = address.script_pubkey();
     let txout = TxOut {
         value: Amount::from_sat(100_000_000),
-        script_pubkey,
+        script_pubkey: script_pubkey.clone(),
+    };
+    let outputs = if with_leftovers_to_separate {
+        vec![
+            txout,
+            op_return,
+            TxOut {
+                value: Amount::from_sat(546),
+                script_pubkey,
+            },
+        ]
+    } else {
+        vec![txout, op_return]
     };
     Transaction {
         version: Version::ONE,
         lock_time: bitcoin::absolute::LockTime::ZERO,
         input: vec![txin],
-        output: vec![txout, op_return],
+        output: outputs,
     }
+}
+
+pub fn create_multiple_cellpack_with_witness_and_in_with_edicts(
+    witness: Witness,
+    cellpacks: Vec<CellpackOrEdict>,
+    previous_output: OutPoint,
+    etch: bool,
+) -> Transaction {
+    create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers(
+        witness,
+        cellpacks,
+        previous_output,
+        etch,
+        false,
+    )
 }

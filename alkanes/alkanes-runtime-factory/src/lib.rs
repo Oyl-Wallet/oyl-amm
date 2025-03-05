@@ -154,10 +154,6 @@ impl AMMFactory {
 
 impl AMMFactoryBase for AMMFactory {
     fn create_new_pool(&self, context: Context) -> Result<CallResponse> {
-        println!(
-            "incoming for create_new_pool {:?}",
-            context.incoming_alkanes
-        );
         if context.incoming_alkanes.0.len() != 2 {
             return Err(anyhow!("must send two runes to initialize a pool"));
         }

@@ -187,10 +187,9 @@ fn test_amm_pool_add_more_liquidity() -> Result<()> {
     let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, false)?;
     let block_height = 840_001;
     let mut add_liquidity_block = create_block_with_coinbase_tx(block_height);
-    // split init tx puts 1000000 / 2 in vout 0, and the other is unspent at vout 1. The split tx is now 2 from the tail
     let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 2].compute_txid(),
-        vout: 1,
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
     };
     insert_add_liquidity_txs(
         amount1,
@@ -223,10 +222,9 @@ fn test_amm_pool_add_more_liquidity_to_wrong_pool() -> Result<()> {
     let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, false)?;
     let block_height = 840_001;
     let mut add_liquidity_block = create_block_with_coinbase_tx(block_height);
-    // split init tx puts 1000000 / 2 in vout 0, and the other is unspent at vout 1. The split tx is now 2 from the tail
     let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 2].compute_txid(),
-        vout: 1,
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
     };
     insert_add_liquidity_txs(
         amount1,
@@ -259,10 +257,9 @@ fn test_amm_pool_add_more_liquidity_w_router() -> Result<()> {
     let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, false)?;
     let block_height = 840_001;
     let mut add_liquidity_block = create_block_with_coinbase_tx(block_height);
-    // split init tx puts 1000000 / 2 in vout 0, and the other is unspent at vout 1. The split tx is now 2 from the tail
     let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 2].compute_txid(),
-        vout: 1,
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
     };
     insert_add_liquidity_txs_w_router(
         amount1,
@@ -294,10 +291,9 @@ fn test_amm_pool_swap() -> Result<()> {
     let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, false)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
-    // split init tx puts 1000000 / 2 in vout 0, and the other is unspent at vout 1. The split tx is now 2 from the tail
     let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 2].compute_txid(),
-        vout: 1,
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
     };
     let amount_to_swap = 10000;
     insert_swap_txs(
@@ -326,10 +322,9 @@ fn test_amm_pool_swap_large() -> Result<()> {
     let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, false)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
-    // split init tx puts 1000000 / 2 in vout 0, and the other is unspent at vout 1. The split tx is now 2 from the tail
     let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 2].compute_txid(),
-        vout: 1,
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
     };
     let amount_to_swap = 500000;
     insert_swap_txs(
@@ -358,10 +353,9 @@ fn test_amm_pool_swap_w_router() -> Result<()> {
     let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, false)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
-    // split init tx puts 1000000 / 2 in vout 0, and the other is unspent at vout 1. The split tx is now 2 from the tail
     let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 2].compute_txid(),
-        vout: 1,
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
     };
     let amount_to_swap = 10000;
     insert_swap_txs_w_router(
@@ -393,10 +387,9 @@ fn test_amm_pool_swap_w_router_middle_path() -> Result<()> {
     let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, false)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
-    // split init tx puts 1000000 / 2 in vout 0, and the other is unspent at vout 1. The split tx is now 2 from the tail
     let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 2].compute_txid(),
-        vout: 1,
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
     };
     let amount_to_swap = 10000;
     insert_swap_txs_w_router(
@@ -429,10 +422,9 @@ fn test_amm_pool_swap_w_router_middle_path() -> Result<()> {
 //     let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, true)?;
 //     let block_height = 840_001;
 //     let mut swap_block = create_block_with_coinbase_tx(block_height);
-//     // split init tx puts 1000000 / 2 in vout 0, and the other is unspent at vout 1. The split tx is now 2 from the tail
 //     let input_outpoint = OutPoint {
-//         txid: init_block.txdata[init_block.txdata.len() - 2].compute_txid(),
-//         vout: 1,
+//         txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+//         vout: 0,
 //     };
 //     let amount_to_swap = 10000;
 //     insert_swap_txs(

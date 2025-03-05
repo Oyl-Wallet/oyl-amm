@@ -12,6 +12,7 @@ use bitcoin::{Block, Witness};
 #[allow(unused_imports)]
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use num::integer::Roots;
+use protorune_support::protostone::ProtostoneEdict;
 use std::fmt::Write;
 
 use super::common::*;
@@ -208,28 +209,42 @@ pub fn insert_init_pool_liquidity_txs(
     deployment_ids: &AmmTestDeploymentIds,
     input_outpoint_for_split: OutPoint,
 ) {
-    insert_two_edict_split_tx(
-        amount1,
-        amount2,
-        token1_address,
-        token2_address,
-        test_block,
-        input_outpoint_for_split,
-    );
-    test_block.txdata.push(
-        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+    // insert_two_edict_split_tx(
+    //     amount1,
+    //     amount2,
+    //     token1_address,
+    //     token2_address,
+    //     test_block,
+    //     input_outpoint_for_split,
+    // );
+    test_block
+        .txdata
+        .push(create_multiple_cellpack_with_witness_and_in_with_edicts(
             Witness::new(),
-            vec![Cellpack {
-                target: deployment_ids.amm_factory_deployment,
-                inputs: vec![1],
-            }],
+            vec![
+                CellpackOrEdict::Edict(vec![
+                    ProtostoneEdict {
+                        id: token1_address.into(),
+                        amount: amount1,
+                        output: 0,
+                    },
+                    ProtostoneEdict {
+                        id: token2_address.into(),
+                        amount: amount2,
+                        output: 0,
+                    },
+                ]),
+                CellpackOrEdict::Cellpack(Cellpack {
+                    target: deployment_ids.amm_factory_deployment,
+                    inputs: vec![1],
+                }),
+            ],
             OutPoint {
                 txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
                 vout: 0,
             },
             false,
-        ),
-    );
+        ));
 }
 
 pub fn calc_lp_balance_from_pool_init(amount1: u128, amount2: u128) -> u128 {
@@ -247,7 +262,11 @@ pub fn check_init_liquidity_lp_1_balance(
 ) -> Result<()> {
     let sheet = get_sheet_with_pool_1_init(test_block)?;
     let expected_amount = calc_lp_balance_from_pool_init(amount1, amount2);
-    println!("expected amt from init {:?}", expected_amount);
+    println!(
+        "expected amt from init {:?} {:?}",
+        sheet.get(&deployment_ids.amm_pool_1_deployment.into()),
+        expected_amount
+    );
     assert_eq!(
         sheet.get(&deployment_ids.amm_pool_1_deployment.into()),
         expected_amount
@@ -291,6 +310,7 @@ pub fn test_amm_pool_init_fixture(
         &deployment_ids,
         input_output_pool1,
     );
+    println!("block len: {}", test_block.txdata.len());
 
     let input_output_pool2 = OutPoint {
         txid: test_block.txdata[test_block.txdata.len() - 2].compute_txid(),
@@ -305,6 +325,7 @@ pub fn test_amm_pool_init_fixture(
         &deployment_ids,
         input_output_pool2,
     );
+    println!("block len: {}", test_block.txdata.len());
 
     index_block(&test_block, block_height)?;
     assert_contracts_correct_ids(&deployment_ids, use_oyl)?;
