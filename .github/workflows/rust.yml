@@ -22,6 +22,6 @@ jobs:
       - name: Install test runner
         run: cargo install wasm-bindgen-cli --version 0.2.100
       - name: Run wasm tests
-        run: cargo test --target wasm32-unknown-unknown --features test-utils
+        run: cargo test --target wasm32-unknown-unknown
       - name: Run unit tests
-        run: cargo test --target x86_64-unknown-linux-gnu  --features test-utils
+        run: cargo test --target x86_64-unknown-linux-gnu
