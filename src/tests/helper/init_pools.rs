@@ -78,7 +78,7 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
         //oyl amm factory
         Cellpack {
             target: AlkaneId { block: 1, tx: 0 },
-            inputs: vec![0, OYL_AMM_POOL_FACTORY_ID],
+            inputs: vec![0, OYL_AMM_POOL_FACTORY_ID, 2, 8], // TODO: 2, 8 is the alkane id of the oyl token, keep it synced with the hardcoded one below
         },
     ]
     .into();
@@ -262,11 +262,7 @@ pub fn insert_init_oyl_pool_liquidity_txs(
             Witness::new(),
             vec![Cellpack {
                 target: deployment_ids.oyl_amm_factory_deployment,
-                inputs: vec![
-                    1,
-                    deployment_ids.oyl_token_deployment.block,
-                    deployment_ids.oyl_token_deployment.tx,
-                ],
+                inputs: vec![1],
             }],
             OutPoint {
                 txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
