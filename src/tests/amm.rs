@@ -490,6 +490,7 @@ fn test_get_all_pools() -> Result<()> {
   
     let trace_data = view::trace(&outpoint_3)?;
     println!("Trace data length from vout 3: {}", trace_data.len());
+    println!("Trace data: {:?}", trace_data);
     
     // The pool data starts at offset 87 in the trace data
     // This is where the actual return data from get_all_pools() begins
