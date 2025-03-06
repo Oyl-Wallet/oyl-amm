@@ -25,5 +25,5 @@ Cargo.lock
 /target
 
 src/tests/std
-.clinerules
-memory-bank/
+memory-bank/activeContext.md
+memory-bank/progress.md
