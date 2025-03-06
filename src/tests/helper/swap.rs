@@ -8,10 +8,14 @@ use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::{Block, Witness};
 #[allow(unused_imports)]
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
+use protorune_support::protostone::ProtostoneEdict;
 use ruint::Uint;
 use std::fmt::Write;
 
-use super::common::{get_last_outpoint_sheet, insert_single_edict_split_tx, AmmTestDeploymentIds};
+use super::common::{
+    create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers,
+    get_last_outpoint_sheet, AmmTestDeploymentIds, CellpackOrEdict,
+};
 
 type U256 = Uint<256, 4>;
 
@@ -38,16 +42,20 @@ fn _insert_swap_txs(
     input_outpoint: OutPoint,
     cellpack: Cellpack,
 ) {
-    insert_single_edict_split_tx(amount, swap_from_token, test_block, input_outpoint);
     test_block.txdata.push(
-        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+        create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers(
             Witness::new(),
-            vec![cellpack],
-            OutPoint {
-                txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-                vout: 0,
-            },
+            vec![
+                CellpackOrEdict::Edict(vec![ProtostoneEdict {
+                    id: swap_from_token.into(),
+                    amount: amount,
+                    output: 0,
+                }]),
+                CellpackOrEdict::Cellpack(cellpack),
+            ],
+            input_outpoint,
             false,
+            true,
         ),
     );
 }

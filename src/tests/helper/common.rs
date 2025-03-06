@@ -83,49 +83,6 @@ pub fn insert_split_tx(
     test_block.txdata.push(split);
 }
 
-pub fn insert_single_edict_split_tx(
-    amount: u128,
-    target: AlkaneId,
-    test_block: &mut Block,
-    input_outpoint: OutPoint,
-) {
-    insert_split_tx(
-        test_block,
-        input_outpoint,
-        vec![ProtostoneEdict {
-            id: target.into(),
-            amount: amount,
-            output: 0,
-        }],
-    );
-}
-
-pub fn insert_two_edict_split_tx(
-    amount1: u128,
-    amount2: u128,
-    token1_address: AlkaneId,
-    token2_address: AlkaneId,
-    test_block: &mut Block,
-    input_outpoint: OutPoint,
-) {
-    insert_split_tx(
-        test_block,
-        input_outpoint,
-        vec![
-            ProtostoneEdict {
-                id: token1_address.into(),
-                amount: amount1,
-                output: 0,
-            },
-            ProtostoneEdict {
-                id: token2_address.into(),
-                amount: amount2,
-                output: 0,
-            },
-        ],
-    );
-}
-
 fn get_sheet_for_outpoint(test_block: &Block, tx_num: usize, vout: u32) -> Result<BalanceSheet> {
     let outpoint = OutPoint {
         txid: test_block.txdata[tx_num].compute_txid(),
@@ -161,23 +118,9 @@ pub fn get_last_outpoint_sheet(test_block: &Block) -> Result<BalanceSheet> {
     get_sheet_for_outpoint(test_block, len - 1, 0)
 }
 
-pub fn get_sheet_with_pool_1_init(test_block: &Block) -> Result<BalanceSheet> {
-    let len = test_block.txdata.len();
-    get_sheet_for_outpoint(test_block, len - 1, 0)
-}
-
-pub fn get_sheet_with_remaining_lp_after_burn(test_block: &Block) -> Result<BalanceSheet> {
-    let len = test_block.txdata.len();
-    get_sheet_for_outpoint(test_block, len - 2, 1)
-}
-pub fn get_trace_after_burn(test_block: &Block) -> Result<Vec<u8>> {
-    let len = test_block.txdata.len();
-    get_trace_for_outpoint(test_block, len - 2, 3)
-}
-
 pub fn create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers(
     witness: Witness,
-    cellpacks: Vec<CellpackOrEdict>,
+    cellpacks_or_edicts: Vec<CellpackOrEdict>,
     previous_output: OutPoint,
     etch: bool,
     with_leftovers_to_separate: bool,
@@ -203,7 +146,7 @@ pub fn create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers(
             }],
             false => vec![],
         },
-        cellpacks
+        cellpacks_or_edicts
             .into_iter()
             .enumerate()
             .map(|(i, cellpack_or_edict)| match cellpack_or_edict {
@@ -307,13 +250,13 @@ pub fn create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers(
 
 pub fn create_multiple_cellpack_with_witness_and_in_with_edicts(
     witness: Witness,
-    cellpacks: Vec<CellpackOrEdict>,
+    cellpacks_or_edicts: Vec<CellpackOrEdict>,
     previous_output: OutPoint,
     etch: bool,
 ) -> Transaction {
     create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers(
         witness,
-        cellpacks,
+        cellpacks_or_edicts,
         previous_output,
         etch,
         false,

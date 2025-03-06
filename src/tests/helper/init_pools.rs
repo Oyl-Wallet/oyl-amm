@@ -251,7 +251,7 @@ pub fn check_init_liquidity_lp_1_balance(
     test_block: &Block,
     deployment_ids: &AmmTestDeploymentIds,
 ) -> Result<()> {
-    let sheet = get_sheet_with_pool_1_init(test_block)?;
+    let sheet = get_last_outpoint_sheet(test_block)?;
     let expected_amount = calc_lp_balance_from_pool_init(amount1, amount2);
     println!(
         "expected amt from init {:?} {:?}",

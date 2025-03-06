@@ -12,6 +12,7 @@ use bitcoin::{Block, Witness};
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
+use protorune_support::protostone::ProtostoneEdict;
 use std::fmt::Write;
 
 use super::common::*;
@@ -23,18 +24,21 @@ fn _insert_remove_liquidity_txs(
     input_outpoint: OutPoint,
     cellpack: Cellpack,
 ) {
-    insert_single_edict_split_tx(amount, pool_address, test_block, input_outpoint);
-    test_block.txdata.push(
-        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+    test_block
+        .txdata
+        .push(create_multiple_cellpack_with_witness_and_in_with_edicts(
             Witness::new(),
-            vec![cellpack],
-            OutPoint {
-                txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-                vout: 0,
-            },
+            vec![
+                CellpackOrEdict::Edict(vec![ProtostoneEdict {
+                    id: pool_address.into(),
+                    amount: amount,
+                    output: 0,
+                }]),
+                CellpackOrEdict::Cellpack(cellpack),
+            ],
+            input_outpoint,
             false,
-        ),
-    );
+        ));
 }
 
 pub fn insert_remove_liquidity_txs(
@@ -115,7 +119,7 @@ pub fn test_amm_burn_fixture(amount_burn: u128, use_router: bool, use_oyl: bool)
 
     index_block(&test_block, block_height)?;
 
-    let sheet = get_sheet_with_remaining_lp_after_burn(&test_block)?;
+    let sheet = get_last_outpoint_sheet(&test_block)?;
     let amount_burned_true = std::cmp::min(amount_burn, total_lp);
     assert_eq!(
         sheet.get(&deployment_ids.amm_pool_1_deployment.into()),
