@@ -207,16 +207,7 @@ pub fn insert_init_pool_liquidity_txs(
     token2_address: AlkaneId,
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
-    input_outpoint_for_split: OutPoint,
 ) {
-    // insert_two_edict_split_tx(
-    //     amount1,
-    //     amount2,
-    //     token1_address,
-    //     token2_address,
-    //     test_block,
-    //     input_outpoint_for_split,
-    // );
     test_block
         .txdata
         .push(create_multiple_cellpack_with_witness_and_in_with_edicts(
@@ -240,7 +231,7 @@ pub fn insert_init_pool_liquidity_txs(
                 }),
             ],
             OutPoint {
-                txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+                txid: test_block.txdata.last().unwrap().compute_txid(),
                 vout: 0,
             },
             false,
@@ -297,10 +288,6 @@ pub fn test_amm_pool_init_fixture(
 ) -> Result<(Block, AmmTestDeploymentIds)> {
     let block_height = 840_000;
     let (mut test_block, deployment_ids) = init_block_with_amm_pool(use_oyl)?;
-    let input_output_pool1 = OutPoint {
-        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-        vout: 0,
-    };
     insert_init_pool_liquidity_txs(
         amount1,
         amount2,
@@ -308,14 +295,9 @@ pub fn test_amm_pool_init_fixture(
         deployment_ids.owned_token_2_deployment,
         &mut test_block,
         &deployment_ids,
-        input_output_pool1,
     );
     println!("block len: {}", test_block.txdata.len());
 
-    let input_output_pool2 = OutPoint {
-        txid: test_block.txdata[test_block.txdata.len() - 2].compute_txid(),
-        vout: 1,
-    };
     insert_init_pool_liquidity_txs(
         amount1,
         amount2,
@@ -323,7 +305,6 @@ pub fn test_amm_pool_init_fixture(
         deployment_ids.owned_token_3_deployment,
         &mut test_block,
         &deployment_ids,
-        input_output_pool2,
     );
     println!("block len: {}", test_block.txdata.len());
 
