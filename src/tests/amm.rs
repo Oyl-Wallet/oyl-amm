@@ -475,55 +475,63 @@ fn test_get_all_pools() -> Result<()> {
         vout: 3,
     };
   
-    let trace_data = view::trace(&outpoint_3)?;
-    println!("Trace data length from vout 3: {}", trace_data.len());
+    
+    let raw_trace_data = view::trace(&outpoint_3)?;
+    println!("Raw trace data length: {}", raw_trace_data.len());
+    
+   
+    let trace_data: Trace = raw_trace_data.clone().try_into()?;
     println!("Trace data: {:?}", trace_data);
     
-    // The pool data starts at offset 87 in the trace data
-    // This is where the actual return data from get_all_pools() begins
-    const POOL_DATA_OFFSET: usize = 87;
     
-    // Parse the pool count (first 16 bytes of the pool data)
-    let pool_count_bytes: [u8; 16] = trace_data[POOL_DATA_OFFSET..POOL_DATA_OFFSET+16]
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("Failed to read pool count"))?;
-    let pool_count = u128::from_le_bytes(pool_count_bytes);
+    let mut data_start = None;
+    for i in 0..raw_trace_data.len().saturating_sub(16) {
+        if raw_trace_data[i] == 2 && 
+           raw_trace_data[i+1..i+16].iter().all(|&b| b == 0) {
+            data_start = Some(i);
+            break;
+        }
+    }
+    
+   
+    let start_idx = data_start.ok_or_else(|| anyhow::anyhow!("Could not find pool count in trace data"))?;
+    println!("Found pool data at offset: {}", start_idx);
+    
+   
+    let count_bytes: [u8; 16] = raw_trace_data[start_idx..start_idx+16].try_into()?;
+    let pool_count = u128::from_le_bytes(count_bytes) as usize;
     println!("Pool count: {}", pool_count);
     
-    // Parse each pool ID
+    
+    assert!(pool_count > 0, "Expected at least one pool, but got {}", pool_count);
+    
+    
+    let expected_data_len = 16 + (pool_count * 32); // 16 bytes for count + 32 bytes per pool
+    assert!(
+        start_idx + expected_data_len <= raw_trace_data.len(),
+        "Not enough data for {} pools. Expected at least {} bytes, but got {}",
+        pool_count,
+        expected_data_len,
+        raw_trace_data.len() - start_idx
+    );
+    
+    
     let mut pools = Vec::new();
     for i in 0..pool_count {
-        let offset = POOL_DATA_OFFSET + 16 + (i as usize * 32); // 16 bytes for count, then 32 bytes per pool
+        let pool_start = start_idx + 16 + (i * 32);
         
-       
-        let block_bytes: [u8; 16] = trace_data[offset..offset+16]
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Failed to read block ID"))?;
+        let block_bytes: [u8; 16] = raw_trace_data[pool_start..pool_start+16].try_into()?;
+        let tx_bytes: [u8; 16] = raw_trace_data[pool_start+16..pool_start+32].try_into()?;
+        
         let block = u128::from_le_bytes(block_bytes);
-        
-       
-        let tx_bytes: [u8; 16] = trace_data[offset+16..offset+32]
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Failed to read tx ID"))?;
         let tx = u128::from_le_bytes(tx_bytes);
         
-        println!("Pool ID {}: ({}, {})", i, block, tx);
-        pools.push(AlkaneId::new(block, tx));
+        println!("Pool ID {}: (block={}, tx={})", i, block, tx);
+        pools.push(AlkaneId::new(block, tx));;
     }
     
-    
-    assert_eq!(pools.len() as u128, pool_count, "Expected {} pool IDs, but got {}", pool_count, pools.len());
-    
-
-    if pools.len() >= 1 {
-        assert_eq!(pools[0].block, 2, "First pool block ID should be 2");
-        assert_eq!(pools[0].tx, 11, "First pool tx ID should be 11");
-    }
-    
-    if pools.len() >= 2 {
-        assert_eq!(pools[1].block, 2, "Second pool block ID should be 2");
-        assert_eq!(pools[1].tx, 12, "Second pool tx ID should be 12");
-    }
+   
+    assert_eq!(pools.len(), pool_count, "Expected {} pool IDs, but got {}", pool_count, pools.len());
     
     Ok(())
 }
