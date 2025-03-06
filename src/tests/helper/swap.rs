@@ -1,17 +1,17 @@
-use alkanes::tests::helpers::{ self as alkane_helpers };
-use alkanes_runtime_pool::{ AMMPoolBase, DEFAULT_FEE_AMOUNT_PER_1000 };
+use alkanes::tests::helpers::{self as alkane_helpers};
+use alkanes_runtime_pool::{AMMPoolBase, DEFAULT_FEE_AMOUNT_PER_1000};
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::id::AlkaneId;
 use alkanes_support::parcel::AlkaneTransfer;
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
-use bitcoin::{ Block, Witness };
+use bitcoin::{Block, Witness};
 #[allow(unused_imports)]
-use metashrew::{ get_cache, index_pointer::IndexPointer, println, stdio::stdout };
-use std::fmt::Write;
+use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use ruint::Uint;
+use std::fmt::Write;
 
-use super::common::{ get_last_outpoint_sheet, insert_single_edict_split_tx, AmmTestDeploymentIds };
+use super::common::{get_last_outpoint_sheet, insert_single_edict_split_tx, AmmTestDeploymentIds};
 
 type U256 = Uint<256, 4>;
 
@@ -21,7 +21,12 @@ struct TestAMMPool {
 }
 
 impl AMMPoolBase for TestAMMPool {
-    fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
+    fn reserves(
+        &self,
+    ) -> (
+        alkanes_support::parcel::AlkaneTransfer,
+        alkanes_support::parcel::AlkaneTransfer,
+    ) {
         (self.reserve_a.clone(), self.reserve_b.clone())
     }
 }
@@ -31,7 +36,7 @@ fn _insert_swap_txs(
     swap_from_token: AlkaneId,
     test_block: &mut Block,
     input_outpoint: OutPoint,
-    cellpack: Cellpack
+    cellpack: Cellpack,
 ) {
     insert_single_edict_split_tx(amount, swap_from_token, test_block, input_outpoint);
     test_block.txdata.push(
@@ -42,8 +47,8 @@ fn _insert_swap_txs(
                 txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
                 vout: 0,
             },
-            false
-        )
+            false,
+        ),
     );
 }
 
@@ -106,12 +111,18 @@ pub fn insert_swap_txs(
     min_out: u128,
     test_block: &mut Block,
     input_outpoint: OutPoint,
-    pool_address: AlkaneId
+    pool_address: AlkaneId,
 ) {
-    _insert_swap_txs(amount, swap_from_token, test_block, input_outpoint, Cellpack {
-        target: pool_address,
-        inputs: vec![3, min_out],
-    })
+    _insert_swap_txs(
+        amount,
+        swap_from_token,
+        test_block,
+        input_outpoint,
+        Cellpack {
+            target: pool_address,
+            inputs: vec![3, min_out],
+        },
+    )
 }
 
 pub fn insert_swap_txs_w_router(
@@ -120,7 +131,7 @@ pub fn insert_swap_txs_w_router(
     min_out: u128,
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
-    input_outpoint: OutPoint
+    input_outpoint: OutPoint,
 ) {
     if swap_path.len() < 2 {
         panic!("Swap path must be at least two alkanes long");
@@ -129,7 +140,9 @@ pub fn insert_swap_txs_w_router(
         target: deployment_ids.amm_router_deployment,
         inputs: vec![3, swap_path.len() as u128],
     };
-    cellpack.inputs.extend(swap_path.iter().flat_map(|s| vec![s.block, s.tx]));
+    cellpack
+        .inputs
+        .extend(swap_path.iter().flat_map(|s| vec![s.block, s.tx]));
     cellpack.inputs.push(min_out);
 
     _insert_swap_txs(amount, swap_path[0], test_block, input_outpoint, cellpack)
@@ -144,7 +157,7 @@ pub fn check_swap_lp_balance(
     prev_reserve_amount_in_path: Vec<u128>,
     swap_amount: u128,
     swap_target_token: AlkaneId,
-    test_block: &Block
+    test_block: &Block,
 ) -> Result<()> {
     let sheet = get_last_outpoint_sheet(test_block)?;
     let mut current_swapped_amount = swap_amount;
@@ -152,7 +165,7 @@ pub fn check_swap_lp_balance(
         current_swapped_amount = calc_swapped_balance(
             current_swapped_amount,
             prev_reserve_amount_in_path[i - 1],
-            prev_reserve_amount_in_path[i]
+            prev_reserve_amount_in_path[i],
         )?;
     }
 

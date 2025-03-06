@@ -18,8 +18,8 @@ crate-type = ["cdylib", "rlib"]
 [workspace]
 members = ["alkanes/*", '.']
 
-[dependencies]
-alkanes-support = { git = "https:/github.com/kungfuflex/alkanes-rs" }
+[workspace.dependencies]
+alkanes-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
 alkanes-runtime = { git = "https://github.com/kungfuflex/alkanes-rs" }
 metashrew-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
 protorune-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
@@ -30,6 +30,20 @@ bitcoin = { version = "0.32.4", features = ["rand"] }
 hex = "0.4.3"
 num = "0.4.3"
 ruint = "1.13.1"
+
+[dependencies]
+alkanes-support = { workspace = true }
+alkanes-runtime = { workspace = true }
+metashrew-support = { workspace = true }
+protorune-support = { workspace = true }
+ordinals = { workspace = true }
+alkanes-runtime-pool = { workspace = true }
+anyhow = { workspace = true }
+bitcoin = { workspace = true }
+hex = { workspace = true }
+num = { workspace = true }
+ruint = { workspace = true }
+
 
 [dev-dependencies]
 alkanes = { git = "https://github.com/kungfuflex/alkanes-rs", features = [

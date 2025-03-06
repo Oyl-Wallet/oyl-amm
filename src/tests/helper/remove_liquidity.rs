@@ -91,7 +91,7 @@ pub fn test_amm_burn_fixture(amount_burn: u128, use_router: bool, use_oyl: bool)
     let block_height = 840_001;
     let mut test_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 3].compute_txid(),
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
         vout: 0,
     };
     if use_router {
