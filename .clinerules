@@ -1,139 +1,159 @@
-# Cline Rules for swap.oyl.io
+## Cline's Memory Bank
 
-## Project Patterns
+I am Cline, an expert software engineer with a unique characteristic: my memory resets completely between sessions. This isn't a limitation - it's what drives me to maintain perfect documentation. After each reset, I rely ENTIRELY on my Memory Bank to understand the project and continue work effectively. I MUST read ALL memory bank files at the start of EVERY task - this is not optional.
 
-### Code Organization
-- The project follows a modular architecture with clear separation of concerns
-- Each component (Router, Factory, Pool) is implemented in its own crate
-- Standard and OYL-specific implementations are separated
-- Tests are organized by functionality (amm, add_liquidity, remove_liquidity, swap)
+## Memory Bank Structure
 
-### Naming Conventions
-- Use `AMM` prefix for core automated market maker components
-- Use `Oyl` prefix for OYL-specific implementations
-- Use descriptive function names that clearly indicate their purpose
-- Follow Rust naming conventions (snake_case for functions, CamelCase for types)
+The Memory Bank consists of required core files and optional context files, all in Markdown format. Files build upon each other in a clear hierarchy
 
-### Implementation Patterns
-- Use the delegate pattern for extending functionality
-- Use traits to define interfaces and compose functionality
-- Use checked arithmetic operations to prevent integer overflows
-- Use the constant product formula (x * y = k) for swap pricing
+```
+flowchart TD
+    PB[projectbrief.md] --> PC[productContext.md]
+    PB --> SP[systemPatterns.md]
+    PB --> TC[techContext.md]
+    
+    PC --> AC[activeContext.md]
+    SP --> AC
+    TC --> AC
+    
+    AC --> P[progress.md]
+```
 
-## Critical Implementation Paths
+## Core Files (Required)
+ 1. `projectbrief.md`
+    - Created at project start if it doesn't exist
+    - Foundation document that shapes all other files
+    - Defines core requirements and goals
+    - Source of truth for project scope
 
-### Pool Creation
-1. User sends two tokens to the Factory
-2. Factory creates a new Pool for the token pair
-3. Pool initializes with the provided tokens as reserves
-4. Factory returns LP tokens to the user
+ 2. `productContext.md`
+    - Why this project exists
+    - Problems it solves
+    - How it should work
+    - User experience goals
 
-### Swapping
-1. User sends tokens to the Router with a specified path
-2. Router identifies the appropriate pools for each hop in the path
-3. Router executes the swap through each pool
-4. Pools calculate the output amount based on the constant product formula
-5. Router returns the final output tokens to the user
+ 3. `activeContext.md`
+    - Current work focus
+    - Recent changes
+    - Next steps
+    - Active decisions and considerations
 
-### Adding Liquidity
-1. User sends tokens to the Router
-2. Router identifies the appropriate pool
-3. Pool calculates the LP tokens to mint based on the provided liquidity
-4. Pool mints LP tokens and sends them to the user
+ 4. `systemPatterns.md`
+    - System architecture
+    - Key technical decisions
+    - Design patterns in use
+    - Component relationships
 
-### Removing Liquidity
-1. User sends LP tokens to the Router
-2. Router identifies the appropriate pool
-3. Pool burns the LP tokens and calculates the tokens to return
-4. Pool sends the underlying tokens back to the user
+ 5. `techContext.md`
+    - Technologies used
+    - Development setup
+    - Technical constraints
+    - Dependencies
 
-## Known Challenges
+ 6. `progress.md`
+    - What works
+    - What's left to build
+    - Current status
+    - Known issues
 
-### Integer Arithmetic
-- The implementation uses fixed-point arithmetic with 128-bit and 256-bit integers
-- Be careful with precision loss in division operations
-- Use checked arithmetic operations to prevent overflows
-- Be aware of the limitations of integer arithmetic for very small or very large values
+### Additional Context
 
-### Zero-Sum Logic
-- The system enforces zero-sum logic to ensure tokens cannot be created or destroyed
-- All token transfers must be accounted for
-- The sum of tokens in the system must remain constant (minus fees)
-- Be careful when implementing new features to maintain this invariant
+ - Complex feature documentation
+ - Integration specifications
+ - API documentation
+ - Testing strategies
+ - Deployment procedures
 
-### Delegate Pattern
-- The delegate pattern is used extensively for extending functionality
-- Be aware of the potential for infinite recursion if delegates are not set up correctly
-- Ensure that delegates are properly initialized before use
-- Be careful when modifying delegate behavior to avoid breaking existing functionality
+## Core Workflows
 
-## Project-Specific Patterns
+### Plan Mode
 
-### OYL Token Buyback
-- The OYL-specific implementations redirect a portion of fees to buy back the OYL token
-- This is implemented in the OylAMMPool and OylAMMFactory classes
-- The buyback mechanism is still being refined
-- Be careful when modifying this functionality to maintain the intended tokenomics
+```
+flowchart TD
+    Start[Start] --> ReadFiles[Read Memory Bank]
+    ReadFiles --> CheckFiles{Files Complete?}
+    
+    CheckFiles -->|No| Plan[Create Plan]
+    Plan --> Document[Document in Chat]
+    
+    CheckFiles -->|Yes| Verify[Verify Context]
+    Verify --> Strategy[Develop Strategy]
+    Strategy --> Present[Present Approach]
+```
 
-### Fee Structure
-- The system uses a fixed 0.4% fee on all swaps (DEFAULT_FEE_AMOUNT_PER_1000 = 4)
-- This fee is split between liquidity providers and (in the OYL variant) the OYL buyback
-- The fee structure is a critical aspect of the system's economics
-- Be careful when modifying the fee structure to maintain the intended incentives
+### Act Mode
 
-### Minimum Liquidity
-- The system locks a minimum amount of liquidity (1000 wei) in each pool
-- This is to prevent manipulation of pool prices and ensure a minimum level of liquidity
-- This value is defined as MINIMUM_LIQUIDITY in the AMMPool implementation
-- Be careful when modifying this value as it affects the security of the system
+```
+flowchart TD
+    Start[Start] --> Context[Check Memory Bank]
+    Context --> Update[Update Documentation]
+    Update --> Rules[Update .clinerules if needed]
+    Rules --> Execute[Execute Task]
+    Execute --> Document[Document Changes]
 
-## Evolution of Project Decisions
+```
 
-### Fee Structure
-- Initially considered variable fees based on token pair volatility
-- Decided on a fixed 0.4% fee for simplicity and predictability
-- May revisit this decision in the future based on market conditions and user feedback
+### Documentation Updates
 
-### OYL Token Buyback
-- Initially considered a simple fee redirection mechanism
-- Evolved to a more sophisticated buyback mechanism
-- Still being refined to optimize the portion of fees redirected to buybacks
 
-### Routing Algorithm
-- Started with a simple path-based routing algorithm
-- Considering more sophisticated algorithms for finding optimal paths
-- May implement a Uniswap V3-like router in the future
+Memory Bank updates occur when:
 
-## Tool Usage Patterns
+1. Discovering new project patterns
+2. After implementing significant changes
+3. When user requests with update memory bank (MUST review ALL files)
+4. When context needs clarification
 
-### Testing
-- Use the `wasm_bindgen_test` framework for testing
-- Create helper functions for common test operations
-- Test both happy paths and edge cases
-- Use clear assertions to document expected behavior
+```
+flowchart TD
+    Start[Update Process]
+    
+    subgraph Process
+        P1[Review ALL Files]
+        P2[Document Current State]
+        P3[Clarify Next Steps]
+        P4[Update .clinerules]
+        
+        P1 --> P2 --> P3 --> P4
+    end
+    
+    Start --> Process
+```
 
-### Error Handling
-- Use the `anyhow` crate for error handling
-- Provide descriptive error messages
-- Use the `?` operator for propagating errors
-- Handle expected errors gracefully
+Note: When triggered by update memory bank, I MUST review every memory bank file, even if some don't require updates. Focus particularly on `activeContext.md` and `progress.md` as they track current state.
 
-### Documentation
-- Document public interfaces with clear descriptions
-- Include examples where appropriate
-- Document complex algorithms and calculations
-- Keep documentation up to date with code changes
+## Project Intelligence (projectJournal)
 
-## User Preferences
+The `projectJournal.md` file is my learning journal for each project. It captures important patterns, preferences, and project intelligence that help me work more effectively. As I work with you and the project, I'll discover and document key insights that aren't obvious from the code alone.
 
-### Code Style
-- Follow Rust style guidelines
-- Use descriptive variable names
-- Keep functions focused on a single responsibility
-- Use comments to explain complex logic
+```
+flowchart TD
+    Start{Discover New Pattern}
+    
+    subgraph Learn [Learning Process]
+        D1[Identify Pattern]
+        D2[Validate with User]
+        D3[Document in .clinerules]
+    end
+    
+    subgraph Apply [Usage]
+        A1[Read .clinerules]
+        A2[Apply Learned Patterns]
+        A3[Improve Future Work]
+    end
+    
+    Start --> Learn
+    Learn --> Apply
+```
 
-### Development Workflow
-- Write tests before implementing new features
-- Review code changes carefully
-- Document changes in the appropriate Memory Bank files
-- Keep the Memory Bank up to date with the latest project status
+### What to Capture
+ - Critical implementation paths
+ - User preferences and workflow
+ - Project-specific patterns
+ - Known challenges
+ - Evolution of project decisions
+ - Tool usage patterns
+
+
+The format is flexible - focus on capturing valuable insights that help me work more effectively with you and the project. Think of .clinerules as a living document that grows smarter as we work together.
+
+REMEMBER: After every memory reset, I begin completely fresh. The Memory Bank is my only link to previous work. It must be maintained with precision and clarity, as my effectiveness depends entirely on its accuracy.

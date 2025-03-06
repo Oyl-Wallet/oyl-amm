@@ -25,3 +25,5 @@ Cargo.lock
 /target
 
 src/tests/std
+memory-bank/activeContext.md
+memory-bank/progress.md

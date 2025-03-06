@@ -27,6 +27,8 @@ use alkanes::view;
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use std::fmt::Write;
 use wasm_bindgen_test::wasm_bindgen_test;
+use alkanes_support::id::AlkaneId;
+use metashrew_support::utils::consume_sized_int;
 
 #[wasm_bindgen_test]
 fn test_amm_pool_normal_init() -> Result<()> {
@@ -440,3 +442,89 @@ fn test_amm_pool_swap_w_router_middle_path() -> Result<()> {
 //     )?;
 //     Ok(())
 // }
+
+
+#[wasm_bindgen_test]
+fn test_get_all_pools() -> Result<()> {
+    clear();
+    let (block, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
+    
+    let block_height = 840_000;
+    
+    let mut test_block = protorune::test_helpers::create_block_with_coinbase_tx(block_height + 1);
+    
+    test_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_factory_deployment,
+                inputs: vec![3], 
+            }],
+            OutPoint {
+                txid: block.txdata[block.txdata.len() - 1].compute_txid(),
+                vout: 0,
+            },
+            false
+        )
+    );
+    
+    index_block(&test_block, block_height + 1)?;
+    
+    let outpoint_3 = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        vout: 3,
+    };
+  
+    let trace_data = view::trace(&outpoint_3)?;
+    println!("Trace data length from vout 3: {}", trace_data.len());
+    println!("Trace data: {:?}", trace_data);
+    
+    // The pool data starts at offset 87 in the trace data
+    // This is where the actual return data from get_all_pools() begins
+    const POOL_DATA_OFFSET: usize = 87;
+    
+    // Parse the pool count (first 16 bytes of the pool data)
+    let pool_count_bytes: [u8; 16] = trace_data[POOL_DATA_OFFSET..POOL_DATA_OFFSET+16]
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("Failed to read pool count"))?;
+    let pool_count = u128::from_le_bytes(pool_count_bytes);
+    println!("Pool count: {}", pool_count);
+    
+    // Parse each pool ID
+    let mut pools = Vec::new();
+    for i in 0..pool_count {
+        let offset = POOL_DATA_OFFSET + 16 + (i as usize * 32); // 16 bytes for count, then 32 bytes per pool
+        
+       
+        let block_bytes: [u8; 16] = trace_data[offset..offset+16]
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Failed to read block ID"))?;
+        let block = u128::from_le_bytes(block_bytes);
+        
+       
+        let tx_bytes: [u8; 16] = trace_data[offset+16..offset+32]
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Failed to read tx ID"))?;
+        let tx = u128::from_le_bytes(tx_bytes);
+        
+        println!("Pool ID {}: ({}, {})", i, block, tx);
+        pools.push(AlkaneId::new(block, tx));
+    }
+    
+    
+    assert_eq!(pools.len() as u128, pool_count, "Expected {} pool IDs, but got {}", pool_count, pools.len());
+    
+
+    if pools.len() >= 1 {
+        assert_eq!(pools[0].block, 2, "First pool block ID should be 2");
+        assert_eq!(pools[0].tx, 11, "First pool tx ID should be 11");
+    }
+    
+    if pools.len() >= 2 {
+        assert_eq!(pools[1].block, 2, "Second pool block ID should be 2");
+        assert_eq!(pools[1].tx, 12, "Second pool tx ID should be 12");
+    }
+    
+    Ok(())
+}
+

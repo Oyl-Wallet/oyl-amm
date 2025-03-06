@@ -52,6 +52,18 @@ impl AMMRouter {
         let pool = AlkaneId::new(consume_u128(&mut cursor)?, consume_u128(&mut cursor)?);
         Ok(pool)
     }
+
+    fn get_all_pools(&self) -> Result<CallResponse> {
+        let factory = Self::factory()?;
+        self.call(
+            &Cellpack {
+                target: factory,
+                inputs: vec![3],
+            },
+            &AlkaneTransferParcel(vec![]),
+            self.fuel(),
+        )
+    }
 }
 
 impl AlkaneResponder for AMMRouter {
@@ -123,6 +135,7 @@ impl AlkaneResponder for AMMRouter {
 
                 Ok(this_response)
             }
+            4 => self.get_all_pools(),
             50 => Ok(CallResponse::forward(&context.incoming_alkanes)),
 
             _ => Err(anyhow!("unrecognized opcode {}", opcode)),

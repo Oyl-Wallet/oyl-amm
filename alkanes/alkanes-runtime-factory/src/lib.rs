@@ -127,6 +127,65 @@ pub trait AMMFactoryBase {
         response.data = id.into();
         Ok(response)
     }
+    // Get the total number of pools
+    fn all_pools_length(&self) -> Result<u128> {
+        let ptr = StoragePointer::from_keyword("/all_pools_length")
+            .get()
+            .as_ref()
+            .clone();
+        
+        if ptr.len() == 0 {
+            return Ok(0);
+        }
+        
+        let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
+        Ok(consume_u128(&mut cursor)?)
+    }
+
+    // Get a pool by index
+    fn all_pools(&self, index: u128) -> Result<AlkaneId> {
+        let ptr = StoragePointer::from_keyword("/all_pools/")
+            .select(&index.to_le_bytes().to_vec())
+            .get()
+            .as_ref()
+            .clone();
+            
+        if ptr.len() == 0 {
+            return Err(anyhow!("pool not found at index {}", index));
+        }
+        
+        let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
+        Ok(AlkaneId::new(
+            consume_sized_int::<u128>(&mut cursor)?,
+            consume_sized_int::<u128>(&mut cursor)?
+        ))
+    }
+
+    // Get all pools (returns a list of pool IDs)
+    fn get_all_pools(&self) -> Result<CallResponse> {
+        let length = self.all_pools_length()?;
+        let mut response = CallResponse::default();
+        let mut all_pools_data = Vec::new();
+        
+        // Add the total count as the first element
+        all_pools_data.extend_from_slice(&length.to_le_bytes());
+        
+
+        for i in 0..length {
+            match self.all_pools(i) {
+                Ok(pool_id) => {
+                    all_pools_data.extend_from_slice(&pool_id.block.to_le_bytes());
+                    all_pools_data.extend_from_slice(&pool_id.tx.to_le_bytes());
+                }
+                Err(_) => {
+                    continue;
+                }
+            }
+        }
+        
+        response.data = all_pools_data;
+        Ok(response)
+    }
 }
 
 #[derive(Default)]
@@ -161,8 +220,23 @@ impl AMMFactoryBase for AMMFactory {
         let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
         let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
         let next_sequence = self.sequence();
+        let pool_id = AlkaneId::new(2, next_sequence);
+        
         self.pool_pointer(&a, &b)
-            .set(Arc::new(AlkaneId::new(2, next_sequence).into()));
+            .set(Arc::new(pool_id.into()));
+            
+        // Add the new pool to the registry
+        let length = self.all_pools_length()?;
+        
+        // Store the pool ID at the current index
+        StoragePointer::from_keyword("/all_pools/")
+            .select(&length.to_le_bytes().to_vec())
+            .set(Arc::new(pool_id.into()));
+        
+        // Update the length
+        StoragePointer::from_keyword("/all_pools_length")
+            .set(Arc::new((length + 1).to_le_bytes().to_vec()));
+            
         self.call(
             &Cellpack {
                 target: AlkaneId {
@@ -189,6 +263,7 @@ impl AlkaneResponder for AMMFactory {
                 0 => delegate.process_inputs_and_init_factory(inputs, context),
                 1 => delegate.create_new_pool(context),
                 2 => delegate.find_existing_pool_id(inputs, context),
+                3 => delegate.get_all_pools(),
                 // TODO: add a function to change the implementation of the AMM pool for upgradeability. Need to check that the caller is the owner of this contract
                 _ => Err(anyhow!("unrecognized opcode")),
             }
