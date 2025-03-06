@@ -1,4 +1,4 @@
-use crate::tests::helper::common::create_multiple_cellpack_with_witness_and_in_with_edicts;
+use crate::tests::helper::common::create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers;
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::id::AlkaneId;
 use anyhow::Result;
@@ -7,7 +7,6 @@ use bitcoin::{Block, Witness};
 use num::integer::Roots;
 use protorune_support::protostone::ProtostoneEdict;
 
-use alkanes::tests::helpers::{self as alkane_helpers};
 #[allow(unused_imports)]
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use std::fmt::Write;
@@ -23,14 +22,6 @@ fn _insert_add_liquidity_txs(
     input_outpoint: OutPoint,
     cellpack: Cellpack,
 ) {
-    // insert_two_edict_split_tx(
-    //     amount1,
-    //     amount2,
-    //     token1_address,
-    //     token2_address,
-    //     test_block,
-    //     input_outpoint
-    // );
     test_block.txdata.push(
         create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers(
             Witness::new(),
