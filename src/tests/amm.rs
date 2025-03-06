@@ -540,7 +540,7 @@ fn test_get_all_pools() -> Result<()> {
         let tx = u128::from_le_bytes(tx_bytes);
         
         println!("Pool ID {}: (block={}, tx={})", i, block, tx);
-        pools.push((block, tx));
+        pools.push(AlkaneId::new(block, tx));;
     }
     
    
