@@ -6,13 +6,14 @@ use alkanes_support::trace::Trace;
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::Witness;
-use common::{get_last_outpoint_sheet, insert_single_edict_split_tx};
+use common::get_last_outpoint_sheet;
 use init_pools::{
     calc_lp_balance_from_pool_init, init_block_with_amm_pool, insert_init_pool_liquidity_txs,
     test_amm_pool_init_fixture,
 };
 use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
+use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
 use swap::{
     check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_router, test_simulate_amount_out,
@@ -23,12 +24,11 @@ use alkane_helpers::clear;
 use alkanes::indexer::index_block;
 use alkanes::tests::helpers::{self as alkane_helpers, assert_token_id_has_no_deployment};
 use alkanes::view;
+use alkanes_support::id::AlkaneId;
 #[allow(unused_imports)]
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use std::fmt::Write;
 use wasm_bindgen_test::wasm_bindgen_test;
-use alkanes_support::id::AlkaneId;
-use metashrew_support::utils::consume_sized_int;
 
 #[wasm_bindgen_test]
 fn test_amm_pool_normal_init() -> Result<()> {
@@ -73,26 +73,22 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
     clear();
     let block_height = 840_000;
     let (mut test_block, deployment_ids) = init_block_with_amm_pool(false)?;
-    let input_outpoint = OutPoint {
-        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-        vout: 0,
-    };
-    insert_single_edict_split_tx(
-        // should fail since init pool requires two alkanes, this only creates a tx with one
-        1000000,
-        deployment_ids.amm_pool_1_deployment.clone(),
-        &mut test_block,
-        input_outpoint,
-    );
     test_block.txdata.push(
-        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+        common::create_multiple_cellpack_with_witness_and_in_with_edicts(
             Witness::new(),
-            vec![Cellpack {
-                target: deployment_ids.amm_factory_deployment,
-                inputs: vec![1],
-            }],
+            vec![
+                common::CellpackOrEdict::Edict(vec![ProtostoneEdict {
+                    id: deployment_ids.owned_token_1_deployment.into(),
+                    amount: 1000000,
+                    output: 0,
+                }]),
+                common::CellpackOrEdict::Cellpack(Cellpack {
+                    target: deployment_ids.amm_factory_deployment,
+                    inputs: vec![1],
+                }),
+            ],
             OutPoint {
-                txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+                txid: test_block.txdata.last().unwrap().compute_txid(),
                 vout: 0,
             },
             false,
@@ -443,69 +439,65 @@ fn test_amm_pool_swap_w_router_middle_path() -> Result<()> {
 //     Ok(())
 // }
 
-
 #[wasm_bindgen_test]
 fn test_get_all_pools() -> Result<()> {
     clear();
     let (block, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
-    
+
     let block_height = 840_000;
-    
+
     let mut test_block = protorune::test_helpers::create_block_with_coinbase_tx(block_height + 1);
-    
+
     test_block.txdata.push(
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
                 target: deployment_ids.amm_factory_deployment,
-                inputs: vec![3], 
+                inputs: vec![3],
             }],
             OutPoint {
                 txid: block.txdata[block.txdata.len() - 1].compute_txid(),
                 vout: 0,
             },
-            false
-        )
+            false,
+        ),
     );
-    
+
     index_block(&test_block, block_height + 1)?;
-    
+
     let outpoint_3 = OutPoint {
         txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
         vout: 3,
     };
-  
-    
+
     let raw_trace_data = view::trace(&outpoint_3)?;
     println!("Raw trace data length: {}", raw_trace_data.len());
-    
-   
+
     let trace_data: Trace = raw_trace_data.clone().try_into()?;
     println!("Trace data: {:?}", trace_data);
-    
-    
+
     let mut data_start = None;
     for i in 0..raw_trace_data.len().saturating_sub(16) {
-        if raw_trace_data[i] == 2 && 
-           raw_trace_data[i+1..i+16].iter().all(|&b| b == 0) {
+        if raw_trace_data[i] == 2 && raw_trace_data[i + 1..i + 16].iter().all(|&b| b == 0) {
             data_start = Some(i);
             break;
         }
     }
-    
-   
-    let start_idx = data_start.ok_or_else(|| anyhow::anyhow!("Could not find pool count in trace data"))?;
+
+    let start_idx =
+        data_start.ok_or_else(|| anyhow::anyhow!("Could not find pool count in trace data"))?;
     println!("Found pool data at offset: {}", start_idx);
-    
-   
-    let count_bytes: [u8; 16] = raw_trace_data[start_idx..start_idx+16].try_into()?;
+
+    let count_bytes: [u8; 16] = raw_trace_data[start_idx..start_idx + 16].try_into()?;
     let pool_count = u128::from_le_bytes(count_bytes) as usize;
     println!("Pool count: {}", pool_count);
-    
-    
-    assert!(pool_count > 0, "Expected at least one pool, but got {}", pool_count);
-    
-    
+
+    assert!(
+        pool_count > 0,
+        "Expected at least one pool, but got {}",
+        pool_count
+    );
+
     let expected_data_len = 16 + (pool_count * 32); // 16 bytes for count + 32 bytes per pool
     assert!(
         start_idx + expected_data_len <= raw_trace_data.len(),
@@ -514,25 +506,28 @@ fn test_get_all_pools() -> Result<()> {
         expected_data_len,
         raw_trace_data.len() - start_idx
     );
-    
-    
+
     let mut pools = Vec::new();
     for i in 0..pool_count {
         let pool_start = start_idx + 16 + (i * 32);
-        
-        let block_bytes: [u8; 16] = raw_trace_data[pool_start..pool_start+16].try_into()?;
-        let tx_bytes: [u8; 16] = raw_trace_data[pool_start+16..pool_start+32].try_into()?;
-        
+
+        let block_bytes: [u8; 16] = raw_trace_data[pool_start..pool_start + 16].try_into()?;
+        let tx_bytes: [u8; 16] = raw_trace_data[pool_start + 16..pool_start + 32].try_into()?;
+
         let block = u128::from_le_bytes(block_bytes);
         let tx = u128::from_le_bytes(tx_bytes);
-        
+
         println!("Pool ID {}: (block={}, tx={})", i, block, tx);
-        pools.push(AlkaneId::new(block, tx));;
+        pools.push(AlkaneId::new(block, tx));
     }
-    
-   
-    assert_eq!(pools.len(), pool_count, "Expected {} pool IDs, but got {}", pool_count, pools.len());
-    
+
+    assert_eq!(
+        pools.len(),
+        pool_count,
+        "Expected {} pool IDs, but got {}",
+        pool_count,
+        pools.len()
+    );
+
     Ok(())
 }
-
