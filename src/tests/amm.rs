@@ -492,6 +492,58 @@ fn test_amm_pool_name() -> Result<()> {
 }
 
 #[wasm_bindgen_test]
+fn test_amm_pool_details() -> Result<()> {
+    clear();
+    // Initialize a pool
+    let (block, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
+
+    // Create a new block for testing the pool details
+    let block_height = 840_001;
+    let mut test_block = create_block_with_coinbase_tx(block_height);
+
+    // Call opcode 999 on the pool to get its pool details including the name
+    test_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_pool_1_deployment,
+                inputs: vec![999],
+            }],
+            OutPoint {
+                txid: block.txdata[block.txdata.len() - 1].compute_txid(),
+                vout: 0,
+            },
+            false,
+        ),
+    );
+
+    index_block(&test_block, block_height)?;
+
+    // Get the trace data from the transaction
+    let outpoint = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        vout: 3,
+    };
+
+    let trace_data = view::trace(&outpoint)?;
+
+    // Convert trace data to string for easier searching
+    let trace_str = String::from_utf8_lossy(&trace_data);
+
+    // The expected pool name
+    let expected_name = "OWNED / OWNED LP (OYL)";
+
+    // Check if the trace data contains the expected name
+    assert!(
+        trace_str.contains(expected_name),
+        "Trace data should contain the name '{}', but it doesn't",
+        expected_name
+    );
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
 fn test_get_all_pools() -> Result<()> {
     clear();
     let (block, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000, false)?;

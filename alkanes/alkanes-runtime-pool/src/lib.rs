@@ -34,6 +34,7 @@ pub struct PoolInfo {
     pub reserve_a: u128,
     pub reserve_b: u128,
     pub total_supply: u128,
+    pub pool_name: String,
 }
 
 impl PoolInfo {
@@ -56,11 +57,19 @@ impl PoolInfo {
 
         bytes.extend_from_slice(&self.reserve_b.to_le_bytes());
         bytes.extend_from_slice(&self.total_supply.to_le_bytes());
+
+        // Add the pool name
+        let name_bytes = self.pool_name.as_bytes();
+        // Add the length of the name as a u32
+        bytes.extend_from_slice(&(name_bytes.len() as u32).to_le_bytes());
+        // Add the name bytes
+        bytes.extend_from_slice(name_bytes);
+
         bytes
     }
 }
 
-pub trait AMMPoolBase {
+pub trait AMMPoolBase: MintableToken {
     fn init_pool(
         &self,
         alkane_a: AlkaneId,
@@ -72,7 +81,7 @@ pub trait AMMPoolBase {
             pointer.set(Arc::new(vec![0x01]));
             StoragePointer::from_keyword("/alkane/0").set(Arc::new(alkane_a.into()));
             StoragePointer::from_keyword("/alkane/1").set(Arc::new(alkane_b.into()));
-            self.mint(context.myself, context.incoming_alkanes)
+            self.add_liquidity(context.myself, context.incoming_alkanes)
         } else {
             Err(anyhow!("already initialized"))
         }
@@ -124,12 +133,6 @@ pub trait AMMPoolBase {
             }
         }
     }
-    fn total_supply(&self) -> u128 {
-        StoragePointer::from_keyword("/totalsupply").get_value::<u128>()
-    }
-    fn set_total_supply(&self, v: u128) {
-        StoragePointer::from_keyword("/totalsupply").set_value::<u128>(v);
-    }
     fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer);
     fn previous_reserves(&self, parcel: &AlkaneTransferParcel) -> (AlkaneTransfer, AlkaneTransfer) {
         let (reserve_a, reserve_b) = self.reserves();
@@ -152,12 +155,14 @@ pub trait AMMPoolBase {
     fn pool_details(&self) -> Result<CallResponse> {
         let (reserve_a, reserve_b) = self.reserves();
         let (token_a, token_b) = self.alkanes_for_self()?;
+
         let pool_info = PoolInfo {
             token_a,
             token_b,
             reserve_a: reserve_a.value,
             reserve_b: reserve_b.value,
             total_supply: self.total_supply(),
+            pool_name: self.name(),
         };
 
         let mut response = CallResponse::default();
@@ -166,7 +171,11 @@ pub trait AMMPoolBase {
         Ok(response)
     }
 
-    fn mint(&self, myself: AlkaneId, parcel: AlkaneTransferParcel) -> Result<CallResponse> {
+    fn add_liquidity(
+        &self,
+        myself: AlkaneId,
+        parcel: AlkaneTransferParcel,
+    ) -> Result<CallResponse> {
         self.check_inputs(&myself, &parcel, 2)?;
         let mut total_supply = self.total_supply();
         let (reserve_a, reserve_b) = self.reserves();
@@ -380,6 +389,8 @@ impl AMMPool {
 
         Ok(())
     }
+
+    // Removed pool_details method from AMMPool implementation
 }
 
 pub trait AMMReserves: AlkaneResponder + AMMPoolBase {
@@ -398,15 +409,13 @@ pub trait AMMReserves: AlkaneResponder + AMMPoolBase {
         )
     }
 }
-
+impl MintableToken for AMMPool {}
 impl AMMReserves for AMMPool {}
 impl AMMPoolBase for AMMPool {
     fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
         AMMReserves::reserves(self)
     }
 }
-
-impl MintableToken for AMMPool {}
 
 impl AlkaneResponder for AMMPool {
     fn execute(&self) -> Result<CallResponse> {
@@ -426,17 +435,17 @@ impl AlkaneResponder for AMMPool {
 
                     result
                 }
-                1 => delegate.mint(context.myself, context.incoming_alkanes),
+                1 => delegate.add_liquidity(context.myself, context.incoming_alkanes),
                 2 => delegate.burn(context.myself, context.incoming_alkanes),
                 3 => delegate.swap(context.incoming_alkanes, shift_or_err(&mut inputs)?),
                 4 => delegate.simulate_amount_out(inputs),
-                5 => delegate.pool_details(),
                 50 => Ok(CallResponse::forward(&context.incoming_alkanes)),
                 99 => {
                     let mut response = CallResponse::forward(&context.incoming_alkanes);
                     response.data = self.name().into_bytes().to_vec();
                     Ok(response)
                 }
+                999 => delegate.pool_details(),
 
                 _ => Err(anyhow!("unrecognized opcode")),
             }
