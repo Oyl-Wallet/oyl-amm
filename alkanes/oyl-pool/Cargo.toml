@@ -10,6 +10,7 @@ crate-type = ["cdylib", "rlib"]
 alkanes-support = { workspace = true }
 alkanes-runtime = { workspace = true }
 alkanes-runtime-pool = { path = "../alkanes-runtime-pool" }
+alkane-factory-support = { workspace = true }
 metashrew-support = { workspace = true }
 protorune-support = { workspace = true }
 anyhow = "1.0.91"
