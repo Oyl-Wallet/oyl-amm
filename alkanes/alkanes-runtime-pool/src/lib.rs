@@ -7,6 +7,7 @@ use alkanes_runtime::{
     stdio::{stdout, Write},
 };
 use alkanes_support::{
+    cellpack::Cellpack,
     context::Context,
     id::AlkaneId,
     parcel::{AlkaneTransfer, AlkaneTransferParcel},
@@ -329,6 +330,56 @@ impl AMMPool {
     pub fn set_delegate(&mut self, delegate: Box<dyn AMMPoolBase>) {
         self.delegate = Some(delegate);
     }
+
+    pub fn set_pool_name_and_symbol(&self) -> Result<()> {
+        let (alkane_a, alkane_b) = self.alkanes_for_self()?;
+
+        // Get name for alkane_a
+        let name_a = match self.call(
+            &Cellpack {
+                target: alkane_a,
+                inputs: vec![99],
+            },
+            &AlkaneTransferParcel(vec![]),
+            self.fuel(),
+        ) {
+            Ok(response) => {
+                if response.data.is_empty() {
+                    format!("{},{}", alkane_a.block, alkane_a.tx)
+                } else {
+                    String::from_utf8_lossy(&response.data).to_string()
+                }
+            }
+            Err(_) => format!("{},{}", alkane_a.block, alkane_a.tx),
+        };
+
+        // Get name for alkane_b
+        let name_b = match self.call(
+            &Cellpack {
+                target: alkane_b,
+                inputs: vec![99],
+            },
+            &AlkaneTransferParcel(vec![]),
+            self.fuel(),
+        ) {
+            Ok(response) => {
+                if response.data.is_empty() {
+                    format!("{},{}", alkane_b.block, alkane_b.tx)
+                } else {
+                    String::from_utf8_lossy(&response.data).to_string()
+                }
+            }
+            Err(_) => format!("{},{}", alkane_b.block, alkane_b.tx),
+        };
+
+        // Format the pool name
+        let pool_name = format!("{} / {} LP (OYL)", name_a, name_b);
+
+        // Set the name using MintableToken trait
+        MintableToken::name_pointer(self).set(Arc::new(pool_name.into_bytes()));
+
+        Ok(())
+    }
 }
 
 pub trait AMMReserves: AlkaneResponder + AMMPoolBase {
@@ -363,7 +414,18 @@ impl AlkaneResponder for AMMPool {
             let context = self.context()?;
             let mut inputs = context.inputs.clone();
             match shift_or_err(&mut inputs)? {
-                0 => delegate.process_inputs_and_init_pool(inputs, context),
+                0 => {
+                    // Process the initialization
+                    let result = delegate.process_inputs_and_init_pool(inputs, context);
+
+                    // If initialization was successful, set the pool name and symbol
+                    if result.is_ok() {
+                        // Ignore errors from set_pool_name_and_symbol to avoid failing the initialization
+                        let _ = self.set_pool_name_and_symbol();
+                    }
+
+                    result
+                }
                 1 => delegate.mint(context.myself, context.incoming_alkanes),
                 2 => delegate.burn(context.myself, context.incoming_alkanes),
                 3 => delegate.swap(context.incoming_alkanes, shift_or_err(&mut inputs)?),
