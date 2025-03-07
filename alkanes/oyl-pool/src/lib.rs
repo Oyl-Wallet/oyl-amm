@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use alkanes_runtime::{declare_alkane, runtime::AlkaneResponder, storage::StoragePointer};
 
+use alkane_factory_support::factory::MintableToken;
 #[allow(unused_imports)]
 use alkanes_runtime::{
     println,
@@ -41,7 +42,7 @@ impl OylAMMPool {
         oyl_pool
     }
 }
-
+impl MintableToken for OylAMMPool {}
 impl AMMReserves for OylAMMPool {}
 impl AMMPoolBase for OylAMMPool {
     fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {

@@ -1,15 +1,20 @@
-use alkanes_runtime::{ runtime::AlkaneResponder, storage::StoragePointer };
+use alkanes_runtime::{runtime::AlkaneResponder, storage::StoragePointer};
 
+use alkane_factory_support::factory::MintableToken;
 #[allow(unused_imports)]
-use alkanes_runtime::{ println, stdio::{ stdout, Write } };
+use alkanes_runtime::{
+    println,
+    stdio::{stdout, Write},
+};
 use alkanes_support::{
+    cellpack::Cellpack,
     context::Context,
     id::AlkaneId,
-    parcel::{ AlkaneTransfer, AlkaneTransferParcel },
+    parcel::{AlkaneTransfer, AlkaneTransferParcel},
     response::CallResponse,
-    utils::{ overflow_error, shift, shift_or_err },
+    utils::{overflow_error, shift, shift_or_err},
 };
-use anyhow::{ anyhow, Result };
+use anyhow::{anyhow, Result};
 use metashrew_support::index_pointer::KeyValuePointer;
 use num::integer::Roots;
 use protorune_support::balance_sheet::BalanceSheet;
@@ -29,6 +34,7 @@ pub struct PoolInfo {
     pub reserve_a: u128,
     pub reserve_b: u128,
     pub total_supply: u128,
+    pub pool_name: String,
 }
 
 impl PoolInfo {
@@ -51,23 +57,31 @@ impl PoolInfo {
 
         bytes.extend_from_slice(&self.reserve_b.to_le_bytes());
         bytes.extend_from_slice(&self.total_supply.to_le_bytes());
+
+        // Add the pool name
+        let name_bytes = self.pool_name.as_bytes();
+        // Add the length of the name as a u32
+        bytes.extend_from_slice(&(name_bytes.len() as u32).to_le_bytes());
+        // Add the name bytes
+        bytes.extend_from_slice(name_bytes);
+
         bytes
     }
 }
 
-pub trait AMMPoolBase {
+pub trait AMMPoolBase: MintableToken {
     fn init_pool(
         &self,
         alkane_a: AlkaneId,
         alkane_b: AlkaneId,
-        context: Context
+        context: Context,
     ) -> Result<CallResponse> {
         let mut pointer = StoragePointer::from_keyword("/initialized");
         if pointer.get().len() == 0 {
             pointer.set(Arc::new(vec![0x01]));
             StoragePointer::from_keyword("/alkane/0").set(Arc::new(alkane_a.into()));
             StoragePointer::from_keyword("/alkane/1").set(Arc::new(alkane_b.into()));
-            self.mint(context.myself, context.incoming_alkanes)
+            self.add_liquidity(context.myself, context.incoming_alkanes)
         } else {
             Err(anyhow!("already initialized"))
         }
@@ -75,46 +89,55 @@ pub trait AMMPoolBase {
     fn process_inputs_and_init_pool(
         &self,
         mut inputs: Vec<u128>,
-        context: Context
+        context: Context,
     ) -> Result<CallResponse> {
         let (a, b) = self.pull_ids_or_err(&mut inputs)?;
         self.init_pool(a, b, context)
     }
     fn alkanes_for_self(&self) -> Result<(AlkaneId, AlkaneId)> {
         Ok((
-            StoragePointer::from_keyword("/alkane/0").get().as_ref().clone().try_into()?,
-            StoragePointer::from_keyword("/alkane/1").get().as_ref().clone().try_into()?,
+            StoragePointer::from_keyword("/alkane/0")
+                .get()
+                .as_ref()
+                .clone()
+                .try_into()?,
+            StoragePointer::from_keyword("/alkane/1")
+                .get()
+                .as_ref()
+                .clone()
+                .try_into()?,
         ))
     }
     fn check_inputs(
         &self,
         myself: &AlkaneId,
         parcel: &AlkaneTransferParcel,
-        n: usize
+        n: usize,
     ) -> Result<()> {
         if parcel.0.len() > n {
-            Err(anyhow!(format!("{} alkanes sent but maximum {} supported", parcel.0.len(), n)))
+            Err(anyhow!(format!(
+                "{} alkanes sent but maximum {} supported",
+                parcel.0.len(),
+                n
+            )))
         } else {
             let (a, b) = self.alkanes_for_self()?;
-            if let Some(_) = parcel.0.iter().find(|v| myself != &v.id && v.id != a && v.id != b) {
+            if let Some(_) = parcel
+                .0
+                .iter()
+                .find(|v| myself != &v.id && v.id != a && v.id != b)
+            {
                 Err(anyhow!("unsupported alkane sent to pool"))
             } else {
                 Ok(())
             }
         }
     }
-    fn total_supply(&self) -> u128 {
-        StoragePointer::from_keyword("/totalsupply").get_value::<u128>()
-    }
-    fn set_total_supply(&self, v: u128) {
-        StoragePointer::from_keyword("/totalsupply").set_value::<u128>(v);
-    }
     fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer);
     fn previous_reserves(&self, parcel: &AlkaneTransferParcel) -> (AlkaneTransfer, AlkaneTransfer) {
         let (reserve_a, reserve_b) = self.reserves();
-        let mut reserve_sheet: BalanceSheet = AlkaneTransferParcel(
-            vec![reserve_a.clone(), reserve_b.clone()]
-        ).into();
+        let mut reserve_sheet: BalanceSheet =
+            AlkaneTransferParcel(vec![reserve_a.clone(), reserve_b.clone()]).into();
         let incoming_sheet: BalanceSheet = parcel.clone().into();
         reserve_sheet.debit(&incoming_sheet).unwrap();
         (
@@ -132,12 +155,14 @@ pub trait AMMPoolBase {
     fn pool_details(&self) -> Result<CallResponse> {
         let (reserve_a, reserve_b) = self.reserves();
         let (token_a, token_b) = self.alkanes_for_self()?;
+
         let pool_info = PoolInfo {
             token_a,
             token_b,
             reserve_a: reserve_a.value,
             reserve_b: reserve_b.value,
             total_supply: self.total_supply(),
+            pool_name: self.name(),
         };
 
         let mut response = CallResponse::default();
@@ -146,7 +171,11 @@ pub trait AMMPoolBase {
         Ok(response)
     }
 
-    fn mint(&self, myself: AlkaneId, parcel: AlkaneTransferParcel) -> Result<CallResponse> {
+    fn add_liquidity(
+        &self,
+        myself: AlkaneId,
+        parcel: AlkaneTransferParcel,
+    ) -> Result<CallResponse> {
         self.check_inputs(&myself, &parcel, 2)?;
         let mut total_supply = self.total_supply();
         let (reserve_a, reserve_b) = self.reserves();
@@ -160,21 +189,19 @@ pub trait AMMPoolBase {
                 total_supply = total_supply + MINIMUM_LIQUIDITY;
             } else {
                 let numerator = overflow_error(
-                    total_supply.checked_mul(overflow_error(root_k.checked_sub(root_k_last))?)
+                    total_supply.checked_mul(overflow_error(root_k.checked_sub(root_k_last))?),
                 )?;
                 let denominator = overflow_error(
-                    overflow_error(root_k.checked_mul(5))?.checked_add(root_k_last) // constant 5 is assuming 1/6 of LP fees goes as protocol fees
+                    overflow_error(root_k.checked_mul(5))?.checked_add(root_k_last), // constant 5 is assuming 1/6 of LP fees goes as protocol fees
                 )?;
                 liquidity = numerator / denominator;
             }
             self.set_total_supply(overflow_error(total_supply.checked_add(liquidity))?);
             let mut response = CallResponse::default();
-            response.alkanes = AlkaneTransferParcel(
-                vec![AlkaneTransfer {
-                    id: myself,
-                    value: liquidity,
-                }]
-            );
+            response.alkanes = AlkaneTransferParcel(vec![AlkaneTransfer {
+                id: myself,
+                value: liquidity,
+            }]);
             Ok(response)
         } else {
             Err(anyhow!("root k is less than previous root k"))
@@ -196,18 +223,16 @@ pub trait AMMPoolBase {
             return Err(anyhow!("insufficient liquidity!"));
         }
         self.set_total_supply(overflow_error(total_supply.checked_sub(liquidity))?);
-        response.alkanes = AlkaneTransferParcel(
-            vec![
-                AlkaneTransfer {
-                    id: reserve_a.id,
-                    value: amount_a,
-                },
-                AlkaneTransfer {
-                    id: reserve_b.id,
-                    value: amount_b,
-                }
-            ]
-        );
+        response.alkanes = AlkaneTransferParcel(vec![
+            AlkaneTransfer {
+                id: reserve_a.id,
+                value: amount_a,
+            },
+            AlkaneTransfer {
+                id: reserve_b.id,
+                value: amount_b,
+            },
+        ]);
         Ok(response)
     }
     fn get_amount_out(&self, amount: u128, reserve_from: u128, reserve_to: u128) -> Result<u128> {
@@ -250,12 +275,13 @@ pub trait AMMPoolBase {
     fn swap(
         &self,
         parcel: AlkaneTransferParcel,
-        amount_out_predicate: u128
+        amount_out_predicate: u128,
     ) -> Result<CallResponse> {
         if parcel.0.len() != 1 {
-            return Err(
-                anyhow!(format!("payload can only include 1 alkane, sent {}", parcel.0.len()))
-            );
+            return Err(anyhow!(format!(
+                "payload can only include 1 alkane, sent {}",
+                parcel.0.len()
+            )));
         }
         let transfer = parcel.0[0].clone();
         let (previous_a, previous_b) = self.previous_reserves(&parcel);
@@ -313,6 +339,58 @@ impl AMMPool {
     pub fn set_delegate(&mut self, delegate: Box<dyn AMMPoolBase>) {
         self.delegate = Some(delegate);
     }
+
+    pub fn set_pool_name_and_symbol(&self) -> Result<()> {
+        let (alkane_a, alkane_b) = self.alkanes_for_self()?;
+
+        // Get name for alkane_a
+        let name_a = match self.call(
+            &Cellpack {
+                target: alkane_a,
+                inputs: vec![99],
+            },
+            &AlkaneTransferParcel(vec![]),
+            self.fuel(),
+        ) {
+            Ok(response) => {
+                if response.data.is_empty() {
+                    format!("{},{}", alkane_a.block, alkane_a.tx)
+                } else {
+                    String::from_utf8_lossy(&response.data).to_string()
+                }
+            }
+            Err(_) => format!("{},{}", alkane_a.block, alkane_a.tx),
+        };
+
+        // Get name for alkane_b
+        let name_b = match self.call(
+            &Cellpack {
+                target: alkane_b,
+                inputs: vec![99],
+            },
+            &AlkaneTransferParcel(vec![]),
+            self.fuel(),
+        ) {
+            Ok(response) => {
+                if response.data.is_empty() {
+                    format!("{},{}", alkane_b.block, alkane_b.tx)
+                } else {
+                    String::from_utf8_lossy(&response.data).to_string()
+                }
+            }
+            Err(_) => format!("{},{}", alkane_b.block, alkane_b.tx),
+        };
+
+        // Format the pool name
+        let pool_name = format!("{} / {} LP (OYL)", name_a, name_b);
+
+        // Set the name using MintableToken trait
+        MintableToken::name_pointer(self).set(Arc::new(pool_name.into_bytes()));
+
+        Ok(())
+    }
+
+    // Removed pool_details method from AMMPool implementation
 }
 
 pub trait AMMReserves: AlkaneResponder + AMMPoolBase {
@@ -331,7 +409,7 @@ pub trait AMMReserves: AlkaneResponder + AMMPoolBase {
         )
     }
 }
-
+impl MintableToken for AMMPool {}
 impl AMMReserves for AMMPool {}
 impl AMMPoolBase for AMMPool {
     fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
@@ -345,13 +423,29 @@ impl AlkaneResponder for AMMPool {
             let context = self.context()?;
             let mut inputs = context.inputs.clone();
             match shift_or_err(&mut inputs)? {
-                0 => delegate.process_inputs_and_init_pool(inputs, context),
-                1 => delegate.mint(context.myself, context.incoming_alkanes),
+                0 => {
+                    // Process the initialization
+                    let result = delegate.process_inputs_and_init_pool(inputs, context);
+
+                    // If initialization was successful, set the pool name and symbol
+                    if result.is_ok() {
+                        // Ignore errors from set_pool_name_and_symbol to avoid failing the initialization
+                        let _ = self.set_pool_name_and_symbol();
+                    }
+
+                    result
+                }
+                1 => delegate.add_liquidity(context.myself, context.incoming_alkanes),
                 2 => delegate.burn(context.myself, context.incoming_alkanes),
                 3 => delegate.swap(context.incoming_alkanes, shift_or_err(&mut inputs)?),
                 4 => delegate.simulate_amount_out(inputs),
-                5 => delegate.pool_details(),
                 50 => Ok(CallResponse::forward(&context.incoming_alkanes)),
+                99 => {
+                    let mut response = CallResponse::forward(&context.incoming_alkanes);
+                    response.data = self.name().into_bytes().to_vec();
+                    Ok(response)
+                }
+                999 => delegate.pool_details(),
 
                 _ => Err(anyhow!("unrecognized opcode")),
             }

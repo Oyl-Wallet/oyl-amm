@@ -1,3 +1,4 @@
+use alkane_factory_support::factory::MintableToken;
 use alkanes::tests::helpers::{self as alkane_helpers};
 use alkanes_runtime_pool::{AMMPoolBase, DEFAULT_FEE_AMOUNT_PER_1000};
 use alkanes_support::cellpack::Cellpack;
@@ -23,7 +24,7 @@ struct TestAMMPool {
     reserve_a: AlkaneTransfer,
     reserve_b: AlkaneTransfer,
 }
-
+impl MintableToken for TestAMMPool {}
 impl AMMPoolBase for TestAMMPool {
     fn reserves(
         &self,
