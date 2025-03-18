@@ -1,4 +1,6 @@
-use alkanes_runtime::{declare_alkane, runtime::AlkaneResponder, storage::StoragePointer};
+use alkanes_runtime::{
+    declare_alkane, message::MessageDispatch, runtime::AlkaneResponder, storage::StoragePointer,
+};
 #[allow(unused_imports)]
 use alkanes_runtime::{
     println,
@@ -21,6 +23,22 @@ use metashrew_support::{
     utils::{consume_sized_int, consume_u128},
 };
 use std::sync::Arc;
+
+#[derive(MessageDispatch)]
+pub enum AMMFactoryMessage {
+    #[opcode(0)]
+    InitFactory { pool_factory_id: u128 },
+
+    #[opcode(1)]
+    CreateNewPool,
+
+    #[opcode(2)]
+    FindExistingPoolId,
+
+    #[opcode(3)]
+    #[returns(Vec<u8>)]
+    GetAllPools,
+}
 
 pub fn take_two<T: Clone>(v: &Vec<T>) -> (T, T) {
     (v[0].clone(), v[1].clone())
@@ -96,14 +114,6 @@ pub trait AMMFactoryBase {
             Err(anyhow!("already initialized"))
         }
     }
-    fn process_inputs_and_init_factory(
-        &self,
-        mut inputs: Vec<u128>,
-        context: Context,
-    ) -> Result<CallResponse> {
-        let pool_factory_id = shift_or_err(&mut inputs)?;
-        self.init_factory(pool_factory_id, context)
-    }
     fn create_new_pool(&self, context: Context) -> Result<CallResponse>;
 
     fn find_existing_pool_id(
@@ -133,11 +143,11 @@ pub trait AMMFactoryBase {
             .get()
             .as_ref()
             .clone();
-        
+
         if ptr.len() == 0 {
             return Ok(0);
         }
-        
+
         let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
         Ok(consume_u128(&mut cursor)?)
     }
@@ -149,15 +159,15 @@ pub trait AMMFactoryBase {
             .get()
             .as_ref()
             .clone();
-            
+
         if ptr.len() == 0 {
             return Err(anyhow!("pool not found at index {}", index));
         }
-        
+
         let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
         Ok(AlkaneId::new(
             consume_sized_int::<u128>(&mut cursor)?,
-            consume_sized_int::<u128>(&mut cursor)?
+            consume_sized_int::<u128>(&mut cursor)?,
         ))
     }
 
@@ -166,10 +176,9 @@ pub trait AMMFactoryBase {
         let length = self.all_pools_length()?;
         let mut response = CallResponse::default();
         let mut all_pools_data = Vec::new();
-        
+
         // Add the total count as the first element
         all_pools_data.extend_from_slice(&length.to_le_bytes());
-        
 
         for i in 0..length {
             match self.all_pools(i) {
@@ -182,7 +191,7 @@ pub trait AMMFactoryBase {
                 }
             }
         }
-        
+
         response.data = all_pools_data;
         Ok(response)
     }
@@ -209,6 +218,42 @@ impl AMMFactory {
     pub fn set_delegate(&mut self, delegate: Box<dyn AMMFactoryBase>) {
         self.delegate = Some(delegate);
     }
+
+    fn init_factory(&self, pool_factory_id: u128) -> Result<CallResponse> {
+        if let Some(delegate) = &self.delegate {
+            let context = self.context()?;
+            delegate.init_factory(pool_factory_id, context)
+        } else {
+            Err(anyhow!("No delegate set"))
+        }
+    }
+
+    fn create_new_pool(&self) -> Result<CallResponse> {
+        if let Some(delegate) = &self.delegate {
+            let context = self.context()?;
+            delegate.create_new_pool(context)
+        } else {
+            Err(anyhow!("No delegate set"))
+        }
+    }
+
+    fn find_existing_pool_id(&self) -> Result<CallResponse> {
+        if let Some(delegate) = &self.delegate {
+            let context = self.context()?;
+            let inputs = context.inputs.clone();
+            delegate.find_existing_pool_id(inputs, context)
+        } else {
+            Err(anyhow!("No delegate set"))
+        }
+    }
+
+    fn get_all_pools(&self) -> Result<CallResponse> {
+        if let Some(delegate) = &self.delegate {
+            delegate.get_all_pools()
+        } else {
+            Err(anyhow!("No delegate set"))
+        }
+    }
 }
 
 impl AMMFactoryBase for AMMFactory {
@@ -221,22 +266,21 @@ impl AMMFactoryBase for AMMFactory {
         let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
         let next_sequence = self.sequence();
         let pool_id = AlkaneId::new(2, next_sequence);
-        
-        self.pool_pointer(&a, &b)
-            .set(Arc::new(pool_id.into()));
-            
+
+        self.pool_pointer(&a, &b).set(Arc::new(pool_id.into()));
+
         // Add the new pool to the registry
         let length = self.all_pools_length()?;
-        
+
         // Store the pool ID at the current index
         StoragePointer::from_keyword("/all_pools/")
             .select(&length.to_le_bytes().to_vec())
             .set(Arc::new(pool_id.into()));
-        
+
         // Update the length
         StoragePointer::from_keyword("/all_pools_length")
             .set(Arc::new((length + 1).to_le_bytes().to_vec()));
-            
+
         self.call(
             &Cellpack {
                 target: AlkaneId {
@@ -256,19 +300,11 @@ impl AMMFactoryBase for AMMFactory {
 
 impl AlkaneResponder for AMMFactory {
     fn execute(&self) -> Result<CallResponse> {
-        if let Some(delegate) = &self.delegate {
-            let context = self.context()?;
-            let mut inputs = context.inputs.clone();
-            match shift_or_err(&mut inputs)? {
-                0 => delegate.process_inputs_and_init_factory(inputs, context),
-                1 => delegate.create_new_pool(context),
-                2 => delegate.find_existing_pool_id(inputs, context),
-                3 => delegate.get_all_pools(),
-                // TODO: add a function to change the implementation of the AMM pool for upgradeability. Need to check that the caller is the owner of this contract
-                _ => Err(anyhow!("unrecognized opcode")),
-            }
-        } else {
-            Err(anyhow!("No delegate set"))
-        }
+        // The opcode extraction and dispatch logic is now handled by the declare_alkane macro
+        // This method is still required by the AlkaneResponder trait, but we can just return an error
+        // indicating that it should not be called directly
+        Err(anyhow!(
+            "This method should not be called directly. Use the declare_alkane macro instead."
+        ))
     }
 }

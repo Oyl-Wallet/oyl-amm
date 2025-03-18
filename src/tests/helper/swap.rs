@@ -79,7 +79,7 @@ pub fn test_simulate_amount_out() -> Result<()> {
 
     // Test case 1: Swap token A for token B
     let input_amount_a = 100_000u128; // 100K tokens
-    let result = test_pool.simulate_amount_out(vec![token_a.block, token_a.tx, input_amount_a])?;
+    let result = test_pool.simulate_amount_out(token_a, input_amount_a)?;
 
     // Calculate expected output with 0.4% fee
     let amount_with_fee = U256::from(996) * U256::from(input_amount_a); // 0.4% fee
@@ -94,7 +94,7 @@ pub fn test_simulate_amount_out() -> Result<()> {
 
     // Test case 2: Swap token B for token A
     let input_amount_b = 200_000u128; // 200K tokens
-    let result = test_pool.simulate_amount_out(vec![token_b.block, token_b.tx, input_amount_b])?;
+    let result = test_pool.simulate_amount_out(token_b, input_amount_b)?;
 
     let amount_with_fee = U256::from(996) * U256::from(input_amount_b);
     let numerator = amount_with_fee * U256::from(1_000_000);
@@ -103,12 +103,8 @@ pub fn test_simulate_amount_out() -> Result<()> {
 
     assert_eq!(result.data, expected_output);
 
-    // Test case 3: Invalid input length
-    let result = test_pool.simulate_amount_out(vec![1, 1]);
-    assert!(result.is_err());
-
-    // Test case 4: Invalid token (not in pool)
-    let result = test_pool.simulate_amount_out(vec![3, 1, 100_000]);
+    // Test case 3: Invalid token (not in pool)
+    let result = test_pool.simulate_amount_out(AlkaneId::new(3, 1), 100_000);
     assert!(result.is_err());
 
     Ok(())

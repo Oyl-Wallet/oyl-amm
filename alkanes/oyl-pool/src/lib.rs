@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
-use alkanes_runtime::{declare_alkane, runtime::AlkaneResponder, storage::StoragePointer};
-
 use alkane_factory_support::factory::MintableToken;
+use alkanes_runtime::message::MessageDispatch;
+use alkanes_runtime::{declare_alkane, runtime::AlkaneResponder, storage::StoragePointer};
 #[allow(unused_imports)]
 use alkanes_runtime::{
     println,
     stdio::{stdout, Write},
 };
-use alkanes_runtime_pool::{AMMPool, AMMPoolBase, AMMReserves};
+use alkanes_runtime_pool::{AMMPoolBase, AMMPoolMessage, AMMReserves};
 use alkanes_support::{
     context::Context,
     id::AlkaneId,
@@ -22,46 +22,176 @@ use metashrew_support::{
     index_pointer::KeyValuePointer,
 };
 
-struct OylAMMPool {
-    inner: AMMPool,
+// Define a new message type for OYL-specific functionality if needed
+// If no additional functionality is needed, we can reuse AMMPoolMessage
+#[derive(MessageDispatch)]
+pub enum OylAMMPoolMessage {
+    #[opcode(0)]
+    InitPool {
+        alkane_a: AlkaneId,
+        alkane_b: AlkaneId,
+    },
+
+    #[opcode(1)]
+    AddLiquidity,
+
+    #[opcode(2)]
+    Burn,
+
+    #[opcode(3)]
+    Swap { amount_out_predicate: u128 },
+
+    #[opcode(4)]
+    SimulateAmountOut { token: AlkaneId, amount: u128 },
+
+    #[opcode(50)]
+    ForwardIncoming,
+
+    #[opcode(99)]
+    #[returns(String)]
+    GetName,
+
+    #[opcode(999)]
+    #[returns(Vec<u8>)]
+    PoolDetails,
 }
 
-impl Clone for OylAMMPool {
-    fn clone(&self) -> Self {
-        OylAMMPool {
-            inner: self.inner.clone(),
-        }
-    }
-}
+#[derive(Default)]
+pub struct OylAMMPool();
 
 impl OylAMMPool {
-    pub fn default() -> Self {
-        let inner = AMMPool::default();
-        let mut oyl_pool = OylAMMPool { inner };
-        oyl_pool.inner.set_delegate(Box::new(oyl_pool.clone())); // Override delegate with self
-        oyl_pool
+    pub fn set_pool_name_and_symbol(&self) -> Result<()> {
+        let (alkane_a, alkane_b) = self.alkanes_for_self()?;
+
+        // Get name for alkane_a
+        let name_a = match self.call(
+            &alkanes_support::cellpack::Cellpack {
+                target: alkane_a,
+                inputs: vec![99],
+            },
+            &AlkaneTransferParcel(vec![]),
+            self.fuel(),
+        ) {
+            Ok(response) => {
+                if response.data.is_empty() {
+                    format!("{},{}", alkane_a.block, alkane_a.tx)
+                } else {
+                    String::from_utf8_lossy(&response.data).to_string()
+                }
+            }
+            Err(_) => format!("{},{}", alkane_a.block, alkane_a.tx),
+        };
+
+        // Get name for alkane_b
+        let name_b = match self.call(
+            &alkanes_support::cellpack::Cellpack {
+                target: alkane_b,
+                inputs: vec![99],
+            },
+            &AlkaneTransferParcel(vec![]),
+            self.fuel(),
+        ) {
+            Ok(response) => {
+                if response.data.is_empty() {
+                    format!("{},{}", alkane_b.block, alkane_b.tx)
+                } else {
+                    String::from_utf8_lossy(&response.data).to_string()
+                }
+            }
+            Err(_) => format!("{},{}", alkane_b.block, alkane_b.tx),
+        };
+
+        // Format the pool name with OYL branding
+        let pool_name = format!("{} / {} LP (OYL)", name_a, name_b);
+
+        // Set the name using MintableToken trait
+        MintableToken::name_pointer(self).set(Arc::new(pool_name.into_bytes()));
+
+        Ok(())
+    }
+
+    // External facing methods that implement the OylAMMPoolMessage interface
+    pub fn init_pool(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> Result<CallResponse> {
+        let context = self.context()?;
+        let result = AMMPoolBase::init_pool(self, alkane_a, alkane_b, context);
+
+        if result.is_ok() {
+            // Ignore errors from set_pool_name_and_symbol to avoid failing the initialization
+            let _ = self.set_pool_name_and_symbol();
+        }
+
+        result
+    }
+
+    pub fn add_liquidity(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        AMMPoolBase::add_liquidity(self, context.myself, context.incoming_alkanes)
+    }
+
+    pub fn burn(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        AMMPoolBase::burn(self, context.myself, context.incoming_alkanes)
+    }
+
+    pub fn swap(&self, amount_out_predicate: u128) -> Result<CallResponse> {
+        println!("special swap for oyl");
+        let context = self.context()?;
+        AMMPoolBase::swap(self, context.incoming_alkanes, amount_out_predicate)
+    }
+
+    pub fn simulate_amount_out(&self, token: AlkaneId, amount: u128) -> Result<CallResponse> {
+        AMMPoolBase::simulate_amount_out(self, token, amount)
+    }
+
+    pub fn forward_incoming(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        Ok(CallResponse::forward(&context.incoming_alkanes))
+    }
+
+    pub fn get_name(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        let mut response = CallResponse::forward(&context.incoming_alkanes);
+        response.data = self.name().into_bytes().to_vec();
+        Ok(response)
+    }
+
+    pub fn pool_details(&self) -> Result<CallResponse> {
+        AMMPoolBase::pool_details(self)
     }
 }
+
 impl MintableToken for OylAMMPool {}
 impl AMMReserves for OylAMMPool {}
 impl AMMPoolBase for OylAMMPool {
     fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
         AMMReserves::reserves(self)
     }
+
+    // Override the swap method if needed for OYL-specific logic
     fn swap(
         &self,
         parcel: AlkaneTransferParcel,
         amount_out_predicate: u128,
     ) -> Result<CallResponse> {
-        println!("special swap for oyl");
-        AMMPoolBase::swap(&self.inner, parcel, amount_out_predicate)
+        // Here we could add OYL-specific swap logic if needed
+        // For now, we're just calling the base implementation
+        AMMPoolBase::swap(self, parcel, amount_out_predicate)
     }
 }
 
 impl AlkaneResponder for OylAMMPool {
     fn execute(&self) -> Result<CallResponse> {
-        self.inner.execute()
+        // The opcode extraction and dispatch logic is now handled by the declare_alkane macro
+        // This method is still required by the AlkaneResponder trait, but we can just return an error
+        // indicating that it should not be called directly
+        Err(anyhow!(
+            "This method should not be called directly. Use the declare_alkane macro instead."
+        ))
     }
 }
 
-declare_alkane! {OylAMMPool}
+declare_alkane! {
+    impl AlkaneResponder for OylAMMPool {
+        type Message = OylAMMPoolMessage;
+    }
+}
