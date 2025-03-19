@@ -26,16 +26,16 @@ use std::sync::Arc;
 #[derive(MessageDispatch)]
 enum AMMRouterMessage {
     #[opcode(0)]
-    Initialize,
+    Initialize { factory_id: AlkaneId },
 
     #[opcode(1)]
-    AddLiquidity,
+    AddLiquidity { token1: AlkaneId, token2: AlkaneId },
 
     #[opcode(2)]
-    RemoveLiquidity,
+    RemoveLiquidity { token1: AlkaneId, token2: AlkaneId },
 
     #[opcode(3)]
-    Swap,
+    Swap { path: Vec<AlkaneId>, amount: u128 },
 
     #[opcode(4)]
     #[returns(Vec<u8>)]
@@ -89,14 +89,12 @@ impl AMMRouter {
         )
     }
 
-    fn initialize(&self) -> Result<CallResponse> {
+    fn initialize(&self, factory_id: AlkaneId) -> Result<CallResponse> {
         let context = self.context()?;
-        let mut inputs = context.inputs.clone();
 
         let mut pointer = StoragePointer::from_keyword("/initialized");
         let mut factory = StoragePointer::from_keyword("/factory");
         if pointer.get().len() == 0 {
-            let factory_id = AlkaneId::new(shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?);
             factory.set(Arc::new(factory_id.into()));
             pointer.set(Arc::new(vec![0x01]));
             //placeholder
@@ -106,13 +104,13 @@ impl AMMRouter {
         }
     }
 
-    fn add_or_remove_liquidity(&self, opcode: u128) -> Result<CallResponse> {
+    fn add_or_remove_liquidity(
+        &self,
+        opcode: u128,
+        token1: AlkaneId,
+        token2: AlkaneId,
+    ) -> Result<CallResponse> {
         let context = self.context()?;
-        let mut inputs = context.inputs.clone();
-
-        // add and remove liquidity
-        let token1 = AlkaneId::new(shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?);
-        let token2 = AlkaneId::new(shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?);
 
         let pool = self.get_pool_for(&token1, &token2)?;
         let cellpack = Cellpack {
@@ -123,43 +121,29 @@ impl AMMRouter {
         Ok(response)
     }
 
-    fn add_liquidity(&self) -> Result<CallResponse> {
-        self.add_or_remove_liquidity(1)
+    fn add_liquidity(&self, token1: AlkaneId, token2: AlkaneId) -> Result<CallResponse> {
+        self.add_or_remove_liquidity(1, token1, token2)
     }
 
-    fn remove_liquidity(&self) -> Result<CallResponse> {
-        self.add_or_remove_liquidity(2)
+    fn remove_liquidity(&self, token1: AlkaneId, token2: AlkaneId) -> Result<CallResponse> {
+        self.add_or_remove_liquidity(2, token1, token2)
     }
 
-    fn swap(&self) -> Result<CallResponse> {
+    fn swap(&self, path: Vec<AlkaneId>, amount: u128) -> Result<CallResponse> {
         let context = self.context()?;
-        let mut inputs = context.inputs.clone();
 
         // swap
-        let num_alkanes_in_path: usize = shift_or_err(&mut inputs)? as usize;
-        if num_alkanes_in_path < 2 {
+        if path.len() < 2 {
             return Err(anyhow!("Routing path must be at least two alkanes long"));
         }
-        let mut path: Vec<AlkaneId> = vec![];
-        for _ in 0..num_alkanes_in_path {
-            path.push(AlkaneId::new(
-                shift_or_err(&mut inputs)?,
-                shift_or_err(&mut inputs)?,
-            ));
-        }
-        let amount = shift_or_err(&mut inputs)?;
         let mut this_response = CallResponse {
             alkanes: context.incoming_alkanes.clone(),
             data: vec![],
         };
 
-        for i in 1..num_alkanes_in_path {
+        for i in 1..path.len() {
             let pool = self.get_pool_for(&path[i - 1], &path[i])?;
-            let this_amount = if i == num_alkanes_in_path - 1 {
-                amount
-            } else {
-                0
-            };
+            let this_amount = if i == path.len() - 1 { amount } else { 0 };
             let cellpack = Cellpack {
                 target: pool,
                 inputs: vec![3, this_amount],

@@ -8,7 +8,7 @@ use alkanes_runtime::{
     println,
     stdio::{stdout, Write},
 };
-use alkanes_runtime_pool::{AMMPoolBase, AMMPoolMessage, AMMReserves};
+use alkanes_runtime_pool::{AMMPoolBase, AMMReserves};
 use alkanes_support::{
     context::Context,
     id::AlkaneId,
@@ -23,7 +23,6 @@ use metashrew_support::{
 };
 
 // Define a new message type for OYL-specific functionality if needed
-// If no additional functionality is needed, we can reuse AMMPoolMessage
 #[derive(MessageDispatch)]
 pub enum OylAMMPoolMessage {
     #[opcode(0)]
@@ -165,17 +164,6 @@ impl AMMReserves for OylAMMPool {}
 impl AMMPoolBase for OylAMMPool {
     fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
         AMMReserves::reserves(self)
-    }
-
-    // Override the swap method if needed for OYL-specific logic
-    fn swap(
-        &self,
-        parcel: AlkaneTransferParcel,
-        amount_out_predicate: u128,
-    ) -> Result<CallResponse> {
-        // Here we could add OYL-specific swap logic if needed
-        // For now, we're just calling the base implementation
-        AMMPoolBase::swap(self, parcel, amount_out_predicate)
     }
 }
 

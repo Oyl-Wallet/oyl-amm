@@ -306,3 +306,20 @@ pub trait AMMPoolBase: MintableToken {
             .map_err(|_| anyhow!("AlkaneId values for pair missing from list"))
     }
 }
+
+pub trait AMMReserves: AlkaneResponder + AMMPoolBase {
+    fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
+        let (a, b) = self.alkanes_for_self().unwrap();
+        let context = self.context().unwrap();
+        (
+            AlkaneTransfer {
+                id: a,
+                value: self.balance(&context.myself, &a),
+            },
+            AlkaneTransfer {
+                id: b,
+                value: self.balance(&context.myself, &b),
+            },
+        )
+    }
+}

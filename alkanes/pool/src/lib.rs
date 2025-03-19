@@ -9,7 +9,7 @@ use alkanes_runtime::{
     println,
     stdio::{stdout, Write},
 };
-use alkanes_runtime_pool::AMMPoolBase;
+use alkanes_runtime_pool::{AMMPoolBase, AMMReserves};
 use alkanes_support::{
     cellpack::Cellpack,
     context::Context,
@@ -20,6 +20,7 @@ use alkanes_support::{
 };
 use anyhow::{anyhow, Result};
 use metashrew_support::compat::{to_arraybuffer_layout, to_passback_ptr};
+use metashrew_support::index_pointer::KeyValuePointer;
 
 #[derive(MessageDispatch)]
 pub enum AMMPoolMessage {
@@ -153,23 +154,6 @@ impl AMMPool {
 
     pub fn pool_details(&self) -> Result<CallResponse> {
         AMMPoolBase::pool_details(self)
-    }
-}
-
-pub trait AMMReserves: AlkaneResponder + AMMPoolBase {
-    fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
-        let (a, b) = self.alkanes_for_self().unwrap();
-        let context = self.context().unwrap();
-        (
-            AlkaneTransfer {
-                id: a,
-                value: self.balance(&context.myself, &a),
-            },
-            AlkaneTransfer {
-                id: b,
-                value: self.balance(&context.myself, &b),
-            },
-        )
     }
 }
 
