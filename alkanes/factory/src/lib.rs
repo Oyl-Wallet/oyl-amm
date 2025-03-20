@@ -33,6 +33,10 @@ pub enum AMMFactoryMessage {
     #[opcode(3)]
     #[returns(Vec<u8>)]
     GetAllPools,
+
+    #[opcode(4)]
+    #[returns(Vec<u8>)]
+    GetNumPools,
 }
 
 // Base implementation of AMMFactory that can be used directly or extended
@@ -61,7 +65,17 @@ impl AMMFactory {
     }
 
     pub fn get_all_pools(&self) -> Result<CallResponse> {
-        AMMFactoryBase::get_all_pools(self)
+        let context = self.context()?;
+        AMMFactoryBase::get_all_pools(self, context)
+    }
+
+    pub fn get_num_pools(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
+        response.data = AMMFactoryBase::all_pools_length(self)?
+            .to_le_bytes()
+            .to_vec();
+        Ok(response)
     }
 }
 
