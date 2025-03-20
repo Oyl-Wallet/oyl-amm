@@ -296,7 +296,6 @@ pub fn test_amm_pool_init_fixture(
         &mut test_block,
         &deployment_ids,
     );
-    println!("block len: {}", test_block.txdata.len());
 
     insert_init_pool_liquidity_txs(
         amount1,
@@ -306,7 +305,6 @@ pub fn test_amm_pool_init_fixture(
         &mut test_block,
         &deployment_ids,
     );
-    println!("block len: {}", test_block.txdata.len());
 
     index_block(&test_block, block_height)?;
     assert_contracts_correct_ids(&deployment_ids, use_oyl)?;

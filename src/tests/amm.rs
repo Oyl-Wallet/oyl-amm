@@ -34,15 +34,7 @@ use wasm_bindgen_test::wasm_bindgen_test;
 #[wasm_bindgen_test]
 fn test_amm_pool_normal_init() -> Result<()> {
     clear();
-    let (block, _ids) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
-    let trace_result: Trace = view::trace(
-        &(OutPoint {
-            txid: block.txdata[block.txdata.len() - 1].compute_txid(),
-            vout: 3,
-        }),
-    )?
-    .try_into()?;
-    println!("trace: {:?}", trace_result);
+    test_amm_pool_init_fixture(1000000, 1000000, false)?;
     Ok(())
 }
 
@@ -66,6 +58,28 @@ fn test_amm_factory_double_init_fail() -> Result<()> {
         ),
     );
     index_block(&test_block, block_height)?;
+    let trace_data: Trace = view::trace(
+        &(OutPoint {
+            txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+            vout: 3,
+        }),
+    )?
+    .try_into()?;
+    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
+    // Access the data field from the trace response
+    if let Some(return_context) = last_trace_event {
+        // Use pattern matching to extract the data field from the TraceEvent enum
+        match return_context {
+            TraceEvent::RevertContext(trace_response) => {
+                // Now we have the TraceResponse, access the data field
+                let data = String::from_utf8_lossy(&trace_response.inner.data);
+                assert!(data.contains("ALKANES: revert: Error: already initialized"));
+            }
+            _ => panic!("Expected RevertContext variant, but got a different variant"),
+        }
+    } else {
+        panic!("Failed to get last_trace_event from trace data");
+    }
     Ok(())
 }
 
@@ -96,6 +110,29 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
         ),
     );
     index_block(&test_block, block_height)?;
+    let trace_data: Trace = view::trace(
+        &(OutPoint {
+            txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+            vout: 4,
+        }),
+    )?
+    .try_into()?;
+    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
+    // Access the data field from the trace response
+    if let Some(return_context) = last_trace_event {
+        // Use pattern matching to extract the data field from the TraceEvent enum
+        match return_context {
+            TraceEvent::RevertContext(trace_response) => {
+                // Now we have the TraceResponse, access the data field
+                let data = String::from_utf8_lossy(&trace_response.inner.data);
+                assert!(data
+                    .contains("ALKANES: revert: Error: must send two runes to initialize a pool"));
+            }
+            _ => panic!("Expected RevertContext variant, but got a different variant"),
+        }
+    } else {
+        panic!("Failed to get last_trace_event from trace data");
+    }
     Ok(())
 }
 
@@ -600,7 +637,7 @@ fn test_get_num_pools() -> Result<()> {
             _ => panic!("Expected ReturnContext variant, but got a different variant"),
         }
     } else {
-        panic!("Failed to get pool count from trace data");
+        panic!("Failed to get last_trace_event from trace data");
     }
 
     Ok(())
@@ -671,7 +708,7 @@ fn test_find_existing_pool_id() -> Result<()> {
             _ => panic!("Expected ReturnContext variant, but got a different variant"),
         }
     } else {
-        panic!("Failed to get pool count from trace data");
+        panic!("Failed to get last_trace_event from trace data");
     }
 
     Ok(())
@@ -724,7 +761,7 @@ fn test_find_nonexisting_pool_id() -> Result<()> {
             _ => panic!("Expected RevertContext variant, but got a different variant"),
         }
     } else {
-        panic!("Failed to get pool count from trace data");
+        panic!("Failed to get last_trace_event from trace data");
     }
 
     Ok(())
