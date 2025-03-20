@@ -1,4 +1,6 @@
-use alkanes_runtime::{declare_alkane, runtime::AlkaneResponder, storage::StoragePointer};
+use alkanes_runtime::{
+    declare_alkane, message::MessageDispatch, runtime::AlkaneResponder, storage::StoragePointer,
+};
 
 #[allow(unused_imports)]
 use alkanes_runtime::{
@@ -20,6 +22,28 @@ use metashrew_support::{
     utils::consume_u128,
 };
 use std::sync::Arc;
+
+#[derive(MessageDispatch)]
+enum AMMRouterMessage {
+    #[opcode(0)]
+    Initialize { factory_id: AlkaneId },
+
+    #[opcode(1)]
+    AddLiquidity { token1: AlkaneId, token2: AlkaneId },
+
+    #[opcode(2)]
+    RemoveLiquidity { token1: AlkaneId, token2: AlkaneId },
+
+    #[opcode(3)]
+    Swap { path: Vec<AlkaneId>, amount: u128 },
+
+    #[opcode(4)]
+    #[returns(Vec<u8>)]
+    GetAllPools,
+
+    #[opcode(50)]
+    ForwardIncoming,
+}
 
 #[derive(Default)]
 struct AMMRouter(());
@@ -64,83 +88,92 @@ impl AMMRouter {
             self.fuel(),
         )
     }
+
+    fn initialize(&self, factory_id: AlkaneId) -> Result<CallResponse> {
+        let context = self.context()?;
+
+        let mut pointer = StoragePointer::from_keyword("/initialized");
+        let mut factory = StoragePointer::from_keyword("/factory");
+        if pointer.get().len() == 0 {
+            factory.set(Arc::new(factory_id.into()));
+            pointer.set(Arc::new(vec![0x01]));
+            //placeholder
+            Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
+        } else {
+            Err(anyhow!("already initialized"))
+        }
+    }
+
+    fn add_or_remove_liquidity(
+        &self,
+        opcode: u128,
+        token1: AlkaneId,
+        token2: AlkaneId,
+    ) -> Result<CallResponse> {
+        let context = self.context()?;
+
+        let pool = self.get_pool_for(&token1, &token2)?;
+        let cellpack = Cellpack {
+            target: pool,
+            inputs: vec![opcode],
+        };
+        let response = self.call(&cellpack, &context.incoming_alkanes, self.fuel())?;
+        Ok(response)
+    }
+
+    fn add_liquidity(&self, token1: AlkaneId, token2: AlkaneId) -> Result<CallResponse> {
+        self.add_or_remove_liquidity(1, token1, token2)
+    }
+
+    fn remove_liquidity(&self, token1: AlkaneId, token2: AlkaneId) -> Result<CallResponse> {
+        self.add_or_remove_liquidity(2, token1, token2)
+    }
+
+    fn swap(&self, path: Vec<AlkaneId>, amount: u128) -> Result<CallResponse> {
+        let context = self.context()?;
+
+        // swap
+        if path.len() < 2 {
+            return Err(anyhow!("Routing path must be at least two alkanes long"));
+        }
+        let mut this_response = CallResponse {
+            alkanes: context.incoming_alkanes.clone(),
+            data: vec![],
+        };
+
+        for i in 1..path.len() {
+            let pool = self.get_pool_for(&path[i - 1], &path[i])?;
+            let this_amount = if i == path.len() - 1 { amount } else { 0 };
+            let cellpack = Cellpack {
+                target: pool,
+                inputs: vec![3, this_amount],
+            };
+            this_response = self.call(&cellpack, &this_response.alkanes, self.fuel())?;
+            println!("This response for pair {}: {:?}", i, this_response);
+        }
+
+        Ok(this_response)
+    }
+
+    fn forward_incoming(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        Ok(CallResponse::forward(&context.incoming_alkanes))
+    }
 }
 
 impl AlkaneResponder for AMMRouter {
     fn execute(&self) -> Result<CallResponse> {
-        let context = self.context()?;
-        let mut inputs = context.inputs.clone();
-        let opcode = shift_or_err(&mut inputs)?;
-        match opcode {
-            0 => {
-                let mut pointer = StoragePointer::from_keyword("/initialized");
-                let mut factory = StoragePointer::from_keyword("/factory");
-                if pointer.get().len() == 0 {
-                    let factory_id =
-                        AlkaneId::new(shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?);
-                    factory.set(Arc::new(factory_id.into()));
-                    pointer.set(Arc::new(vec![0x01]));
-                    //placeholder
-                    Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
-                } else {
-                    Err(anyhow!("already initialized"))
-                }
-            }
-            1..3 => {
-                // add and remove liquidity
-                let token1 = AlkaneId::new(shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?);
-                let token2 = AlkaneId::new(shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?);
-
-                let pool = self.get_pool_for(&token1, &token2)?;
-                let cellpack = Cellpack {
-                    target: pool,
-                    inputs: vec![opcode],
-                };
-                let response = self.call(&cellpack, &context.incoming_alkanes, self.fuel())?;
-                Ok(response)
-            }
-            3 => {
-                // swap
-                let num_alkanes_in_path: usize = shift_or_err(&mut inputs)? as usize;
-                if num_alkanes_in_path < 2 {
-                    return Err(anyhow!("Routing path must be at least two alkanes long"));
-                }
-                let mut path: Vec<AlkaneId> = vec![];
-                for _ in 0..num_alkanes_in_path {
-                    path.push(AlkaneId::new(
-                        shift_or_err(&mut inputs)?,
-                        shift_or_err(&mut inputs)?,
-                    ));
-                }
-                let amount = shift_or_err(&mut inputs)?;
-                let mut this_response = CallResponse {
-                    alkanes: context.incoming_alkanes.clone(),
-                    data: vec![],
-                };
-
-                for i in 1..num_alkanes_in_path {
-                    let pool = self.get_pool_for(&path[i - 1], &path[i])?;
-                    let this_amount = if i == num_alkanes_in_path - 1 {
-                        amount
-                    } else {
-                        0
-                    };
-                    let cellpack = Cellpack {
-                        target: pool,
-                        inputs: vec![opcode, this_amount],
-                    };
-                    this_response = self.call(&cellpack, &this_response.alkanes, self.fuel())?;
-                    println!("This response for pair {}: {:?}", i, this_response);
-                }
-
-                Ok(this_response)
-            }
-            4 => self.get_all_pools(),
-            50 => Ok(CallResponse::forward(&context.incoming_alkanes)),
-
-            _ => Err(anyhow!("unrecognized opcode {}", opcode)),
-        }
+        // The opcode extraction and dispatch logic is now handled by the declare_alkane macro
+        // This method is still required by the AlkaneResponder trait, but we can just return an error
+        // indicating that it should not be called directly
+        Err(anyhow!(
+            "This method should not be called directly. Use the declare_alkane macro instead."
+        ))
     }
 }
 
-declare_alkane! {AMMRouter}
+declare_alkane! {
+    impl AlkaneResponder for AMMRouter {
+        type Message = AMMRouterMessage;
+    }
+}

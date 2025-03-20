@@ -1,22 +1,15 @@
-use alkanes_runtime::{declare_alkane, runtime::AlkaneResponder, storage::StoragePointer};
+use alkanes_runtime::storage::StoragePointer;
 #[allow(unused_imports)]
 use alkanes_runtime::{
     println,
     stdio::{stdout, Write},
 };
 use alkanes_support::{
-    cellpack::Cellpack,
-    constants::AMM_FACTORY_ID,
-    context::Context,
-    id::AlkaneId,
-    parcel::{AlkaneTransfer, AlkaneTransferParcel},
-    response::CallResponse,
-    utils::shift_or_err,
+    context::Context, id::AlkaneId, parcel::AlkaneTransfer, response::CallResponse,
 };
 use anyhow::{anyhow, Result};
 use metashrew_support::{
     byte_view::ByteView,
-    compat::{to_arraybuffer_layout, to_passback_ptr},
     index_pointer::KeyValuePointer,
     utils::{consume_sized_int, consume_u128},
 };
@@ -96,27 +89,16 @@ pub trait AMMFactoryBase {
             Err(anyhow!("already initialized"))
         }
     }
-    fn process_inputs_and_init_factory(
-        &self,
-        mut inputs: Vec<u128>,
-        context: Context,
-    ) -> Result<CallResponse> {
-        let pool_factory_id = shift_or_err(&mut inputs)?;
-        self.init_factory(pool_factory_id, context)
-    }
     fn create_new_pool(&self, context: Context) -> Result<CallResponse>;
 
     fn find_existing_pool_id(
         &self,
-        mut inputs: Vec<u128>,
+        alkane_a: AlkaneId,
+        alkane_b: AlkaneId,
         context: Context,
     ) -> Result<CallResponse> {
         let mut response = CallResponse::default();
         response.alkanes = context.incoming_alkanes.clone();
-        let (alkane_a, alkane_b) = (
-            AlkaneId::new(shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?),
-            AlkaneId::new(shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?),
-        );
         let (a, b) = sort_alkanes((alkane_a, alkane_b));
         let mut cursor =
             std::io::Cursor::<Vec<u8>>::new(self.pool_pointer(&a, &b).get().as_ref().clone());
@@ -133,11 +115,11 @@ pub trait AMMFactoryBase {
             .get()
             .as_ref()
             .clone();
-        
+
         if ptr.len() == 0 {
             return Ok(0);
         }
-        
+
         let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
         Ok(consume_u128(&mut cursor)?)
     }
@@ -149,15 +131,15 @@ pub trait AMMFactoryBase {
             .get()
             .as_ref()
             .clone();
-            
+
         if ptr.len() == 0 {
             return Err(anyhow!("pool not found at index {}", index));
         }
-        
+
         let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
         Ok(AlkaneId::new(
             consume_sized_int::<u128>(&mut cursor)?,
-            consume_sized_int::<u128>(&mut cursor)?
+            consume_sized_int::<u128>(&mut cursor)?,
         ))
     }
 
@@ -166,10 +148,9 @@ pub trait AMMFactoryBase {
         let length = self.all_pools_length()?;
         let mut response = CallResponse::default();
         let mut all_pools_data = Vec::new();
-        
+
         // Add the total count as the first element
         all_pools_data.extend_from_slice(&length.to_le_bytes());
-        
 
         for i in 0..length {
             match self.all_pools(i) {
@@ -182,93 +163,8 @@ pub trait AMMFactoryBase {
                 }
             }
         }
-        
+
         response.data = all_pools_data;
         Ok(response)
-    }
-}
-
-#[derive(Default)]
-pub struct AMMFactory {
-    delegate: Option<Box<dyn AMMFactoryBase>>,
-}
-
-impl Clone for AMMFactory {
-    fn clone(&self) -> Self {
-        AMMFactory { delegate: None }
-    }
-}
-
-impl AMMFactory {
-    pub fn default() -> Self {
-        let mut pool = AMMFactory { delegate: None };
-        pool.set_delegate(Box::new(pool.clone()));
-        pool
-    }
-
-    pub fn set_delegate(&mut self, delegate: Box<dyn AMMFactoryBase>) {
-        self.delegate = Some(delegate);
-    }
-}
-
-impl AMMFactoryBase for AMMFactory {
-    fn create_new_pool(&self, context: Context) -> Result<CallResponse> {
-        if context.incoming_alkanes.0.len() != 2 {
-            return Err(anyhow!("must send two runes to initialize a pool"));
-        }
-        // check that
-        let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
-        let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
-        let next_sequence = self.sequence();
-        let pool_id = AlkaneId::new(2, next_sequence);
-        
-        self.pool_pointer(&a, &b)
-            .set(Arc::new(pool_id.into()));
-            
-        // Add the new pool to the registry
-        let length = self.all_pools_length()?;
-        
-        // Store the pool ID at the current index
-        StoragePointer::from_keyword("/all_pools/")
-            .select(&length.to_le_bytes().to_vec())
-            .set(Arc::new(pool_id.into()));
-        
-        // Update the length
-        StoragePointer::from_keyword("/all_pools_length")
-            .set(Arc::new((length + 1).to_le_bytes().to_vec()));
-            
-        self.call(
-            &Cellpack {
-                target: AlkaneId {
-                    block: 6,
-                    tx: self.pool_id()?,
-                },
-                inputs: vec![0, a.block, a.tx, b.block, b.tx],
-            },
-            &AlkaneTransferParcel(vec![
-                context.incoming_alkanes.0[0].clone(),
-                context.incoming_alkanes.0[1].clone(),
-            ]),
-            self.fuel(),
-        )
-    }
-}
-
-impl AlkaneResponder for AMMFactory {
-    fn execute(&self) -> Result<CallResponse> {
-        if let Some(delegate) = &self.delegate {
-            let context = self.context()?;
-            let mut inputs = context.inputs.clone();
-            match shift_or_err(&mut inputs)? {
-                0 => delegate.process_inputs_and_init_factory(inputs, context),
-                1 => delegate.create_new_pool(context),
-                2 => delegate.find_existing_pool_id(inputs, context),
-                3 => delegate.get_all_pools(),
-                // TODO: add a function to change the implementation of the AMM pool for upgradeability. Need to check that the caller is the owner of this contract
-                _ => Err(anyhow!("unrecognized opcode")),
-            }
-        } else {
-            Err(anyhow!("No delegate set"))
-        }
     }
 }

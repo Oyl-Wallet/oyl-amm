@@ -479,7 +479,7 @@ fn test_amm_pool_name() -> Result<()> {
     let trace_str = String::from_utf8_lossy(&trace_data);
 
     // The expected pool name based on the feedback
-    let expected_name = "OWNED / OWNED LP (OYL)";
+    let expected_name = "OWNED / OWNED LP";
 
     // Check if the trace data contains the expected name
     assert!(
@@ -531,7 +531,7 @@ fn test_amm_pool_details() -> Result<()> {
     let trace_str = String::from_utf8_lossy(&trace_data);
 
     // The expected pool name
-    let expected_name = "OWNED / OWNED LP (OYL)";
+    let expected_name = "OWNED / OWNED LP";
 
     // Check if the trace data contains the expected name
     assert!(
