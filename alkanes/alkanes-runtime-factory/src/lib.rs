@@ -33,7 +33,10 @@ pub enum AMMFactoryMessage {
     CreateNewPool,
 
     #[opcode(2)]
-    FindExistingPoolId,
+    FindExistingPoolId {
+        alkane_a: AlkaneId,
+        alkane_b: AlkaneId,
+    },
 
     #[opcode(3)]
     #[returns(Vec<u8>)]
@@ -118,15 +121,12 @@ pub trait AMMFactoryBase {
 
     fn find_existing_pool_id(
         &self,
-        mut inputs: Vec<u128>,
+        alkane_a: AlkaneId,
+        alkane_b: AlkaneId,
         context: Context,
     ) -> Result<CallResponse> {
         let mut response = CallResponse::default();
         response.alkanes = context.incoming_alkanes.clone();
-        let (alkane_a, alkane_b) = (
-            AlkaneId::new(shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?),
-            AlkaneId::new(shift_or_err(&mut inputs)?, shift_or_err(&mut inputs)?),
-        );
         let (a, b) = sort_alkanes((alkane_a, alkane_b));
         let mut cursor =
             std::io::Cursor::<Vec<u8>>::new(self.pool_pointer(&a, &b).get().as_ref().clone());
@@ -197,62 +197,33 @@ pub trait AMMFactoryBase {
     }
 }
 
+// Base implementation of AMMFactory that can be used directly or extended
 #[derive(Default)]
-pub struct AMMFactory {
-    delegate: Option<Box<dyn AMMFactoryBase>>,
-}
-
-impl Clone for AMMFactory {
-    fn clone(&self) -> Self {
-        AMMFactory { delegate: None }
-    }
-}
+pub struct AMMFactory();
 
 impl AMMFactory {
-    pub fn default() -> Self {
-        let mut pool = AMMFactory { delegate: None };
-        pool.set_delegate(Box::new(pool.clone()));
-        pool
+    // External facing methods that implement the AMMFactoryMessage interface
+    pub fn init_factory(&self, pool_factory_id: u128) -> Result<CallResponse> {
+        let context = self.context()?;
+        AMMFactoryBase::init_factory(self, pool_factory_id, context)
     }
 
-    pub fn set_delegate(&mut self, delegate: Box<dyn AMMFactoryBase>) {
-        self.delegate = Some(delegate);
+    pub fn create_new_pool(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        AMMFactoryBase::create_new_pool(self, context)
     }
 
-    fn init_factory(&self, pool_factory_id: u128) -> Result<CallResponse> {
-        if let Some(delegate) = &self.delegate {
-            let context = self.context()?;
-            delegate.init_factory(pool_factory_id, context)
-        } else {
-            Err(anyhow!("No delegate set"))
-        }
+    pub fn find_existing_pool_id(
+        &self,
+        alkane_a: AlkaneId,
+        alkane_b: AlkaneId,
+    ) -> Result<CallResponse> {
+        let context = self.context()?;
+        AMMFactoryBase::find_existing_pool_id(self, alkane_a, alkane_b, context)
     }
 
-    fn create_new_pool(&self) -> Result<CallResponse> {
-        if let Some(delegate) = &self.delegate {
-            let context = self.context()?;
-            delegate.create_new_pool(context)
-        } else {
-            Err(anyhow!("No delegate set"))
-        }
-    }
-
-    fn find_existing_pool_id(&self) -> Result<CallResponse> {
-        if let Some(delegate) = &self.delegate {
-            let context = self.context()?;
-            let inputs = context.inputs.clone();
-            delegate.find_existing_pool_id(inputs, context)
-        } else {
-            Err(anyhow!("No delegate set"))
-        }
-    }
-
-    fn get_all_pools(&self) -> Result<CallResponse> {
-        if let Some(delegate) = &self.delegate {
-            delegate.get_all_pools()
-        } else {
-            Err(anyhow!("No delegate set"))
-        }
+    pub fn get_all_pools(&self) -> Result<CallResponse> {
+        AMMFactoryBase::get_all_pools(self)
     }
 }
 
