@@ -578,11 +578,10 @@ fn test_get_num_pools() -> Result<()> {
     let raw_trace_data = view::trace(&outpoint_3)?;
     let trace_data: Trace = raw_trace_data.clone().try_into()?;
 
-    let pool_count = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
-    println!("Pool count: {:?}", pool_count);
+    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
 
     // Access the data field from the trace response
-    if let Some(return_context) = pool_count {
+    if let Some(return_context) = last_trace_event {
         // Use pattern matching to extract the data field from the TraceEvent enum
         match return_context {
             TraceEvent::ReturnContext(trace_response) => {
@@ -599,6 +598,130 @@ fn test_get_num_pools() -> Result<()> {
                 println!("Successfully verified data[0] = {}", data[0]);
             }
             _ => panic!("Expected ReturnContext variant, but got a different variant"),
+        }
+    } else {
+        panic!("Failed to get pool count from trace data");
+    }
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_find_existing_pool_id() -> Result<()> {
+    clear();
+    let (block, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
+
+    let block_height = 840_000;
+
+    let mut test_block = protorune::test_helpers::create_block_with_coinbase_tx(block_height + 1);
+
+    test_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_factory_deployment,
+                inputs: vec![
+                    2,
+                    deployment_ids.owned_token_1_deployment.block,
+                    deployment_ids.owned_token_1_deployment.tx,
+                    deployment_ids.owned_token_2_deployment.block,
+                    deployment_ids.owned_token_2_deployment.tx,
+                ],
+            }],
+            OutPoint {
+                txid: block.txdata[block.txdata.len() - 1].compute_txid(),
+                vout: 0,
+            },
+            false,
+        ),
+    );
+
+    index_block(&test_block, block_height + 1)?;
+
+    let outpoint_3 = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        vout: 3,
+    };
+
+    let raw_trace_data = view::trace(&outpoint_3)?;
+    let trace_data: Trace = raw_trace_data.clone().try_into()?;
+    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
+    // Access the data field from the trace response
+    if let Some(return_context) = last_trace_event {
+        // Use pattern matching to extract the data field from the TraceEvent enum
+        match return_context {
+            TraceEvent::ReturnContext(trace_response) => {
+                // Now we have the TraceResponse, access the data field
+                let data = &trace_response.inner.data;
+
+                println!("Last return data = {:?}", data);
+
+                // Assert that the first element of the data array is 2
+                assert_eq!(
+                    data[0], 2,
+                    "Expected first u128 of data to be 2, but got {}",
+                    data[0]
+                );
+                assert_eq!(
+                    data[16], 11,
+                    "Expected second u128 of data to be 11, but got {}",
+                    data[16]
+                );
+            }
+            _ => panic!("Expected ReturnContext variant, but got a different variant"),
+        }
+    } else {
+        panic!("Failed to get pool count from trace data");
+    }
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_find_nonexisting_pool_id() -> Result<()> {
+    clear();
+    let (block, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
+
+    let block_height = 840_000;
+
+    let mut test_block = protorune::test_helpers::create_block_with_coinbase_tx(block_height + 1);
+
+    test_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_factory_deployment,
+                inputs: vec![2, 12, 100, 13, 101],
+            }],
+            OutPoint {
+                txid: block.txdata[block.txdata.len() - 1].compute_txid(),
+                vout: 0,
+            },
+            false,
+        ),
+    );
+
+    index_block(&test_block, block_height + 1)?;
+
+    let outpoint_3 = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        vout: 3,
+    };
+
+    let raw_trace_data = view::trace(&outpoint_3)?;
+    let trace_data: Trace = raw_trace_data.clone().try_into()?;
+    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
+    println!("last trace event {:?}", last_trace_event);
+    // Access the data field from the trace response
+    if let Some(return_context) = last_trace_event {
+        // Use pattern matching to extract the data field from the TraceEvent enum
+        match return_context {
+            TraceEvent::RevertContext(trace_response) => {
+                // Now we have the TraceResponse, access the data field
+                let data = String::from_utf8_lossy(&trace_response.inner.data);
+                assert!(data.contains("ALKANES: revert:"));
+            }
+            _ => panic!("Expected RevertContext variant, but got a different variant"),
         }
     } else {
         panic!("Failed to get pool count from trace data");

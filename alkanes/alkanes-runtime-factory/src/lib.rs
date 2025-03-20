@@ -91,23 +91,14 @@ pub trait AMMFactoryBase {
     }
     fn create_new_pool(&self, context: Context) -> Result<CallResponse>;
 
-    fn find_existing_pool_id(
-        &self,
-        alkane_a: AlkaneId,
-        alkane_b: AlkaneId,
-        context: Context,
-    ) -> Result<CallResponse> {
-        let mut response = CallResponse::default();
-        response.alkanes = context.incoming_alkanes.clone();
+    fn find_existing_pool_id(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> AlkaneId {
         let (a, b) = sort_alkanes((alkane_a, alkane_b));
         let mut cursor =
             std::io::Cursor::<Vec<u8>>::new(self.pool_pointer(&a, &b).get().as_ref().clone());
-        let id = AlkaneId::new(
+        AlkaneId::new(
             consume_sized_int::<u128>(&mut cursor).unwrap(),
             consume_sized_int::<u128>(&mut cursor).unwrap(),
-        );
-        response.data = id.into();
-        Ok(response)
+        )
     }
     // Get the total number of pools
     fn all_pools_length(&self) -> Result<u128> {
