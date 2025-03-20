@@ -2,7 +2,8 @@ use add_liquidity::{
     check_add_liquidity_lp_balance, insert_add_liquidity_txs, insert_add_liquidity_txs_w_router,
 };
 use alkanes_support::cellpack::Cellpack;
-use alkanes_support::trace::Trace;
+use alkanes_support::response::ExtendedCallResponse;
+use alkanes_support::trace::{Trace, TraceEvent};
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::Witness;
@@ -539,6 +540,69 @@ fn test_amm_pool_details() -> Result<()> {
         "Trace data should contain the name '{}', but it doesn't",
         expected_name
     );
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_get_num_pools() -> Result<()> {
+    clear();
+    let (block, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
+
+    let block_height = 840_000;
+
+    let mut test_block = protorune::test_helpers::create_block_with_coinbase_tx(block_height + 1);
+
+    test_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_factory_deployment,
+                inputs: vec![4],
+            }],
+            OutPoint {
+                txid: block.txdata[block.txdata.len() - 1].compute_txid(),
+                vout: 0,
+            },
+            false,
+        ),
+    );
+
+    index_block(&test_block, block_height + 1)?;
+
+    let outpoint_3 = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        vout: 3,
+    };
+
+    let raw_trace_data = view::trace(&outpoint_3)?;
+    let trace_data: Trace = raw_trace_data.clone().try_into()?;
+
+    let pool_count = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
+    println!("Pool count: {:?}", pool_count);
+
+    // Access the data field from the trace response
+    if let Some(return_context) = pool_count {
+        // Use pattern matching to extract the data field from the TraceEvent enum
+        match return_context {
+            TraceEvent::ReturnContext(trace_response) => {
+                // Now we have the TraceResponse, access the data field
+                let data = &trace_response.inner.data;
+
+                // Assert that the first element of the data array is 2
+                assert_eq!(
+                    data[0], 2,
+                    "Expected first element of data to be 2, but got {}",
+                    data[0]
+                );
+
+                println!("Successfully verified data[0] = {}", data[0]);
+            }
+            _ => panic!("Expected ReturnContext variant, but got a different variant"),
+        }
+    } else {
+        panic!("Failed to get pool count from trace data");
+    }
 
     Ok(())
 }

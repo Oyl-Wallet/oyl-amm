@@ -144,9 +144,9 @@ pub trait AMMFactoryBase {
     }
 
     // Get all pools (returns a list of pool IDs)
-    fn get_all_pools(&self) -> Result<CallResponse> {
+    fn get_all_pools(&self, context: Context) -> Result<CallResponse> {
         let length = self.all_pools_length()?;
-        let mut response = CallResponse::default();
+        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
         let mut all_pools_data = Vec::new();
 
         // Add the total count as the first element
