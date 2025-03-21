@@ -207,6 +207,7 @@ pub fn insert_init_pool_liquidity_txs(
     token2_address: AlkaneId,
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
+    previous_output: OutPoint,
 ) {
     test_block
         .txdata
@@ -230,10 +231,7 @@ pub fn insert_init_pool_liquidity_txs(
                     inputs: vec![1],
                 }),
             ],
-            OutPoint {
-                txid: test_block.txdata.last().unwrap().compute_txid(),
-                vout: 0,
-            },
+            previous_output,
             false,
         ));
 }
@@ -288,6 +286,10 @@ pub fn test_amm_pool_init_fixture(
 ) -> Result<(Block, AmmTestDeploymentIds)> {
     let block_height = 840_000;
     let (mut test_block, deployment_ids) = init_block_with_amm_pool(use_oyl)?;
+    let mut previous_outpoint = OutPoint {
+        txid: test_block.txdata.last().unwrap().compute_txid(),
+        vout: 0,
+    };
     insert_init_pool_liquidity_txs(
         amount1,
         amount2,
@@ -295,8 +297,13 @@ pub fn test_amm_pool_init_fixture(
         deployment_ids.owned_token_2_deployment,
         &mut test_block,
         &deployment_ids,
+        previous_outpoint,
     );
 
+    previous_outpoint = OutPoint {
+        txid: test_block.txdata.last().unwrap().compute_txid(),
+        vout: 0,
+    };
     insert_init_pool_liquidity_txs(
         amount1,
         amount2,
@@ -304,6 +311,7 @@ pub fn test_amm_pool_init_fixture(
         deployment_ids.owned_token_3_deployment,
         &mut test_block,
         &deployment_ids,
+        previous_outpoint,
     );
 
     index_block(&test_block, block_height)?;
