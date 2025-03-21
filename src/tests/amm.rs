@@ -137,6 +137,55 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
 }
 
 #[wasm_bindgen_test]
+fn test_amm_factory_duplicate_pool_fail() -> Result<()> {
+    clear();
+    let (amount1, amount2) = (500000, 500000);
+    let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, false)?;
+    let block_height = 840_001;
+    let mut init_block_2 = create_block_with_coinbase_tx(block_height);
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    insert_init_pool_liquidity_txs(
+        10000,
+        10000,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
+        &mut init_block_2,
+        &deployment_ids,
+        input_outpoint,
+    );
+    index_block(&init_block_2, block_height)?;
+
+    let trace_data: Trace = view::trace(
+        &(OutPoint {
+            txid: init_block_2.txdata[init_block_2.txdata.len() - 1].compute_txid(),
+            vout: 4,
+        }),
+    )?
+    .try_into()?;
+    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
+    println!("last_trace_event: {:?}", last_trace_event);
+    // Access the data field from the trace response
+    if let Some(return_context) = last_trace_event {
+        // Use pattern matching to extract the data field from the TraceEvent enum
+        match return_context {
+            TraceEvent::RevertContext(trace_response) => {
+                // Now we have the TraceResponse, access the data field
+                let data = String::from_utf8_lossy(&trace_response.inner.data);
+                println!("revert data: {:?}", data);
+                assert!(data.contains("ALKANES: revert: Error: pool already exists"));
+            }
+            _ => panic!("Expected RevertContext variant, but got a different variant"),
+        }
+    } else {
+        panic!("Failed to get last_trace_event from trace data");
+    }
+    Ok(())
+}
+
+#[wasm_bindgen_test]
 fn test_amm_pool_skewed_init() -> Result<()> {
     clear();
     test_amm_pool_init_fixture(1000000 / 2, 1000000, false)?;
@@ -162,6 +211,10 @@ fn test_amm_pool_bad_init() -> Result<()> {
     clear();
     let block_height = 840_000;
     let (mut test_block, deployment_ids) = init_block_with_amm_pool(false)?;
+    let previous_outpoint = OutPoint {
+        txid: test_block.txdata.last().unwrap().compute_txid(),
+        vout: 0,
+    };
     insert_init_pool_liquidity_txs(
         10000,
         1,
@@ -169,6 +222,7 @@ fn test_amm_pool_bad_init() -> Result<()> {
         deployment_ids.owned_token_2_deployment,
         &mut test_block,
         &deployment_ids,
+        previous_outpoint,
     );
     index_block(&test_block, block_height)?;
     assert_token_id_has_no_deployment(deployment_ids.amm_pool_1_deployment)?;

@@ -86,13 +86,16 @@ impl AMMFactoryBase for AMMFactory {
         if context.incoming_alkanes.0.len() != 2 {
             return Err(anyhow!("must send two runes to initialize a pool"));
         }
-        // check that
         let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
         let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
         let next_sequence = self.sequence();
         let pool_id = AlkaneId::new(2, next_sequence);
-
-        self.pool_pointer(&a, &b).set(Arc::new(pool_id.into()));
+        // check if this pool already exists
+        if self.pool_pointer(&a, &b).get().len() == 0 {
+            self.pool_pointer(&a, &b).set(Arc::new(pool_id.into()));
+        } else {
+            return Err(anyhow!("pool already exists"));
+        }
 
         // Add the new pool to the registry
         let length = self.all_pools_length()?;
