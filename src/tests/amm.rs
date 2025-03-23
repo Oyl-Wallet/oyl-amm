@@ -228,6 +228,29 @@ fn test_amm_pool_bad_init() -> Result<()> {
     assert_token_id_has_no_deployment(deployment_ids.amm_pool_1_deployment)?;
     let sheet = get_last_outpoint_sheet(&test_block)?;
     assert_eq!(sheet.get(&deployment_ids.amm_pool_1_deployment.into()), 0);
+    let trace_data: Trace = view::trace(
+        &(OutPoint {
+            txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+            vout: 4,
+        }),
+    )?
+    .try_into()?;
+    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
+    // Access the data field from the trace response
+    if let Some(return_context) = last_trace_event {
+        // Use pattern matching to extract the data field from the TraceEvent enum
+        match return_context {
+            TraceEvent::RevertContext(trace_response) => {
+                // Now we have the TraceResponse, access the data field
+                let data = String::from_utf8_lossy(&trace_response.inner.data);
+                println!("error msg: {:?}", data);
+                assert!(data.contains("ALKANES: revert:"));
+            }
+            _ => panic!("Expected RevertContext variant, but got a different variant"),
+        }
+    } else {
+        panic!("Failed to get last_trace_event from trace data");
+    }
     Ok(())
 }
 
