@@ -235,7 +235,18 @@ fn test_amm_pool_bad_init() -> Result<()> {
         }),
     )?
     .try_into()?;
-    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
+    let trace_events = trace_data.0.lock().expect("Mutex poisoned");
+    let second_last_trace_event = trace_events[trace_events.len() - 2].clone();
+    match second_last_trace_event {
+        TraceEvent::RevertContext(trace_response) => {
+            // Now we have the TraceResponse, access the data field
+            let data = String::from_utf8_lossy(&trace_response.inner.data);
+            assert!(data
+                .contains("Overflow error in expression: root_k.checked_sub(MINIMUM_LIQUIDITY)"));
+        }
+        _ => panic!("Expected RevertContext variant, but got a different variant"),
+    }
+    let last_trace_event = trace_events.last().cloned();
     // Access the data field from the trace response
     if let Some(return_context) = last_trace_event {
         // Use pattern matching to extract the data field from the TraceEvent enum
@@ -243,8 +254,7 @@ fn test_amm_pool_bad_init() -> Result<()> {
             TraceEvent::RevertContext(trace_response) => {
                 // Now we have the TraceResponse, access the data field
                 let data = String::from_utf8_lossy(&trace_response.inner.data);
-                println!("error msg: {:?}", data);
-                assert!(data.contains("ALKANES: revert:"));
+                assert!(data.contains("Extcall failed: ALKANES: revert: Error: Overflow error in expression: root_k.checked_sub(MINIMUM_LIQUIDITY)"));
             }
             _ => panic!("Expected RevertContext variant, but got a different variant"),
         }

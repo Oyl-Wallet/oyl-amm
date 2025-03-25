@@ -10,6 +10,7 @@ use alkanes_runtime::{
 };
 use alkanes_support::{
     cellpack::Cellpack,
+    checked_expr,
     context::Context,
     id::AlkaneId,
     parcel::{AlkaneTransfer, AlkaneTransferParcel},
@@ -174,23 +175,21 @@ pub trait AMMPoolBase: MintableToken {
         let mut total_supply = self.total_supply();
         let (reserve_a, reserve_b) = self.reserves();
         let (previous_a, previous_b) = self.previous_reserves(&parcel);
-        let root_k_last = overflow_error(previous_a.value.checked_mul(previous_b.value))?.sqrt();
-        let root_k = overflow_error(reserve_a.value.checked_mul(reserve_b.value))?.sqrt();
+        let root_k_last = checked_expr!(previous_a.value.checked_mul(previous_b.value))?.sqrt();
+        let root_k = checked_expr!(reserve_a.value.checked_mul(reserve_b.value))?.sqrt();
         if root_k > root_k_last || root_k_last == 0 {
             let liquidity;
             if total_supply == 0 {
-                liquidity = overflow_error(root_k.checked_sub(MINIMUM_LIQUIDITY))?;
+                liquidity = checked_expr!(root_k.checked_sub(MINIMUM_LIQUIDITY))?;
                 total_supply = total_supply + MINIMUM_LIQUIDITY;
             } else {
-                let numerator = overflow_error(
-                    total_supply.checked_mul(overflow_error(root_k.checked_sub(root_k_last))?),
-                )?;
-                let denominator = overflow_error(
-                    overflow_error(root_k.checked_mul(5))?.checked_add(root_k_last), // constant 5 is assuming 1/6 of LP fees goes as protocol fees
-                )?;
+                let root_k_diff = checked_expr!(root_k.checked_sub(root_k_last))?;
+                let numerator = checked_expr!(total_supply.checked_mul(root_k_diff))?;
+                let root_k_times_5 = checked_expr!(root_k.checked_mul(5))?; // constant 5 is assuming 1/6 of LP fees goes as protocol fees
+                let denominator = checked_expr!(root_k_times_5.checked_add(root_k_last))?;
                 liquidity = numerator / denominator;
             }
-            self.set_total_supply(overflow_error(total_supply.checked_add(liquidity))?);
+            self.set_total_supply(checked_expr!(total_supply.checked_add(liquidity))?);
             let mut response = CallResponse::default();
             response.alkanes = AlkaneTransferParcel(vec![AlkaneTransfer {
                 id: myself,
@@ -211,12 +210,12 @@ pub trait AMMPoolBase: MintableToken {
         let (reserve_a, reserve_b) = self.reserves();
         let total_supply = self.total_supply();
         let mut response = CallResponse::default();
-        let amount_a = overflow_error(liquidity.checked_mul(reserve_a.value))? / total_supply;
-        let amount_b = overflow_error(liquidity.checked_mul(reserve_b.value))? / total_supply;
+        let amount_a = checked_expr!(liquidity.checked_mul(reserve_a.value))? / total_supply;
+        let amount_b = checked_expr!(liquidity.checked_mul(reserve_b.value))? / total_supply;
         if amount_a == 0 || amount_b == 0 {
             return Err(anyhow!("insufficient liquidity!"));
         }
-        self.set_total_supply(overflow_error(total_supply.checked_sub(liquidity))?);
+        self.set_total_supply(checked_expr!(total_supply.checked_sub(liquidity))?);
         response.alkanes = AlkaneTransferParcel(vec![
             AlkaneTransfer {
                 id: reserve_a.id,
