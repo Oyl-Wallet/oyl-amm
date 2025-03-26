@@ -235,30 +235,6 @@ pub trait AMMPoolBase: MintableToken {
         let denominator = U256::from(1000) * U256::from(reserve_from) + amount_in_with_fee;
         Ok((numerator / denominator).try_into()?)
     }
-    fn simulate_amount_out(&self, token: AlkaneId, amount: u128) -> Result<CallResponse> {
-        let (reserve_a, reserve_b) = self.reserves();
-
-        if token != reserve_a.id && token != reserve_b.id {
-            return Err(anyhow!("Token not found in pool"));
-        }
-
-        let amount_in_with_fee =
-            U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(amount);
-
-        let mut response = CallResponse::default();
-
-        if &token == &reserve_a.id {
-            let numerator = amount_in_with_fee * U256::from(reserve_b.value);
-            let denominator = U256::from(1000) * U256::from(reserve_a.value) + amount_in_with_fee;
-            response.data = (numerator / denominator).to_le_bytes_vec();
-            return Ok(response);
-        } else {
-            let numerator = amount_in_with_fee * U256::from(reserve_a.value);
-            let denominator = U256::from(1000) * U256::from(reserve_b.value) + amount_in_with_fee;
-            response.data = (numerator / denominator).to_le_bytes_vec();
-            return Ok(response);
-        }
-    }
     fn swap(
         &self,
         parcel: AlkaneTransferParcel,

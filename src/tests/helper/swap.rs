@@ -61,55 +61,6 @@ fn _insert_swap_txs(
     );
 }
 
-pub fn test_simulate_amount_out() -> Result<()> {
-    // Set up test pool with initial reserves
-    let token_a = AlkaneId::new(1, 1);
-    let token_b = AlkaneId::new(2, 1);
-
-    let test_pool = TestAMMPool {
-        reserve_a: AlkaneTransfer {
-            id: token_a.clone(),
-            value: 1_000_000, // 1M tokens
-        },
-        reserve_b: AlkaneTransfer {
-            id: token_b.clone(),
-            value: 2_000_000, // 2M tokens
-        },
-    };
-
-    // Test case 1: Swap token A for token B
-    let input_amount_a = 100_000u128; // 100K tokens
-    let result = test_pool.simulate_amount_out(token_a, input_amount_a)?;
-
-    // Calculate expected output with 0.4% fee
-    let amount_with_fee = U256::from(996) * U256::from(input_amount_a); // 0.4% fee
-    let numerator = amount_with_fee * U256::from(2_000_000);
-    let denominator = U256::from(1000) * U256::from(1_000_000) + amount_with_fee;
-    let expected_output = (numerator / denominator).to_le_bytes_vec();
-
-    println!("result amt out {:?}", result.data);
-    println!("expected output {:?}", expected_output);
-
-    assert_eq!(result.data, expected_output);
-
-    // Test case 2: Swap token B for token A
-    let input_amount_b = 200_000u128; // 200K tokens
-    let result = test_pool.simulate_amount_out(token_b, input_amount_b)?;
-
-    let amount_with_fee = U256::from(996) * U256::from(input_amount_b);
-    let numerator = amount_with_fee * U256::from(1_000_000);
-    let denominator = U256::from(1000) * U256::from(2_000_000) + amount_with_fee;
-    let expected_output = (numerator / denominator).to_le_bytes_vec();
-
-    assert_eq!(result.data, expected_output);
-
-    // Test case 3: Invalid token (not in pool)
-    let result = test_pool.simulate_amount_out(AlkaneId::new(3, 1), 100_000);
-    assert!(result.is_err());
-
-    Ok(())
-}
-
 pub fn insert_swap_txs(
     amount: u128,
     swap_from_token: AlkaneId,

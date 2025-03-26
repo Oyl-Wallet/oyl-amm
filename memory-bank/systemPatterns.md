@@ -217,7 +217,6 @@ impl AlkaneResponder for AMMPool {
                 1 => delegate.mint(context.myself, context.incoming_alkanes),
                 2 => delegate.burn(context.myself, context.incoming_alkanes),
                 3 => delegate.swap(context.incoming_alkanes, shift_or_err(&mut inputs)?),
-                4 => delegate.simulate_amount_out(inputs),
                 5 => delegate.pool_details(),
                 // Other opcodes...
                 _ => Err(anyhow!("unrecognized opcode")),
