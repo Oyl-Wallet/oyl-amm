@@ -78,7 +78,7 @@ The system follows a modular architecture with several key components:
      - Token swapping
      - Reserve management
    - Uses constant product formula (x * y = k) for price calculation
-   - Implements a 0.4% swap fee (DEFAULT_FEE_AMOUNT_PER_1000 = 4)
+   - Implements a 0.5% swap fee (DEFAULT_FEE_AMOUNT_PER_1000 = 5)
 
 2. **alkanes-runtime-factory**
    - Implements the factory contract for creating and managing pools
