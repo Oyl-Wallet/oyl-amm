@@ -26,7 +26,7 @@ use std::sync::Arc;
 
 // per uniswap docs, the first 1e3 wei of lp token minted are burned to mitigate attacks where the value of a lp token is raised too high easily
 pub const MINIMUM_LIQUIDITY: u128 = 1000;
-pub const DEFAULT_FEE_AMOUNT_PER_1000: u128 = 4;
+pub const DEFAULT_FEE_AMOUNT_PER_1000: u128 = 5;
 
 type U256 = Uint<256, 4>;
 
