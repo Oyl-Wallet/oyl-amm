@@ -16,9 +16,7 @@ use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
-use swap::{
-    check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_router, test_simulate_amount_out,
-};
+use swap::{check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_router};
 
 use crate::tests::helper::*;
 use alkane_helpers::clear;
@@ -196,13 +194,6 @@ fn test_amm_pool_skewed_init() -> Result<()> {
 fn test_amm_pool_zero_init() -> Result<()> {
     clear();
     test_amm_pool_init_fixture(1000000, 1, false)?;
-    Ok(())
-}
-
-#[wasm_bindgen_test]
-fn test_amm_pool_simulate_amount_out() -> Result<()> {
-    clear();
-    test_simulate_amount_out()?;
     Ok(())
 }
 

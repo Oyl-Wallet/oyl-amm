@@ -39,9 +39,6 @@ pub enum AMMPoolMessage {
     #[opcode(3)]
     Swap { amount_out_predicate: u128 },
 
-    #[opcode(4)]
-    SimulateAmountOut { token: AlkaneId, amount: u128 },
-
     #[opcode(50)]
     ForwardIncoming,
 
@@ -134,10 +131,6 @@ impl AMMPool {
     pub fn swap(&self, amount_out_predicate: u128) -> Result<CallResponse> {
         let context = self.context()?;
         AMMPoolBase::swap(self, context.incoming_alkanes, amount_out_predicate)
-    }
-
-    pub fn simulate_amount_out(&self, token: AlkaneId, amount: u128) -> Result<CallResponse> {
-        AMMPoolBase::simulate_amount_out(self, token, amount)
     }
 
     pub fn forward_incoming(&self) -> Result<CallResponse> {
