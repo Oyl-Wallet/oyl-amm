@@ -8,6 +8,7 @@ use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::transaction::Version;
 use bitcoin::{Address, Amount, Block, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness};
 use hex;
+use metashrew::index_pointer::AtomicPointer;
 #[allow(unused_imports)]
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use metashrew_support::index_pointer::KeyValuePointer;
@@ -98,19 +99,19 @@ fn get_sheet_for_outpoint(test_block: &Block, tx_num: usize, vout: u32) -> Resul
     );
     Ok(sheet)
 }
-fn get_trace_for_outpoint(test_block: &Block, tx_num: usize, vout: u32) -> Result<Vec<u8>> {
-    let outpoint = OutPoint {
-        txid: test_block.txdata[tx_num].compute_txid(),
-        vout,
-    };
-    let trace = view::trace(&outpoint).unwrap();
-    println!(
-        "trace at outpoint tx {} vout {}: {:?}",
-        tx_num,
-        vout,
-        hex::encode(&trace)
-    );
-    Ok(trace)
+
+pub fn get_sheet_for_runtime() -> BalanceSheet {
+    let ptr = RuneTable::for_protocol(AlkaneMessageContext::protocol_tag()).RUNTIME_BALANCE;
+    let sheet = load_sheet(&ptr);
+    println!("runtime balances: {:?}", sheet);
+    sheet
+}
+
+pub fn get_lazy_sheet_for_runtime() -> BalanceSheet {
+    let atomic = AtomicPointer::default();
+    let ptr = RuneTable::for_protocol(AlkaneMessageContext::protocol_tag()).RUNTIME_BALANCE;
+    let sheet = BalanceSheet::new_ptr_backed(atomic.derive(&ptr));
+    sheet
 }
 
 pub fn get_last_outpoint_sheet(test_block: &Block) -> Result<BalanceSheet> {

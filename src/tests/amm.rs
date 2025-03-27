@@ -29,6 +29,8 @@ use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use std::fmt::Write;
 use wasm_bindgen_test::wasm_bindgen_test;
 
+use super::helper::add_liquidity::check_add_liquidity_runtime_balance;
+
 #[wasm_bindgen_test]
 fn test_amm_pool_normal_init() -> Result<()> {
     clear();
@@ -218,7 +220,10 @@ fn test_amm_pool_bad_init() -> Result<()> {
     index_block(&test_block, block_height)?;
     assert_token_id_has_no_deployment(deployment_ids.amm_pool_1_deployment)?;
     let sheet = get_last_outpoint_sheet(&test_block)?;
-    assert_eq!(sheet.get(&deployment_ids.amm_pool_1_deployment.into()), 0);
+    assert_eq!(
+        sheet.get_cached(&deployment_ids.amm_pool_1_deployment.into()),
+        0
+    );
     let trace_data: Trace = view::trace(
         &(OutPoint {
             txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
@@ -320,6 +325,16 @@ fn test_amm_pool_add_more_liquidity() -> Result<()> {
         &add_liquidity_block,
         deployment_ids.amm_pool_1_deployment,
     )?;
+
+    check_add_liquidity_runtime_balance(
+        amount1,
+        amount1 + amount2,
+        amount2,
+        amount1,
+        amount2,
+        0,
+        &deployment_ids,
+    )?;
     Ok(())
 }
 
@@ -355,6 +370,16 @@ fn test_amm_pool_add_more_liquidity_to_wrong_pool() -> Result<()> {
         &add_liquidity_block,
         deployment_ids.amm_pool_2_deployment,
     )?;
+
+    check_add_liquidity_runtime_balance(
+        amount1,
+        amount1 + amount2,
+        amount2,
+        0,
+        0,
+        0,
+        &deployment_ids,
+    )?;
     Ok(())
 }
 
@@ -389,6 +414,16 @@ fn test_amm_pool_add_more_liquidity_w_router() -> Result<()> {
         total_supply,
         &add_liquidity_block,
         deployment_ids.amm_pool_1_deployment,
+    )?;
+
+    check_add_liquidity_runtime_balance(
+        amount1,
+        amount1 + amount2,
+        amount2,
+        amount1,
+        amount2,
+        0,
+        &deployment_ids,
     )?;
     Ok(())
 }

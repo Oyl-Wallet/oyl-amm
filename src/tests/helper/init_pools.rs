@@ -253,11 +253,11 @@ pub fn check_init_liquidity_lp_1_balance(
     let expected_amount = calc_lp_balance_from_pool_init(amount1, amount2);
     println!(
         "expected amt from init {:?} {:?}",
-        sheet.get(&deployment_ids.amm_pool_1_deployment.into()),
+        sheet.get_cached(&deployment_ids.amm_pool_1_deployment.into()),
         expected_amount
     );
     assert_eq!(
-        sheet.get(&deployment_ids.amm_pool_1_deployment.into()),
+        sheet.get_cached(&deployment_ids.amm_pool_1_deployment.into()),
         expected_amount
     );
     Ok(())
@@ -273,8 +273,42 @@ pub fn check_init_liquidity_lp_2_balance(
     let expected_amount = calc_lp_balance_from_pool_init(amount1, amount2);
     println!("expected amt from init {:?}", expected_amount);
     assert_eq!(
-        sheet.get(&deployment_ids.amm_pool_2_deployment.into()),
+        sheet.get_cached(&deployment_ids.amm_pool_2_deployment.into()),
         expected_amount
+    );
+    Ok(())
+}
+
+pub fn check_init_liquidity_runtime_balance(
+    amount1: u128,
+    amount2: u128,
+    deployment_ids: &AmmTestDeploymentIds,
+) -> Result<()> {
+    let sheet = get_sheet_for_runtime();
+    assert_eq!(
+        sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
+        amount1
+    );
+    assert_eq!(
+        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
+        amount1 + amount2
+    );
+    assert_eq!(
+        sheet.get_cached(&deployment_ids.owned_token_3_deployment.into()),
+        amount2
+    );
+    let mut lazy_sheet = get_lazy_sheet_for_runtime();
+    assert_eq!(
+        lazy_sheet.get(&deployment_ids.owned_token_1_deployment.into()),
+        amount1
+    );
+    assert_eq!(
+        lazy_sheet.get(&deployment_ids.owned_token_2_deployment.into()),
+        amount1 + amount2
+    );
+    assert_eq!(
+        lazy_sheet.get(&deployment_ids.owned_token_3_deployment.into()),
+        amount2
     );
     Ok(())
 }
@@ -318,5 +352,6 @@ pub fn test_amm_pool_init_fixture(
     assert_contracts_correct_ids(&deployment_ids, use_oyl)?;
     check_init_liquidity_lp_1_balance(amount1, amount2, &test_block, &deployment_ids)?;
     check_init_liquidity_lp_2_balance(amount1, amount2, &test_block, &deployment_ids)?;
+    check_init_liquidity_runtime_balance(amount1, amount2, &deployment_ids)?;
     Ok((test_block, deployment_ids))
 }

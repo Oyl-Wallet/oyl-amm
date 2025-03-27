@@ -126,6 +126,9 @@ pub fn check_swap_lp_balance(
     }
 
     println!("expected amt from swapping {:?}", current_swapped_amount);
-    assert_eq!(sheet.get(&swap_target_token.into()), current_swapped_amount);
+    assert_eq!(
+        sheet.get_cached(&swap_target_token.into()),
+        current_swapped_amount
+    );
     Ok(())
 }

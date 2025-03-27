@@ -19,12 +19,12 @@ crate-type = ["cdylib", "rlib"]
 members = ["alkanes/*", '.']
 
 [workspace.dependencies]
-alkanes-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
-alkanes-runtime = { git = "https://github.com/kungfuflex/alkanes-rs" }
+alkanes-support = { git = "https://github.com/kungfuflex/alkanes-rs", branch = "hude/balance_sheet_load_ptr" }
+alkanes-runtime = { git = "https://github.com/kungfuflex/alkanes-rs", branch = "hude/balance_sheet_load_ptr" }
 alkane-factory-support = { git = "https://github.com/kungfuflex/alkane-factory" }
-metashrew-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
-protorune-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
-ordinals = { git = "https://github.com/kungfuflex/alkanes-rs" }
+metashrew-support = { git = "https://github.com/kungfuflex/alkanes-rs", branch = "hude/balance_sheet_load_ptr" }
+protorune-support = { git = "https://github.com/kungfuflex/alkanes-rs", branch = "hude/balance_sheet_load_ptr" }
+ordinals = { git = "https://github.com/kungfuflex/alkanes-rs", branch = "hude/balance_sheet_load_ptr" }
 alkanes-runtime-pool = { path = "./alkanes/alkanes-runtime-pool" }
 anyhow = "1.0.94"
 bitcoin = { version = "0.32.4", features = ["rand"] }
@@ -48,13 +48,13 @@ ruint = { workspace = true }
 
 
 [dev-dependencies]
-alkanes = { git = "https://github.com/kungfuflex/alkanes-rs", features = [
+alkanes = { git = "https://github.com/kungfuflex/alkanes-rs", branch = "hude/balance_sheet_load_ptr", features = [
     "test-utils",
 ] }
-metashrew = { git = "https://github.com/kungfuflex/alkanes-rs", features = [
+metashrew = { git = "https://github.com/kungfuflex/alkanes-rs", branch = "hude/balance_sheet_load_ptr", features = [
     "test-utils",
 ] }
-protorune = { git = "https://github.com/kungfuflex/alkanes-rs", features = [
+protorune = { git = "https://github.com/kungfuflex/alkanes-rs", branch = "hude/balance_sheet_load_ptr", features = [
     "test-utils",
 ] }
 wasm-bindgen = "0.2.100"
