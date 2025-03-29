@@ -7,7 +7,7 @@ use alkanes_runtime::{
     println,
     stdio::{stdout, Write},
 };
-use alkanes_std_owned_token::factory::MintableToken;
+use alkanes_std_factory_support::MintableToken;
 use alkanes_support::{
     cellpack::Cellpack,
     checked_expr,
