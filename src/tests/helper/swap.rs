@@ -7,6 +7,7 @@ use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::{Block, Witness};
 #[allow(unused_imports)]
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
+use protorune_support::balance_sheet::BalanceSheetOperations;
 use protorune_support::protostone::ProtostoneEdict;
 use ruint::Uint;
 use std::fmt::Write;
