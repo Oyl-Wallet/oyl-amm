@@ -5,6 +5,7 @@ use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::{Block, Witness};
 use num::integer::Roots;
+use protorune_support::balance_sheet::BalanceSheetOperations;
 use protorune_support::protostone::ProtostoneEdict;
 
 #[allow(unused_imports)]

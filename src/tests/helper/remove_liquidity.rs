@@ -12,6 +12,7 @@ use bitcoin::{Block, Witness};
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
+use protorune_support::balance_sheet::BalanceSheetOperations;
 use protorune_support::protostone::ProtostoneEdict;
 use std::fmt::Write;
 

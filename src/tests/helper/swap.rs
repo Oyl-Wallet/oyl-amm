@@ -1,14 +1,13 @@
-use alkane_factory_support::factory::MintableToken;
 use alkanes::tests::helpers::{self as alkane_helpers};
 use alkanes_runtime_pool::{AMMPoolBase, DEFAULT_FEE_AMOUNT_PER_1000};
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::id::AlkaneId;
-use alkanes_support::parcel::AlkaneTransfer;
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::{Block, Witness};
 #[allow(unused_imports)]
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
+use protorune_support::balance_sheet::BalanceSheetOperations;
 use protorune_support::protostone::ProtostoneEdict;
 use ruint::Uint;
 use std::fmt::Write;
@@ -17,24 +16,6 @@ use super::common::{
     create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers,
     get_last_outpoint_sheet, AmmTestDeploymentIds, CellpackOrEdict,
 };
-
-type U256 = Uint<256, 4>;
-
-struct TestAMMPool {
-    reserve_a: AlkaneTransfer,
-    reserve_b: AlkaneTransfer,
-}
-impl MintableToken for TestAMMPool {}
-impl AMMPoolBase for TestAMMPool {
-    fn reserves(
-        &self,
-    ) -> (
-        alkanes_support::parcel::AlkaneTransfer,
-        alkanes_support::parcel::AlkaneTransfer,
-    ) {
-        (self.reserve_a.clone(), self.reserve_b.clone())
-    }
-}
 
 fn _insert_swap_txs(
     amount: u128,

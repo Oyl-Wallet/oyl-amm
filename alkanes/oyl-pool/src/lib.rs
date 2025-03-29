@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use alkane_factory_support::factory::MintableToken;
 use alkanes_runtime::message::MessageDispatch;
 use alkanes_runtime::{declare_alkane, runtime::AlkaneResponder, storage::StoragePointer};
 #[allow(unused_imports)]
@@ -9,6 +8,7 @@ use alkanes_runtime::{
     stdio::{stdout, Write},
 };
 use alkanes_runtime_pool::{AMMPoolBase, AMMReserves};
+use alkanes_std_factory_support::MintableToken;
 use alkanes_support::{
     context::Context,
     id::AlkaneId,

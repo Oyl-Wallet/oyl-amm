@@ -2,12 +2,12 @@ use alkanes_runtime::{
     message::MessageDispatch, runtime::AlkaneResponder, storage::StoragePointer,
 };
 
-use alkane_factory_support::factory::MintableToken;
 #[allow(unused_imports)]
 use alkanes_runtime::{
     println,
     stdio::{stdout, Write},
 };
+use alkanes_std_factory_support::MintableToken;
 use alkanes_support::{
     cellpack::Cellpack,
     checked_expr,
@@ -20,7 +20,7 @@ use alkanes_support::{
 use anyhow::{anyhow, Result};
 use metashrew_support::index_pointer::KeyValuePointer;
 use num::integer::Roots;
-use protorune_support::balance_sheet::BalanceSheet;
+use protorune_support::balance_sheet::{BalanceSheetOperations, CachedBalanceSheet};
 use ruint::Uint;
 use std::sync::Arc;
 
@@ -131,9 +131,9 @@ pub trait AMMPoolBase: MintableToken {
     fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer);
     fn previous_reserves(&self, parcel: &AlkaneTransferParcel) -> (AlkaneTransfer, AlkaneTransfer) {
         let (reserve_a, reserve_b) = self.reserves();
-        let mut reserve_sheet: BalanceSheet =
+        let mut reserve_sheet: CachedBalanceSheet =
             AlkaneTransferParcel(vec![reserve_a.clone(), reserve_b.clone()]).into();
-        let incoming_sheet: BalanceSheet = parcel.clone().into();
+        let incoming_sheet: CachedBalanceSheet = parcel.clone().into();
         reserve_sheet.debit(&incoming_sheet).unwrap();
         (
             AlkaneTransfer {
