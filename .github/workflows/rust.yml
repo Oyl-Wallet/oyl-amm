@@ -19,6 +19,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+      - name: Clean env
+        run: cargo clean
       - name: Install test runner
         run: cargo install wasm-bindgen-cli --version 0.2.100
       - name: Run wasm tests
