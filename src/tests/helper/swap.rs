@@ -1,6 +1,6 @@
-use alkane_factory_support::factory::MintableToken;
 use alkanes::tests::helpers::{self as alkane_helpers};
 use alkanes_runtime_pool::{AMMPoolBase, DEFAULT_FEE_AMOUNT_PER_1000};
+use alkanes_std_owned_token::factory::MintableToken;
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::id::AlkaneId;
 use alkanes_support::parcel::AlkaneTransfer;

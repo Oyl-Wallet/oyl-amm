@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alkane_factory_support::factory::MintableToken;
+use alkanes_std_owned_token::factory::MintableToken;
 use alkanes_runtime::message::MessageDispatch;
 use alkanes_runtime::{declare_alkane, runtime::AlkaneResponder, storage::StoragePointer};
 #[allow(unused_imports)]

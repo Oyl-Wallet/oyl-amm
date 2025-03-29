@@ -2,12 +2,12 @@ use alkanes_runtime::{
     message::MessageDispatch, runtime::AlkaneResponder, storage::StoragePointer,
 };
 
-use alkane_factory_support::factory::MintableToken;
 #[allow(unused_imports)]
 use alkanes_runtime::{
     println,
     stdio::{stdout, Write},
 };
+use alkanes_std_owned_token::factory::MintableToken;
 use alkanes_support::{
     cellpack::Cellpack,
     checked_expr,

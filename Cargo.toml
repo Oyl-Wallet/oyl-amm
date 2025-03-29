@@ -21,7 +21,7 @@ members = ["alkanes/*", '.']
 [workspace.dependencies]
 alkanes-support = { git = "https://github.com/kungfuflex/alkanes-rs", branch = "hude/test_revert" }
 alkanes-runtime = { git = "https://github.com/kungfuflex/alkanes-rs", branch = "hude/test_revert"  }
-alkane-factory-support = { git = "https://github.com/kungfuflex/alkane-factory" }
+alkanes-std-owned-token = { git = "https://github.com/kungfuflex/alkanes-rs", branch = "hude/test_revert"  }
 metashrew-support = { git = "https://github.com/kungfuflex/alkanes-rs", branch = "hude/test_revert"  }
 protorune-support = { git = "https://github.com/kungfuflex/alkanes-rs", branch = "hude/test_revert"  }
 ordinals = { git = "https://github.com/kungfuflex/alkanes-rs", branch = "hude/test_revert"  }
@@ -35,7 +35,6 @@ ruint = "1.13.1"
 [dependencies]
 alkanes-support = { workspace = true }
 alkanes-runtime = { workspace = true }
-alkane-factory-support = { workspace = true }
 metashrew-support = { workspace = true }
 protorune-support = { workspace = true }
 ordinals = { workspace = true }
