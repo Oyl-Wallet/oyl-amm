@@ -83,7 +83,11 @@ pub fn insert_split_tx(
     test_block.txdata.push(split);
 }
 
-fn get_sheet_for_outpoint(test_block: &Block, tx_num: usize, vout: u32) -> Result<BalanceSheet> {
+fn get_sheet_for_outpoint(
+    test_block: &Block,
+    tx_num: usize,
+    vout: u32,
+) -> Result<BalanceSheet<IndexPointer>> {
     let outpoint = OutPoint {
         txid: test_block.txdata[tx_num].compute_txid(),
         vout,
@@ -113,7 +117,7 @@ fn get_trace_for_outpoint(test_block: &Block, tx_num: usize, vout: u32) -> Resul
     Ok(trace)
 }
 
-pub fn get_last_outpoint_sheet(test_block: &Block) -> Result<BalanceSheet> {
+pub fn get_last_outpoint_sheet(test_block: &Block) -> Result<BalanceSheet<IndexPointer>> {
     let len = test_block.txdata.len();
     get_sheet_for_outpoint(test_block, len - 1, 0)
 }
