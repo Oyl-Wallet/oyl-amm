@@ -14,6 +14,7 @@ use init_pools::{
 };
 use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
+use protorune_support::balance_sheet::BalanceSheetOperations;
 use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
 use swap::{check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_router};
