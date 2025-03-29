@@ -1,9 +1,7 @@
 use alkanes::tests::helpers::{self as alkane_helpers};
 use alkanes_runtime_pool::{AMMPoolBase, DEFAULT_FEE_AMOUNT_PER_1000};
-use alkanes_std_owned_token::factory::MintableToken;
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::id::AlkaneId;
-use alkanes_support::parcel::AlkaneTransfer;
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::{Block, Witness};
@@ -17,24 +15,6 @@ use super::common::{
     create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers,
     get_last_outpoint_sheet, AmmTestDeploymentIds, CellpackOrEdict,
 };
-
-type U256 = Uint<256, 4>;
-
-struct TestAMMPool {
-    reserve_a: AlkaneTransfer,
-    reserve_b: AlkaneTransfer,
-}
-impl MintableToken for TestAMMPool {}
-impl AMMPoolBase for TestAMMPool {
-    fn reserves(
-        &self,
-    ) -> (
-        alkanes_support::parcel::AlkaneTransfer,
-        alkanes_support::parcel::AlkaneTransfer,
-    ) {
-        (self.reserve_a.clone(), self.reserve_b.clone())
-    }
-}
 
 fn _insert_swap_txs(
     amount: u128,
