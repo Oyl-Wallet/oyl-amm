@@ -123,17 +123,17 @@ pub fn test_amm_burn_fixture(amount_burn: u128, use_router: bool, use_oyl: bool)
     let sheet = get_last_outpoint_sheet(&test_block)?;
     let amount_burned_true = std::cmp::min(amount_burn, total_lp);
     assert_eq!(
-        sheet.get(&deployment_ids.amm_pool_1_deployment.into()),
+        sheet.get_cached(&deployment_ids.amm_pool_1_deployment.into()),
         total_lp - amount_burned_true
     );
 
     let owned_alkane_sheets = get_last_outpoint_sheet(&test_block)?;
     assert_eq!(
-        owned_alkane_sheets.get(&deployment_ids.owned_token_1_deployment.into()),
+        owned_alkane_sheets.get_cached(&deployment_ids.owned_token_1_deployment.into()),
         amount_burned_true * amount1 / total_supply
     );
     assert_eq!(
-        owned_alkane_sheets.get(&deployment_ids.owned_token_2_deployment.into()),
+        owned_alkane_sheets.get_cached(&deployment_ids.owned_token_2_deployment.into()),
         amount_burned_true * amount2 / total_supply
     );
     Ok(())

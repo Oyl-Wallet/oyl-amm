@@ -132,6 +132,51 @@ pub fn check_add_liquidity_lp_balance(
         total_supply,
     );
     println!("expected amt from adding liquidity {:?}", expected_amount);
-    assert_eq!(sheet.get(&pool_address.into()), expected_amount);
+    assert_eq!(sheet.get_cached(&pool_address.into()), expected_amount);
+    Ok(())
+}
+
+pub fn check_add_liquidity_runtime_balance(
+    prev_amount1: u128,
+    prev_amount2: u128,
+    prev_amount3: u128,
+    added_amount1: u128,
+    added_amount2: u128,
+    added_amount3: u128,
+    deployment_ids: &AmmTestDeploymentIds,
+) -> Result<()> {
+    let sheet = get_sheet_for_runtime();
+
+    assert_eq!(
+        sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
+        prev_amount1 + added_amount1
+    );
+
+    assert_eq!(
+        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
+        prev_amount2 + added_amount2
+    );
+
+    assert_eq!(
+        sheet.get_cached(&deployment_ids.owned_token_3_deployment.into()),
+        prev_amount3 + added_amount3
+    );
+
+    let sheet_lazy = get_lazy_sheet_for_runtime();
+
+    assert_eq!(
+        sheet_lazy.get(&deployment_ids.owned_token_1_deployment.into()),
+        prev_amount1 + added_amount1
+    );
+
+    assert_eq!(
+        sheet_lazy.get(&deployment_ids.owned_token_2_deployment.into()),
+        prev_amount2 + added_amount2
+    );
+
+    assert_eq!(
+        sheet_lazy.get(&deployment_ids.owned_token_3_deployment.into()),
+        prev_amount3 + added_amount3
+    );
     Ok(())
 }
