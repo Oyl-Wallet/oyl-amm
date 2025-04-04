@@ -19,6 +19,9 @@ use std::fmt::Write;
 use super::common::*;
 
 pub const OYL_AMM_POOL_FACTORY_ID: u128 = 0xf041;
+pub const INIT_AMT_TOKEN1: u128 = 1000000;
+pub const INIT_AMT_TOKEN2: u128 = 2000000;
+pub const INIT_AMT_TOKEN3: u128 = 1000000;
 
 pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeploymentIds)> {
     let pool_id = if use_oyl {
@@ -58,17 +61,17 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
         // token 1 init 1 auth token and mint 1000000 owned tokens. Also deploys owned token contract at {2,2}
         Cellpack {
             target: AlkaneId { block: 1, tx: 0 },
-            inputs: vec![0, 1, 1000000],
+            inputs: vec![0, 1, INIT_AMT_TOKEN1],
         },
         // token 2 init 1 auth token and mint 2000000 owned tokens
         Cellpack {
             target: AlkaneId { block: 5, tx: 2 }, // factory creation of owned token using {2, 2} as the factory
-            inputs: vec![0, 1, 2000000],
+            inputs: vec![0, 1, INIT_AMT_TOKEN2],
         },
         // token 3 init 1 auth token and mint 1000000 owned tokens
         Cellpack {
             target: AlkaneId { block: 5, tx: 2 }, // factory creation of owned token using {2, 2} as the factory
-            inputs: vec![0, 1, 1000000],
+            inputs: vec![0, 1, INIT_AMT_TOKEN1],
         },
         // oyl token init 1 auth token and mint 1000000 owned tokens.
         Cellpack {
@@ -261,6 +264,15 @@ pub fn check_init_liquidity_lp_1_balance(
         sheet.get(&deployment_ids.amm_pool_1_deployment.into()),
         expected_amount
     );
+    assert_eq!(
+        sheet.get(&deployment_ids.owned_token_1_deployment.into()),
+        INIT_AMT_TOKEN1 - amount1
+    );
+    assert_eq!(
+        sheet.get(&deployment_ids.owned_token_2_deployment.into()),
+        INIT_AMT_TOKEN2 - amount1 - amount2
+    );
+
     Ok(())
 }
 
@@ -276,6 +288,14 @@ pub fn check_init_liquidity_lp_2_balance(
     assert_eq!(
         sheet.get(&deployment_ids.amm_pool_2_deployment.into()),
         expected_amount
+    );
+    assert_eq!(
+        sheet.get(&deployment_ids.owned_token_2_deployment.into()),
+        INIT_AMT_TOKEN2 - amount1 - amount2
+    );
+    assert_eq!(
+        sheet.get(&deployment_ids.owned_token_3_deployment.into()),
+        INIT_AMT_TOKEN3 - amount2
     );
     Ok(())
 }
