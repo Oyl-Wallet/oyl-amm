@@ -91,6 +91,7 @@ pub fn check_remove_liquidity_runtime_balance(
     runtime_balances: &mut BalanceSheet<IndexPointer>,
     removed_amount1: u128,
     removed_amount2: u128,
+    lp_burned: u128,
     deployment_ids: &AmmTestDeploymentIds,
 ) -> Result<()> {
     runtime_balances.decrease(
@@ -101,6 +102,7 @@ pub fn check_remove_liquidity_runtime_balance(
         &deployment_ids.owned_token_2_deployment.into(),
         removed_amount2,
     );
+    runtime_balances.increase(&deployment_ids.amm_pool_1_deployment.into(), lp_burned);
     let sheet = get_sheet_for_runtime();
 
     assert_eq!(sheet, runtime_balances.clone());
@@ -167,6 +169,7 @@ pub fn test_amm_burn_fixture(amount_burn: u128, use_router: bool, use_oyl: bool)
         &mut runtime_balances,
         amount_returned_1,
         amount_returned_2,
+        amount_burned_true,
         &deployment_ids,
     )?;
     Ok(())
