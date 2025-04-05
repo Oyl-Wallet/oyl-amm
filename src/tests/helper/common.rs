@@ -104,17 +104,16 @@ fn get_sheet_for_outpoint(
     Ok(sheet)
 }
 
-pub fn get_sheet_for_runtime() -> BalanceSheet {
+pub fn get_sheet_for_runtime() -> BalanceSheet<IndexPointer> {
     let ptr = RuneTable::for_protocol(AlkaneMessageContext::protocol_tag()).RUNTIME_BALANCE;
     let sheet = load_sheet(&ptr);
     println!("runtime balances: {:?}", sheet);
     sheet
 }
 
-pub fn get_lazy_sheet_for_runtime() -> BalanceSheet {
-    let atomic = AtomicPointer::default();
+pub fn get_lazy_sheet_for_runtime() -> BalanceSheet<IndexPointer> {
     let ptr = RuneTable::for_protocol(AlkaneMessageContext::protocol_tag()).RUNTIME_BALANCE;
-    let sheet = BalanceSheet::new_ptr_backed(atomic.derive(&ptr));
+    let sheet = BalanceSheet::new_ptr_backed(ptr);
     sheet
 }
 

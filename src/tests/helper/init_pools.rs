@@ -12,7 +12,7 @@ use bitcoin::{Block, Witness};
 #[allow(unused_imports)]
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use num::integer::Roots;
-use protorune_support::balance_sheet::BalanceSheetOperations;
+use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations};
 use protorune_support::protostone::ProtostoneEdict;
 use std::fmt::Write;
 
@@ -300,45 +300,31 @@ pub fn check_init_liquidity_lp_2_balance(
     Ok(())
 }
 
-pub fn check_init_liquidity_runtime_balance(
+pub fn check_and_get_init_liquidity_runtime_balance(
     amount1: u128,
     amount2: u128,
     deployment_ids: &AmmTestDeploymentIds,
-) -> Result<()> {
+) -> Result<BalanceSheet<IndexPointer>> {
+    let mut initial_runtime_balances: BalanceSheet<IndexPointer> =
+        BalanceSheet::<IndexPointer>::new();
+    initial_runtime_balances.set(&deployment_ids.owned_token_1_deployment.into(), amount1);
+    initial_runtime_balances.set(
+        &deployment_ids.owned_token_2_deployment.into(),
+        amount1 + amount2,
+    );
+    initial_runtime_balances.set(&deployment_ids.owned_token_3_deployment.into(), amount2);
     let sheet = get_sheet_for_runtime();
-    assert_eq!(
-        sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
-        amount1
-    );
-    assert_eq!(
-        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
-        amount1 + amount2
-    );
-    assert_eq!(
-        sheet.get_cached(&deployment_ids.owned_token_3_deployment.into()),
-        amount2
-    );
-    let mut lazy_sheet = get_lazy_sheet_for_runtime();
-    assert_eq!(
-        lazy_sheet.get(&deployment_ids.owned_token_1_deployment.into()),
-        amount1
-    );
-    assert_eq!(
-        lazy_sheet.get(&deployment_ids.owned_token_2_deployment.into()),
-        amount1 + amount2
-    );
-    assert_eq!(
-        lazy_sheet.get(&deployment_ids.owned_token_3_deployment.into()),
-        amount2
-    );
-    Ok(())
+    assert_eq!(sheet, initial_runtime_balances);
+    let lazy_sheet = get_lazy_sheet_for_runtime();
+    assert_eq!(lazy_sheet, initial_runtime_balances);
+    Ok(initial_runtime_balances)
 }
 
 pub fn test_amm_pool_init_fixture(
     amount1: u128,
     amount2: u128,
     use_oyl: bool,
-) -> Result<(Block, AmmTestDeploymentIds)> {
+) -> Result<(Block, AmmTestDeploymentIds, BalanceSheet<IndexPointer>)> {
     let block_height = 840_000;
     let (mut test_block, deployment_ids) = init_block_with_amm_pool(use_oyl)?;
     let mut previous_outpoint = OutPoint {
@@ -373,6 +359,7 @@ pub fn test_amm_pool_init_fixture(
     assert_contracts_correct_ids(&deployment_ids, use_oyl)?;
     check_init_liquidity_lp_1_balance(amount1, amount2, &test_block, &deployment_ids)?;
     check_init_liquidity_lp_2_balance(amount1, amount2, &test_block, &deployment_ids)?;
-    check_init_liquidity_runtime_balance(amount1, amount2, &deployment_ids)?;
-    Ok((test_block, deployment_ids))
+    let init_runtime_balance =
+        check_and_get_init_liquidity_runtime_balance(amount1, amount2, &deployment_ids)?;
+    Ok((test_block, deployment_ids, init_runtime_balance))
 }

@@ -12,7 +12,7 @@ use bitcoin::{Block, Witness};
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
-use protorune_support::balance_sheet::BalanceSheetOperations;
+use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations};
 use protorune_support::protostone::ProtostoneEdict;
 use std::fmt::Write;
 
@@ -87,11 +87,36 @@ pub fn insert_remove_liquidity_txs_w_router(
     )
 }
 
+pub fn check_remove_liquidity_runtime_balance(
+    runtime_balances: &mut BalanceSheet<IndexPointer>,
+    removed_amount1: u128,
+    removed_amount2: u128,
+    deployment_ids: &AmmTestDeploymentIds,
+) -> Result<()> {
+    runtime_balances.decrease(
+        &deployment_ids.owned_token_1_deployment.into(),
+        removed_amount1,
+    );
+    runtime_balances.decrease(
+        &deployment_ids.owned_token_2_deployment.into(),
+        removed_amount2,
+    );
+    let sheet = get_sheet_for_runtime();
+
+    assert_eq!(sheet, runtime_balances.clone());
+
+    let sheet_lazy = get_lazy_sheet_for_runtime();
+
+    assert_eq!(sheet_lazy, runtime_balances.clone());
+    Ok(())
+}
+
 pub fn test_amm_burn_fixture(amount_burn: u128, use_router: bool, use_oyl: bool) -> Result<()> {
     let (amount1, amount2) = (1000000, 1000000);
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
     let total_supply = (amount1 * amount2).sqrt();
-    let (mut init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, use_oyl)?;
+    let (mut init_block, deployment_ids, mut runtime_balances) =
+        test_amm_pool_init_fixture(amount1, amount2, use_oyl)?;
 
     let block_height = 840_001;
     let mut test_block = create_block_with_coinbase_tx(block_height);
@@ -128,13 +153,21 @@ pub fn test_amm_burn_fixture(amount_burn: u128, use_router: bool, use_oyl: bool)
     );
 
     let owned_alkane_sheets = get_last_outpoint_sheet(&test_block)?;
+    let amount_returned_1 = amount_burned_true * amount1 / total_supply;
     assert_eq!(
         owned_alkane_sheets.get_cached(&deployment_ids.owned_token_1_deployment.into()),
-        amount_burned_true * amount1 / total_supply
+        amount_returned_1
     );
+    let amount_returned_2 = amount_burned_true * amount2 / total_supply;
     assert_eq!(
         owned_alkane_sheets.get_cached(&deployment_ids.owned_token_2_deployment.into()),
-        amount_burned_true * amount2 / total_supply
+        amount_returned_2
     );
+    check_remove_liquidity_runtime_balance(
+        &mut runtime_balances,
+        amount_returned_1,
+        amount_returned_2,
+        &deployment_ids,
+    )?;
     Ok(())
 }

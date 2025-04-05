@@ -5,7 +5,7 @@ use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::{Block, Witness};
 use num::integer::Roots;
-use protorune_support::balance_sheet::BalanceSheetOperations;
+use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations};
 use protorune_support::protostone::ProtostoneEdict;
 
 #[allow(unused_imports)]
@@ -137,46 +137,30 @@ pub fn check_add_liquidity_lp_balance(
 }
 
 pub fn check_add_liquidity_runtime_balance(
-    prev_amount1: u128,
-    prev_amount2: u128,
-    prev_amount3: u128,
+    runtime_balances: &mut BalanceSheet<IndexPointer>,
     added_amount1: u128,
     added_amount2: u128,
     added_amount3: u128,
     deployment_ids: &AmmTestDeploymentIds,
 ) -> Result<()> {
+    runtime_balances.increase(
+        &deployment_ids.owned_token_1_deployment.into(),
+        added_amount1,
+    );
+    runtime_balances.increase(
+        &deployment_ids.owned_token_2_deployment.into(),
+        added_amount2,
+    );
+    runtime_balances.increase(
+        &deployment_ids.owned_token_3_deployment.into(),
+        added_amount3,
+    );
+
     let sheet = get_sheet_for_runtime();
-
-    assert_eq!(
-        sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
-        prev_amount1 + added_amount1
-    );
-
-    assert_eq!(
-        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
-        prev_amount2 + added_amount2
-    );
-
-    assert_eq!(
-        sheet.get_cached(&deployment_ids.owned_token_3_deployment.into()),
-        prev_amount3 + added_amount3
-    );
+    assert_eq!(sheet, runtime_balances.clone());
 
     let sheet_lazy = get_lazy_sheet_for_runtime();
+    assert_eq!(sheet_lazy, runtime_balances.clone());
 
-    assert_eq!(
-        sheet_lazy.get(&deployment_ids.owned_token_1_deployment.into()),
-        prev_amount1 + added_amount1
-    );
-
-    assert_eq!(
-        sheet_lazy.get(&deployment_ids.owned_token_2_deployment.into()),
-        prev_amount2 + added_amount2
-    );
-
-    assert_eq!(
-        sheet_lazy.get(&deployment_ids.owned_token_3_deployment.into()),
-        prev_amount3 + added_amount3
-    );
     Ok(())
 }

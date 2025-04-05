@@ -7,10 +7,12 @@ use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::{Block, Witness};
 #[allow(unused_imports)]
 use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
-use protorune_support::balance_sheet::BalanceSheetOperations;
+use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations};
 use protorune_support::protostone::ProtostoneEdict;
 use ruint::Uint;
 use std::fmt::Write;
+
+use crate::tests::helper::common::{get_lazy_sheet_for_runtime, get_sheet_for_runtime};
 
 use super::common::{
     create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers,
@@ -90,13 +92,10 @@ fn calc_swapped_balance(amount: u128, reserve_from: u128, reserve_to: u128) -> R
     Ok((amount_in_with_fee * reserve_to) / (1000 * reserve_from + amount_in_with_fee))
 }
 
-pub fn check_swap_lp_balance(
+fn calc_swapped_balance_from_path(
     prev_reserve_amount_in_path: Vec<u128>,
     swap_amount: u128,
-    swap_target_token: AlkaneId,
-    test_block: &Block,
-) -> Result<()> {
-    let sheet = get_last_outpoint_sheet(test_block)?;
+) -> Result<u128> {
     let mut current_swapped_amount = swap_amount;
     for i in 1..prev_reserve_amount_in_path.len() {
         current_swapped_amount = calc_swapped_balance(
@@ -105,11 +104,35 @@ pub fn check_swap_lp_balance(
             prev_reserve_amount_in_path[i],
         )?;
     }
+    Ok(current_swapped_amount)
+}
 
-    println!("expected amt from swapping {:?}", current_swapped_amount);
-    assert_eq!(
-        sheet.get_cached(&swap_target_token.into()),
-        current_swapped_amount
-    );
+pub fn check_swap_lp_balance(
+    prev_reserve_amount_in_path: Vec<u128>,
+    swap_amount: u128,
+    swap_target_token: AlkaneId,
+    test_block: &Block,
+) -> Result<()> {
+    let sheet = get_last_outpoint_sheet(test_block)?;
+    let swapped_amount = calc_swapped_balance_from_path(prev_reserve_amount_in_path, swap_amount)?;
+    println!("expected amt from swapping {:?}", swapped_amount);
+    assert_eq!(sheet.get_cached(&swap_target_token.into()), swapped_amount);
+    Ok(())
+}
+
+pub fn check_swap_runtime_balance(
+    prev_reserve_amount_in_path: Vec<u128>,
+    runtime_balances: &mut BalanceSheet<IndexPointer>,
+    swap_amount: u128,
+    swap_starting_token: AlkaneId,
+    swap_target_token: AlkaneId,
+) -> Result<()> {
+    runtime_balances.increase(&swap_starting_token.into(), swap_amount);
+    let swapped_amount = calc_swapped_balance_from_path(prev_reserve_amount_in_path, swap_amount)?;
+    runtime_balances.decrease(&swap_target_token.into(), swapped_amount);
+    let sheet = get_sheet_for_runtime();
+    assert_eq!(sheet, runtime_balances.clone());
+    let lazy_sheet = get_lazy_sheet_for_runtime();
+    assert_eq!(lazy_sheet, runtime_balances.clone());
     Ok(())
 }
