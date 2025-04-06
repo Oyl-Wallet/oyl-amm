@@ -898,8 +898,7 @@ fn test_find_nonexisting_pool_id() -> Result<()> {
             TraceEvent::RevertContext(trace_response) => {
                 // Now we have the TraceResponse, access the data field
                 let data = String::from_utf8_lossy(&trace_response.inner.data);
-                println!("error message {:?}", data);
-                assert!(data.contains("ALKANES: revert:"));
+                assert!(data.contains("ALKANES: revert: wasm `unreachable` instruction executed"));
             }
             _ => panic!("Expected RevertContext variant, but got a different variant"),
         }
