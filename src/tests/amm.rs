@@ -60,28 +60,15 @@ fn test_amm_factory_double_init_fail() -> Result<()> {
         ),
     );
     index_block(&test_block, block_height)?;
-    let trace_data: Trace = view::trace(
+
+    common::assert_revert_context(
         &(OutPoint {
             txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
             vout: 3,
         }),
-    )?
-    .try_into()?;
-    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
-    // Access the data field from the trace response
-    if let Some(return_context) = last_trace_event {
-        // Use pattern matching to extract the data field from the TraceEvent enum
-        match return_context {
-            TraceEvent::RevertContext(trace_response) => {
-                // Now we have the TraceResponse, access the data field
-                let data = String::from_utf8_lossy(&trace_response.inner.data);
-                assert!(data.contains("ALKANES: revert: Error: already initialized"));
-            }
-            _ => panic!("Expected RevertContext variant, but got a different variant"),
-        }
-    } else {
-        panic!("Failed to get last_trace_event from trace data");
-    }
+        "ALKANES: revert: Error: already initialized",
+    )?;
+
     Ok(())
 }
 
@@ -112,29 +99,15 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
         ),
     );
     index_block(&test_block, block_height)?;
-    let trace_data: Trace = view::trace(
+
+    common::assert_revert_context(
         &(OutPoint {
             txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
             vout: 4,
         }),
-    )?
-    .try_into()?;
-    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
-    // Access the data field from the trace response
-    if let Some(return_context) = last_trace_event {
-        // Use pattern matching to extract the data field from the TraceEvent enum
-        match return_context {
-            TraceEvent::RevertContext(trace_response) => {
-                // Now we have the TraceResponse, access the data field
-                let data = String::from_utf8_lossy(&trace_response.inner.data);
-                assert!(data
-                    .contains("ALKANES: revert: Error: must send two runes to initialize a pool"));
-            }
-            _ => panic!("Expected RevertContext variant, but got a different variant"),
-        }
-    } else {
-        panic!("Failed to get last_trace_event from trace data");
-    }
+        "ALKANES: revert: Error: must send two runes to initialize a pool",
+    )?;
+
     Ok(())
 }
 
@@ -160,30 +133,20 @@ fn test_amm_factory_duplicate_pool_fail() -> Result<()> {
     );
     index_block(&init_block_2, block_height)?;
 
-    let trace_data: Trace = view::trace(
-        &(OutPoint {
-            txid: init_block_2.txdata[init_block_2.txdata.len() - 1].compute_txid(),
-            vout: 4,
-        }),
-    )?
-    .try_into()?;
-    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
-    println!("last_trace_event: {:?}", last_trace_event);
-    // Access the data field from the trace response
-    if let Some(return_context) = last_trace_event {
-        // Use pattern matching to extract the data field from the TraceEvent enum
-        match return_context {
-            TraceEvent::RevertContext(trace_response) => {
-                // Now we have the TraceResponse, access the data field
-                let data = String::from_utf8_lossy(&trace_response.inner.data);
-                println!("revert data: {:?}", data);
-                assert!(data.contains("ALKANES: revert: Error: pool already exists"));
-            }
-            _ => panic!("Expected RevertContext variant, but got a different variant"),
-        }
-    } else {
-        panic!("Failed to get last_trace_event from trace data");
-    }
+    let outpoint = OutPoint {
+        txid: init_block_2.txdata[init_block_2.txdata.len() - 1].compute_txid(),
+        vout: 4,
+    };
+
+    // For debugging purposes
+    let trace_data: Trace = view::trace(&outpoint)?.try_into()?;
+    println!(
+        "last_trace_event: {:?}",
+        trace_data.0.lock().expect("Mutex poisoned").last()
+    );
+
+    common::assert_revert_context(&outpoint, "ALKANES: revert: Error: pool already exists")?;
+
     Ok(())
 }
 
@@ -226,39 +189,25 @@ fn test_amm_pool_bad_init() -> Result<()> {
         sheet.get_cached(&deployment_ids.amm_pool_1_deployment.into()),
         0
     );
-    let trace_data: Trace = view::trace(
-        &(OutPoint {
-            txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-            vout: 4,
-        }),
-    )?
-    .try_into()?;
-    let trace_events = trace_data.0.lock().expect("Mutex poisoned");
-    let second_last_trace_event = trace_events[trace_events.len() - 2].clone();
-    match second_last_trace_event {
-        TraceEvent::RevertContext(trace_response) => {
-            // Now we have the TraceResponse, access the data field
-            let data = String::from_utf8_lossy(&trace_response.inner.data);
-            assert!(data
-                .contains("Overflow error in expression: root_k.checked_sub(MINIMUM_LIQUIDITY)"));
-        }
-        _ => panic!("Expected RevertContext variant, but got a different variant"),
-    }
-    let last_trace_event = trace_events.last().cloned();
-    // Access the data field from the trace response
-    if let Some(return_context) = last_trace_event {
-        // Use pattern matching to extract the data field from the TraceEvent enum
-        match return_context {
-            TraceEvent::RevertContext(trace_response) => {
-                // Now we have the TraceResponse, access the data field
-                let data = String::from_utf8_lossy(&trace_response.inner.data);
-                assert!(data.contains("Extcall failed: ALKANES: revert: Error: Overflow error in expression: root_k.checked_sub(MINIMUM_LIQUIDITY)"));
-            }
-            _ => panic!("Expected RevertContext variant, but got a different variant"),
-        }
-    } else {
-        panic!("Failed to get last_trace_event from trace data");
-    }
+
+    let outpoint = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        vout: 4,
+    };
+
+    // Check the second-to-last trace event
+    common::assert_revert_context_at_index(
+        &outpoint,
+        "Overflow error in expression: root_k.checked_sub(MINIMUM_LIQUIDITY)",
+        Some(-2),
+    )?;
+
+    // Check the last trace event
+    common::assert_revert_context(
+        &outpoint,
+        "Extcall failed: ALKANES: revert: Error: Overflow error in expression: root_k.checked_sub(MINIMUM_LIQUIDITY)"
+    )?;
+
     Ok(())
 }
 
@@ -374,6 +323,14 @@ fn test_amm_pool_add_more_liquidity_to_wrong_pool() -> Result<()> {
     )?;
 
     check_add_liquidity_runtime_balance(&mut runtime_balances, 0, 0, 0, &deployment_ids)?;
+
+    common::assert_revert_context(
+        &(OutPoint {
+            txid: add_liquidity_block.txdata[add_liquidity_block.txdata.len() - 1].compute_txid(),
+            vout: 5,
+        }),
+        "ALKANES: revert: Error: unsupported alkane sent to pool",
+    )?;
     Ok(())
 }
 
@@ -887,24 +844,18 @@ fn test_find_nonexisting_pool_id() -> Result<()> {
         vout: 3,
     };
 
+    // Print the trace event for debugging purposes
     let raw_trace_data = view::trace(&outpoint_3)?;
     let trace_data: Trace = raw_trace_data.clone().try_into()?;
-    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
-    println!("last trace event {:?}", last_trace_event);
-    // Access the data field from the trace response
-    if let Some(return_context) = last_trace_event {
-        // Use pattern matching to extract the data field from the TraceEvent enum
-        match return_context {
-            TraceEvent::RevertContext(trace_response) => {
-                // Now we have the TraceResponse, access the data field
-                let data = String::from_utf8_lossy(&trace_response.inner.data);
-                assert!(data.contains("ALKANES: revert: wasm `unreachable` instruction executed"));
-            }
-            _ => panic!("Expected RevertContext variant, but got a different variant"),
-        }
-    } else {
-        panic!("Failed to get last_trace_event from trace data");
-    }
+    println!(
+        "last trace event {:?}",
+        trace_data.0.lock().expect("Mutex poisoned").last()
+    );
+
+    common::assert_revert_context(
+        &outpoint_3,
+        "ALKANES: revert: wasm `unreachable` instruction executed",
+    )?;
 
     Ok(())
 }
