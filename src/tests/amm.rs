@@ -26,7 +26,7 @@ use alkanes::tests::helpers::{self as alkane_helpers, assert_token_id_has_no_dep
 use alkanes::view;
 use alkanes_support::id::AlkaneId;
 #[allow(unused_imports)]
-use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
+use metashrew_core::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use std::fmt::Write;
 use wasm_bindgen_test::wasm_bindgen_test;
 

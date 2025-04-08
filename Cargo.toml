@@ -22,7 +22,7 @@ members = ["alkanes/*", '.']
 alkanes-support = { git = "https://github.com/kungfuflex/alkanes-rs"}
 alkanes-runtime = { git = "https://github.com/kungfuflex/alkanes-rs" }
 alkanes-std-factory-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
-metashrew-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
+metashrew-support = { git = "https://github.com/sandshrewmetaprotocols/metashrew" }
 protorune-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
 ordinals = { git = "https://github.com/kungfuflex/alkanes-rs" }
 alkanes-runtime-pool = { path = "./alkanes/alkanes-runtime-pool" }
@@ -50,7 +50,7 @@ ruint = { workspace = true }
 alkanes = { git = "https://github.com/kungfuflex/alkanes-rs", features = [
     "test-utils",
 ] }
-metashrew = { git = "https://github.com/kungfuflex/alkanes-rs", features = [
+metashrew-core = { git = "https://github.com/sandshrewmetaprotocols/metashrew", features = [
     "test-utils",
 ] }
 protorune = { git = "https://github.com/kungfuflex/alkanes-rs", features = [

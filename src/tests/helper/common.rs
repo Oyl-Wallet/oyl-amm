@@ -9,9 +9,9 @@ use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::transaction::Version;
 use bitcoin::{Address, Amount, Block, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness};
 use hex;
-use metashrew::index_pointer::AtomicPointer;
+use metashrew_core::index_pointer::AtomicPointer;
 #[allow(unused_imports)]
-use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
+use metashrew_core::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use metashrew_support::index_pointer::KeyValuePointer;
 use ordinals::{Etching, Rune, Runestone};
 use protorune::protostone::Protostones;

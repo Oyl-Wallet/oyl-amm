@@ -9,7 +9,7 @@ use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations};
 use protorune_support::protostone::ProtostoneEdict;
 
 #[allow(unused_imports)]
-use metashrew::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
+use metashrew_core::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use std::fmt::Write;
 
 use super::common::*;
