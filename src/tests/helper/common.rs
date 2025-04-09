@@ -86,7 +86,7 @@ pub fn insert_split_tx(
     test_block.txdata.push(split);
 }
 
-fn get_sheet_for_outpoint(
+pub fn get_sheet_for_outpoint(
     test_block: &Block,
     tx_num: usize,
     vout: u32,
