@@ -1,4 +1,6 @@
-use crate::tests::std::{factory_build, oyl_pool_build, pool_build, router_build};
+use crate::tests::std::{
+    factory_build, oyl_pool_build, path_provider_build, pool_build, router_build,
+};
 use alkanes::indexer::index_block;
 use alkanes::precompiled::{alkanes_std_auth_token_build, alkanes_std_owned_token_build};
 use alkanes::tests::helpers::{self as alkane_helpers, assert_binary_deployed_to_id};
