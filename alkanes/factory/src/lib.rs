@@ -19,7 +19,10 @@ use metashrew_support::{compat::to_arraybuffer_layout, index_pointer::KeyValuePo
 #[derive(MessageDispatch)]
 pub enum AMMFactoryMessage {
     #[opcode(0)]
-    InitFactory { pool_factory_id: u128 },
+    InitFactory {
+        pool_factory_id: u128,
+        path_provider_id: AlkaneId,
+    },
 
     #[opcode(1)]
     CreateNewPool,
@@ -45,9 +48,18 @@ pub struct AMMFactory();
 
 impl AMMFactory {
     // External facing methods that implement the AMMFactoryMessage interface
-    pub fn init_factory(&self, pool_factory_id: u128) -> Result<CallResponse> {
+    pub fn init_factory(
+        &self,
+        pool_factory_id: u128,
+        path_provider_id: AlkaneId,
+    ) -> Result<CallResponse> {
         let context = self.context()?;
-        AMMFactoryBase::init_factory(self, pool_factory_id, context)
+        let response = AMMFactoryBase::init_factory(self, pool_factory_id, context);
+        if &response.is_ok() == &true {
+            let mut path_provider_id_pointer = StoragePointer::from_keyword("/path_provider_id");
+            path_provider_id_pointer.set(Arc::new(path_provider_id.into()));
+        }
+        response
     }
 
     pub fn create_new_pool(&self) -> Result<CallResponse> {
