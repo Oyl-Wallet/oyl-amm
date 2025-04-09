@@ -64,7 +64,16 @@ impl AMMFactory {
 
     pub fn create_new_pool(&self) -> Result<CallResponse> {
         let context = self.context()?;
-        AMMFactoryBase::create_new_pool(self, context)
+        let (mut cellpack, parcel, fuel) = AMMFactoryBase::create_new_pool(self, context)?;
+
+        //pass down path_provider
+        let path_provider: AlkaneId = (*StoragePointer::from_keyword("/path_provider_id").get())
+            .clone()
+            .try_into()?;
+
+        cellpack.inputs.append(&mut path_provider.into());
+
+        self.call(&cellpack, &parcel, fuel)
     }
 
     pub fn find_existing_pool_id(
@@ -94,7 +103,7 @@ impl AMMFactory {
 }
 
 impl AMMFactoryBase for AMMFactory {
-    fn create_new_pool(&self, context: Context) -> Result<CallResponse> {
+    fn create_new_pool(&self, context: Context) -> Result<(Cellpack, AlkaneTransferParcel, u64)> {
         if context.incoming_alkanes.0.len() != 2 {
             return Err(anyhow!("must send two runes to initialize a pool"));
         }
@@ -121,20 +130,20 @@ impl AMMFactoryBase for AMMFactory {
         StoragePointer::from_keyword("/all_pools_length")
             .set(Arc::new((length + 1).to_le_bytes().to_vec()));
 
-        self.call(
-            &Cellpack {
+        Ok((
+            Cellpack {
                 target: AlkaneId {
                     block: 6,
                     tx: self.pool_id()?,
                 },
                 inputs: vec![0, a.block, a.tx, b.block, b.tx],
             },
-            &AlkaneTransferParcel(vec![
+            AlkaneTransferParcel(vec![
                 context.incoming_alkanes.0[0].clone(),
                 context.incoming_alkanes.0[1].clone(),
             ]),
             self.fuel(),
-        )
+        ))
     }
 }
 

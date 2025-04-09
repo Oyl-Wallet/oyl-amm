@@ -5,7 +5,11 @@ use alkanes_runtime::{
     stdio::{stdout, Write},
 };
 use alkanes_support::{
-    context::Context, id::AlkaneId, parcel::AlkaneTransfer, response::CallResponse,
+    cellpack::Cellpack,
+    context::Context,
+    id::AlkaneId,
+    parcel::{AlkaneTransfer, AlkaneTransferParcel},
+    response::CallResponse,
 };
 use anyhow::{anyhow, Result};
 use metashrew_support::{
@@ -89,7 +93,7 @@ pub trait AMMFactoryBase {
             Err(anyhow!("already initialized"))
         }
     }
-    fn create_new_pool(&self, context: Context) -> Result<CallResponse>;
+    fn create_new_pool(&self, context: Context) -> Result<(Cellpack, AlkaneTransferParcel, u64)>;
 
     fn find_existing_pool_id(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> AlkaneId {
         let (a, b) = sort_alkanes((alkane_a, alkane_b));
