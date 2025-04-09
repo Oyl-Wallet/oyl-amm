@@ -83,6 +83,11 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
             target: AlkaneId { block: 1, tx: 0 },
             inputs: vec![0, 2, 1],
         },
+        // path provider
+        Cellpack {
+            target: AlkaneId { block: 1, tx: 0 },
+            inputs: vec![0],
+        },
     ]
     .into();
     let test_block = alkane_helpers::init_with_multiple_cellpacks_with_tx(
@@ -96,6 +101,7 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
             [].into(),
             [].into(),
             router_build::get_bytes(),
+            path_provider_build::get_bytes(),
         ]
         .into(),
         cellpacks,
@@ -124,8 +130,9 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
         oyl_token_deployment: AlkaneId { block: 2, tx: 8 },
         oyl_auth_token_deployment: AlkaneId { block: 2, tx: 9 },
         amm_router_deployment: AlkaneId { block: 2, tx: 10 },
-        amm_pool_1_deployment: AlkaneId { block: 2, tx: 11 },
-        amm_pool_2_deployment: AlkaneId { block: 2, tx: 12 },
+        amm_pool_1_deployment: AlkaneId { block: 2, tx: 13 },
+        amm_pool_2_deployment: AlkaneId { block: 2, tx: 14 },
+        amm_path_provider_deployment: AlkaneId { block: 2, tx: 11 },
     };
 
     return Ok((test_block, deployed_ids));
@@ -200,6 +207,10 @@ pub fn assert_contracts_correct_ids(
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_router_deployment.clone(),
         router_build::get_bytes(),
+    );
+    let _ = assert_binary_deployed_to_id(
+        deployment_ids.amm_path_provider_deployment.clone(),
+        path_provider_build::get_bytes(),
     );
     Ok(())
 }

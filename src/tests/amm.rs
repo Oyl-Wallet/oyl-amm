@@ -9,20 +9,23 @@ use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::Witness;
 use common::get_last_outpoint_sheet;
 use init_pools::{
-    calc_lp_balance_from_pool_init, init_block_with_amm_pool, insert_init_pool_liquidity_txs,
-    test_amm_pool_init_fixture,
+    assert_contracts_correct_ids, calc_lp_balance_from_pool_init, init_block_with_amm_pool,
+    insert_init_pool_liquidity_txs, test_amm_pool_init_fixture,
 };
 use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
-use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations};
+use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations, ProtoruneRuneId};
 use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
 use swap::{check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_router};
 
 use crate::tests::helper::*;
+use crate::tests::std::path_provider_build;
 use alkane_helpers::clear;
 use alkanes::indexer::index_block;
-use alkanes::tests::helpers::{self as alkane_helpers, assert_token_id_has_no_deployment};
+use alkanes::tests::helpers::{
+    self as alkane_helpers, assert_binary_deployed_to_id, assert_token_id_has_no_deployment,
+};
 use alkanes::view;
 use alkanes_support::id::AlkaneId;
 #[allow(unused_imports)]
@@ -856,6 +859,30 @@ fn test_find_nonexisting_pool_id() -> Result<()> {
         &outpoint_3,
         "ALKANES: revert: wasm `unreachable` instruction executed",
     )?;
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_path_provider() -> Result<()> {
+    clear();
+    let (test_block, deployment_ids) = init_block_with_amm_pool(false)?;
+
+    let block_height = 840_000;
+
+    index_block(&test_block, block_height)?;
+
+    let _ = assert_binary_deployed_to_id(
+        deployment_ids.amm_path_provider_deployment.clone(),
+        path_provider_build::get_bytes(),
+    );
+
+    let sheet = get_last_outpoint_sheet(&test_block)?;
+    assert_eq!(
+        sheet.get(&ProtoruneRuneId { block: 2, tx: 12 }),
+        1,
+        "No authtoken found",
+    );
 
     Ok(())
 }
