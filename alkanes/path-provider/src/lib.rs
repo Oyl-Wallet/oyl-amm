@@ -9,7 +9,7 @@ use alkanes_runtime::{
 };
 use alkanes_runtime_path_provider::AMMPathProviderBase;
 use alkanes_support::{id::AlkaneId, response::CallResponse};
-use anyhow::{anyhow, Ok, Result};
+use anyhow::{anyhow, Result};
 use metashrew_support::compat::to_arraybuffer_layout;
 
 #[derive(MessageDispatch)]
