@@ -7,7 +7,10 @@ use alkanes_runtime::{
 };
 use alkanes_support::{context::Context, id::AlkaneId, response::CallResponse};
 use anyhow::{anyhow, Result};
-use metashrew_support::{index_pointer::KeyValuePointer, utils::consume_sized_int};
+use metashrew_support::{
+    index_pointer::KeyValuePointer,
+    utils::{consume_sized_int, consume_u128},
+};
 use std::sync::Arc;
 
 fn sort_alkanes((a, b): (AlkaneId, AlkaneId)) -> (AlkaneId, AlkaneId) {
@@ -36,6 +39,21 @@ pub trait AMMPathProviderBase: AuthenticatedResponder {
         StoragePointer::from_keyword("/path")
             .select(&alkane_a.into())
             .select(&alkane_b.into())
+    }
+    fn get_path(&self, alkane_a: &AlkaneId, alkane_b: &AlkaneId) -> Vec<AlkaneId> {
+        let data = self.path_bytes(alkane_a, alkane_b);
+        let mut cursor = std::io::Cursor::<Vec<u8>>::new(data);
+        let mut path = Vec::new();
+        while let (Ok(block), Ok(tx)) = (consume_u128(&mut cursor), consume_u128(&mut cursor)) {
+            path.push(AlkaneId { block, tx });
+        }
+        path
+    }
+
+    fn path_bytes(&self, alkane_a: &AlkaneId, alkane_b: &AlkaneId) -> Vec<u8> {
+        let data = self.path(alkane_a, alkane_b).get();
+        let path = data.to_vec();
+        path
     }
 
     fn set_optimal_path(
