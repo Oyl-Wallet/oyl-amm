@@ -1,5 +1,5 @@
 [package]
-name = "alkanes-runtime-path-provider"
+name = "oyl-factory"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,6 +11,7 @@ alkanes-support = { workspace = true }
 alkanes-runtime = { workspace = true }
 metashrew-support = { workspace = true }
 protorune-support = { workspace = true }
-anyhow = { workspace = true }
-bitcoin = { workspace = true }
-hex = { workspace = true }
+alkanes-runtime-factory = { path = "../alkanes-runtime-factory" }
+anyhow = "1.0.91"
+bitcoin = { version = "0.32.4", features = ["rand"] }
+hex = "0.4.3"

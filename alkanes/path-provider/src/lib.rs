@@ -17,6 +17,7 @@ pub enum AMMPathProviderMessage {
     #[opcode(0)]
     InitPathProvider,
     #[opcode(1)]
+    #[returns(Vec<AlkaneId>)]
     GetOptimalPath { start: AlkaneId, end: AlkaneId },
     #[opcode(2)]
     SetPath {

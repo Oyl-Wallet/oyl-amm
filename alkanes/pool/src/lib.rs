@@ -28,7 +28,6 @@ pub enum AMMPoolMessage {
     InitPool {
         alkane_a: AlkaneId,
         alkane_b: AlkaneId,
-        path_provider: AlkaneId,
     },
 
     #[opcode(1)]
@@ -107,20 +106,13 @@ impl AMMPool {
     }
 
     // External facing methods that implement the AMMPoolMessage interface
-    pub fn init_pool(
-        &self,
-        alkane_a: AlkaneId,
-        alkane_b: AlkaneId,
-        path_provider: AlkaneId,
-    ) -> Result<CallResponse> {
+    pub fn init_pool(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> Result<CallResponse> {
         let context = self.context()?;
         let result = AMMPoolBase::init_pool(self, alkane_a, alkane_b, context);
 
         if result.is_ok() {
             // Ignore errors from set_pool_name_and_symbol to avoid failing the initialization
             let _ = self.set_pool_name_and_symbol();
-            let mut path_provider_id_pointer = StoragePointer::from_keyword("/path_provider_id");
-            path_provider_id_pointer.set(Arc::new(path_provider.into()));
         }
 
         result

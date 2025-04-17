@@ -1,5 +1,5 @@
 use crate::tests::std::{
-    factory_build, oyl_pool_build, path_provider_build, pool_build, router_build,
+    oyl_factory_build, oyl_pool_build, path_provider_build, pool_build, router_build,
 };
 use alkanes::indexer::index_block;
 use alkanes::precompiled::{alkanes_std_auth_token_build, alkanes_std_owned_token_build};
@@ -97,7 +97,7 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
             pool_build::get_bytes(),
             oyl_pool_build::get_bytes(),
             alkanes_std_auth_token_build::get_bytes(),
-            factory_build::get_bytes(),
+            oyl_factory_build::get_bytes(),
             alkanes_std_owned_token_build::get_bytes(),
             [].into(),
             [].into(),
@@ -164,7 +164,7 @@ pub fn assert_contracts_correct_ids(
 
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_factory_deployment.clone(),
-        factory_build::get_bytes(),
+        oyl_factory_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
         deployment_ids.owned_token_1_deployment.clone(),

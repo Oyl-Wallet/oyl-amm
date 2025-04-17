@@ -29,6 +29,7 @@ pub enum OylAMMPoolMessage {
     InitPool {
         alkane_a: AlkaneId,
         alkane_b: AlkaneId,
+        factory: AlkaneId,
     },
 
     #[opcode(1)]
@@ -106,19 +107,25 @@ impl OylAMMPool {
         Ok(())
     }
 
-    // External facing methods that implement the OylAMMPoolMessage interface
-    pub fn init_pool(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> Result<CallResponse> {
+    // External facing methods that implement the AMMPoolMessage interface
+    pub fn init_pool(
+        &self,
+        alkane_a: AlkaneId,
+        alkane_b: AlkaneId,
+        factory: AlkaneId,
+    ) -> Result<CallResponse> {
         let context = self.context()?;
         let result = AMMPoolBase::init_pool(self, alkane_a, alkane_b, context);
 
         if result.is_ok() {
             // Ignore errors from set_pool_name_and_symbol to avoid failing the initialization
             let _ = self.set_pool_name_and_symbol();
+            let mut factory_id_pointer = StoragePointer::from_keyword("/factory_id");
+            factory_id_pointer.set(Arc::new(factory.into()));
         }
 
         result
     }
-
     pub fn add_liquidity(&self) -> Result<CallResponse> {
         let context = self.context()?;
         AMMPoolBase::add_liquidity(self, context.myself, context.incoming_alkanes)

@@ -884,6 +884,7 @@ fn test_path_provider() -> Result<()> {
         "No authtoken found",
     );
 
+    //TODO: implement path provider tests
     Ok(())
 }
 

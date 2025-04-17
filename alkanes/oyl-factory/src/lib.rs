@@ -17,9 +17,12 @@ use anyhow::{anyhow, Result};
 use metashrew_support::{compat::to_arraybuffer_layout, index_pointer::KeyValuePointer};
 
 #[derive(MessageDispatch)]
-pub enum AMMFactoryMessage {
+pub enum OylAMMFactoryMessage {
     #[opcode(0)]
-    InitFactory { pool_factory_id: u128 },
+    InitFactory {
+        pool_factory_id: u128,
+        path_provider_id: AlkaneId,
+    },
 
     #[opcode(1)]
     CreateNewPool,
@@ -37,17 +40,30 @@ pub enum AMMFactoryMessage {
     #[opcode(4)]
     #[returns(Vec<u8>)]
     GetNumPools,
+
+    #[opcode(5)]
+    #[returns(AlkaneId)]
+    GetPathProvider,
 }
 
 // Base implementation of AMMFactory that can be used directly or extended
 #[derive(Default)]
-pub struct AMMFactory();
+pub struct OylAMMFactory();
 
-impl AMMFactory {
+impl OylAMMFactory {
     // External facing methods that implement the AMMFactoryMessage interface
-    pub fn init_factory(&self, pool_factory_id: u128) -> Result<CallResponse> {
+    pub fn init_factory(
+        &self,
+        pool_factory_id: u128,
+        path_provider_id: AlkaneId,
+    ) -> Result<CallResponse> {
         let context = self.context()?;
-        AMMFactoryBase::init_factory(self, pool_factory_id, context)
+        let response = AMMFactoryBase::init_factory(self, pool_factory_id, context);
+        if &response.is_ok() == &true {
+            let mut path_provider_id_pointer = StoragePointer::from_keyword("/path_provider_id");
+            path_provider_id_pointer.set(Arc::new(path_provider_id.into()));
+        }
+        response
     }
 
     pub fn create_new_pool(&self) -> Result<CallResponse> {
@@ -88,9 +104,19 @@ impl AMMFactory {
             .to_vec();
         Ok(response)
     }
+
+    pub fn get_path_provider(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
+        let path_provider_id = StoragePointer::from_keyword("/path_provider_id")
+            .get()
+            .to_vec();
+        response.data = path_provider_id;
+        Ok(response)
+    }
 }
 
-impl AMMFactoryBase for AMMFactory {
+impl AMMFactoryBase for OylAMMFactory {
     fn create_new_pool(&self, context: Context) -> Result<(Cellpack, AlkaneTransferParcel, u64)> {
         if context.incoming_alkanes.0.len() != 2 {
             return Err(anyhow!("must send two runes to initialize a pool"));
@@ -124,7 +150,15 @@ impl AMMFactoryBase for AMMFactory {
                     block: 6,
                     tx: self.pool_id()?,
                 },
-                inputs: vec![0, a.block, a.tx, b.block, b.tx],
+                inputs: vec![
+                    0,
+                    a.block,
+                    a.tx,
+                    b.block,
+                    b.tx,
+                    context.myself.block,
+                    context.myself.tx,
+                ],
             },
             AlkaneTransferParcel(vec![
                 context.incoming_alkanes.0[0].clone(),
@@ -135,7 +169,7 @@ impl AMMFactoryBase for AMMFactory {
     }
 }
 
-impl AlkaneResponder for AMMFactory {
+impl AlkaneResponder for OylAMMFactory {
     fn execute(&self) -> Result<CallResponse> {
         // The opcode extraction and dispatch logic is now handled by the declare_alkane macro
         // This method is still required by the AlkaneResponder trait, but we can just return an error
@@ -147,7 +181,7 @@ impl AlkaneResponder for AMMFactory {
 }
 
 declare_alkane! {
-    impl AlkaneResponder for AMMFactory {
-        type Message = AMMFactoryMessage;
+    impl AlkaneResponder for OylAMMFactory {
+        type Message = OylAMMFactoryMessage;
     }
 }
