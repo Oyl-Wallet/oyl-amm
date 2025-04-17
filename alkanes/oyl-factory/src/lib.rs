@@ -68,14 +68,7 @@ impl OylAMMFactory {
 
     pub fn create_new_pool(&self) -> Result<CallResponse> {
         let context = self.context()?;
-        let (mut cellpack, parcel, fuel) = AMMFactoryBase::create_new_pool(self, context)?;
-
-        //pass down path_provider
-        let path_provider: AlkaneId = (*StoragePointer::from_keyword("/path_provider_id").get())
-            .clone()
-            .try_into()?;
-
-        cellpack.inputs.append(&mut path_provider.into());
+        let (cellpack, parcel, fuel) = AMMFactoryBase::create_new_pool(self, context)?;
 
         self.call(&cellpack, &parcel, fuel)
     }
