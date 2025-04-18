@@ -115,16 +115,12 @@ impl OylAMMPool {
         factory: AlkaneId,
     ) -> Result<CallResponse> {
         let context = self.context()?;
-        let result = AMMPoolBase::init_pool(self, alkane_a, alkane_b, context);
+        let result = AMMPoolBase::init_pool(self, alkane_a, alkane_b, context)?;
+        let _ = self.set_pool_name_and_symbol();
+        let mut factory_id_pointer = StoragePointer::from_keyword("/factory_id");
+        factory_id_pointer.set(Arc::new(factory.into()));
 
-        if result.is_ok() {
-            // Ignore errors from set_pool_name_and_symbol to avoid failing the initialization
-            let _ = self.set_pool_name_and_symbol();
-            let mut factory_id_pointer = StoragePointer::from_keyword("/factory_id");
-            factory_id_pointer.set(Arc::new(factory.into()));
-        }
-
-        result
+        Ok(result)
     }
     pub fn add_liquidity(&self) -> Result<CallResponse> {
         let context = self.context()?;

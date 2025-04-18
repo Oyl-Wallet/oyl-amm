@@ -93,7 +93,50 @@ pub trait AMMFactoryBase {
             Err(anyhow!("already initialized"))
         }
     }
-    fn create_new_pool(&self, context: Context) -> Result<(Cellpack, AlkaneTransferParcel, u64)>;
+    fn create_new_pool(
+        &self,
+        context: Context,
+        next_sequence: u128,
+    ) -> Result<(Cellpack, AlkaneTransferParcel)> {
+        if context.incoming_alkanes.0.len() != 2 {
+            return Err(anyhow!("must send two runes to initialize a pool"));
+        }
+        let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
+        let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
+        let pool_id = AlkaneId::new(2, next_sequence);
+        // check if this pool already exists
+        if self.pool_pointer(&a, &b).get().len() == 0 {
+            self.pool_pointer(&a, &b).set(Arc::new(pool_id.into()));
+        } else {
+            return Err(anyhow!("pool already exists"));
+        }
+
+        // Add the new pool to the registry
+        let length = self.all_pools_length()?;
+
+        // Store the pool ID at the current index
+        StoragePointer::from_keyword("/all_pools/")
+            .select(&length.to_le_bytes().to_vec())
+            .set(Arc::new(pool_id.into()));
+
+        // Update the length
+        StoragePointer::from_keyword("/all_pools_length")
+            .set(Arc::new((length + 1).to_le_bytes().to_vec()));
+
+        Ok((
+            Cellpack {
+                target: AlkaneId {
+                    block: 6,
+                    tx: self.pool_id()?,
+                },
+                inputs: vec![0, a.block, a.tx, b.block, b.tx],
+            },
+            AlkaneTransferParcel(vec![
+                context.incoming_alkanes.0[0].clone(),
+                context.incoming_alkanes.0[1].clone(),
+            ]),
+        ))
+    }
 
     fn find_existing_pool_id(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> AlkaneId {
         let (a, b) = sort_alkanes((alkane_a, alkane_b));

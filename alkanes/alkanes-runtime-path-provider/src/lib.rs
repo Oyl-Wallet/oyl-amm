@@ -13,14 +13,6 @@ use metashrew_support::{
 };
 use std::sync::Arc;
 
-fn sort_alkanes((a, b): (AlkaneId, AlkaneId)) -> (AlkaneId, AlkaneId) {
-    if a < b {
-        (a, b)
-    } else {
-        (b, a)
-    }
-}
-
 pub trait AMMPathProviderBase: AuthenticatedResponder {
     fn init_path_provider(&self, context: Context) -> Result<CallResponse> {
         let mut pointer = StoragePointer::from_keyword("/initialized");
@@ -63,20 +55,19 @@ pub trait AMMPathProviderBase: AuthenticatedResponder {
         optimal_path: Vec<AlkaneId>,
     ) -> Result<()> {
         self.only_owner()?;
-        let (a, b) = sort_alkanes((alkane_a, alkane_b));
         let data: Vec<u8> = optimal_path
             .into_iter()
             .map(|alkane| Into::<Vec<u8>>::into(&alkane))
             .flatten()
             .collect::<_>();
 
-        self.path(&a, &b).set(Arc::from(data));
+        self.path(&alkane_a, &alkane_b).set(Arc::from(data));
         Ok(())
     }
 
     fn find_optimal_path(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> Vec<AlkaneId> {
-        let (a, b) = sort_alkanes((alkane_a, alkane_b));
-        let mut cursor = std::io::Cursor::<Vec<u8>>::new(self.path(&a, &b).get().as_ref().clone());
+        let mut cursor =
+            std::io::Cursor::<Vec<u8>>::new(self.path(&alkane_a, &alkane_b).get().as_ref().clone());
         let mut result: Vec<AlkaneId> = Vec::new();
         //merge the 2 results into one
         while let (Ok(block), Ok(tx)) = (

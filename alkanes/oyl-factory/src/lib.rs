@@ -14,14 +14,19 @@ use alkanes_support::{
     response::CallResponse,
 };
 use anyhow::{anyhow, Result};
-use metashrew_support::{compat::to_arraybuffer_layout, index_pointer::KeyValuePointer};
+use metashrew_support::{
+    compat::to_arraybuffer_layout, index_pointer::KeyValuePointer, utils::consume_u128,
+};
 
+pub const FEE_TO_SWAP_TO_OYL_PER_1000: u128 = 3;
 #[derive(MessageDispatch)]
 pub enum OylAMMFactoryMessage {
     #[opcode(0)]
     InitFactory {
         pool_factory_id: u128,
         path_provider_id: AlkaneId,
+        router_id: AlkaneId,
+        oyl_token_id: AlkaneId,
     },
 
     #[opcode(1)]
@@ -44,6 +49,9 @@ pub enum OylAMMFactoryMessage {
     #[opcode(5)]
     #[returns(AlkaneId)]
     GetPathProvider,
+
+    #[opcode(6)]
+    SwapToAndBurnOyl,
 }
 
 // Base implementation of AMMFactory that can be used directly or extended
@@ -51,26 +59,73 @@ pub enum OylAMMFactoryMessage {
 pub struct OylAMMFactory();
 
 impl OylAMMFactory {
+    fn path_provider() -> Result<AlkaneId> {
+        let ptr = StoragePointer::from_keyword("/path_provider_id")
+            .get()
+            .as_ref()
+            .clone();
+        let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
+        Ok(AlkaneId::new(
+            consume_u128(&mut cursor)?,
+            consume_u128(&mut cursor)?,
+        ))
+    }
+    fn set_path_provider(path_provider_id: AlkaneId) {
+        let mut path_provider_id_pointer = StoragePointer::from_keyword("/path_provider_id");
+        path_provider_id_pointer.set(Arc::new(path_provider_id.into()));
+    }
+    fn router() -> Result<AlkaneId> {
+        let ptr = StoragePointer::from_keyword("/router_id")
+            .get()
+            .as_ref()
+            .clone();
+        let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
+        Ok(AlkaneId::new(
+            consume_u128(&mut cursor)?,
+            consume_u128(&mut cursor)?,
+        ))
+    }
+    fn set_router(router_id: AlkaneId) {
+        let mut router_id_pointer = StoragePointer::from_keyword("/router_id");
+        router_id_pointer.set(Arc::new(router_id.into()));
+    }
+    fn oyl_token() -> Result<AlkaneId> {
+        let ptr = StoragePointer::from_keyword("/oyl_token_id")
+            .get()
+            .as_ref()
+            .clone();
+        let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
+        Ok(AlkaneId::new(
+            consume_u128(&mut cursor)?,
+            consume_u128(&mut cursor)?,
+        ))
+    }
+    fn set_oyl_token(oyl_token_id: AlkaneId) {
+        let mut oyl_token_id_pointer = StoragePointer::from_keyword("/oyl_token_id");
+        oyl_token_id_pointer.set(Arc::new(oyl_token_id.into()));
+    }
     // External facing methods that implement the AMMFactoryMessage interface
     pub fn init_factory(
         &self,
         pool_factory_id: u128,
         path_provider_id: AlkaneId,
+        router_id: AlkaneId,
+        oyl_token_id: AlkaneId,
     ) -> Result<CallResponse> {
         let context = self.context()?;
-        let response = AMMFactoryBase::init_factory(self, pool_factory_id, context);
-        if &response.is_ok() == &true {
-            let mut path_provider_id_pointer = StoragePointer::from_keyword("/path_provider_id");
-            path_provider_id_pointer.set(Arc::new(path_provider_id.into()));
-        }
-        response
+        let response = AMMFactoryBase::init_factory(self, pool_factory_id, context)?;
+        OylAMMFactory::set_path_provider(path_provider_id);
+        OylAMMFactory::set_router(router_id);
+        OylAMMFactory::set_oyl_token(oyl_token_id);
+        Ok(response)
     }
 
     pub fn create_new_pool(&self) -> Result<CallResponse> {
         let context = self.context()?;
-        let (cellpack, parcel, fuel) = AMMFactoryBase::create_new_pool(self, context)?;
-
-        self.call(&cellpack, &parcel, fuel)
+        let (mut cellpack, parcel) =
+            AMMFactoryBase::create_new_pool(self, context.clone(), self.sequence())?;
+        cellpack.inputs.append(&mut context.clone().myself.into());
+        self.call(&cellpack, &parcel, self.fuel())
     }
 
     pub fn find_existing_pool_id(
@@ -107,60 +162,60 @@ impl OylAMMFactory {
         response.data = path_provider_id;
         Ok(response)
     }
-}
 
-impl AMMFactoryBase for OylAMMFactory {
-    fn create_new_pool(&self, context: Context) -> Result<(Cellpack, AlkaneTransferParcel, u64)> {
-        if context.incoming_alkanes.0.len() != 2 {
-            return Err(anyhow!("must send two runes to initialize a pool"));
+    fn _get_path_between(&self, alkane1: &AlkaneId, alkane2: &AlkaneId) -> Result<Vec<AlkaneId>> {
+        let path_provider = OylAMMFactory::path_provider()?;
+        let cellpack = Cellpack {
+            target: path_provider,
+            inputs: vec![1, alkane1.block, alkane1.tx, alkane2.block, alkane2.tx], // get optimal path
+        };
+        let response = self.call(&cellpack, &AlkaneTransferParcel::default(), self.fuel())?;
+        let mut cursor = std::io::Cursor::<Vec<u8>>::new(response.data);
+        let mut path = Vec::new();
+
+        // Keep reading pairs of u128s until consume_u128 returns an error
+        loop {
+            match (consume_u128(&mut cursor), consume_u128(&mut cursor)) {
+                (Ok(block), Ok(tx)) => {
+                    path.push(AlkaneId::new(block, tx));
+                }
+                _ => break, // Break the loop if either consume_u128 call fails
+            }
         }
-        let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
-        let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
-        let next_sequence = self.sequence();
-        let pool_id = AlkaneId::new(2, next_sequence);
-        // check if this pool already exists
-        if self.pool_pointer(&a, &b).get().len() == 0 {
-            self.pool_pointer(&a, &b).set(Arc::new(pool_id.into()));
-        } else {
-            return Err(anyhow!("pool already exists"));
+
+        Ok(path)
+    }
+
+    fn _swap_and_burn_oyl(&self, path: Vec<AlkaneId>) -> Result<()> {
+        let router = OylAMMFactory::router()?;
+        let mut input: Vec<u128> = vec![3, path.len() as u128];
+        for id in path {
+            input.append(&mut id.into());
         }
-
-        // Add the new pool to the registry
-        let length = self.all_pools_length()?;
-
-        // Store the pool ID at the current index
-        StoragePointer::from_keyword("/all_pools/")
-            .select(&length.to_le_bytes().to_vec())
-            .set(Arc::new(pool_id.into()));
-
-        // Update the length
-        StoragePointer::from_keyword("/all_pools_length")
-            .set(Arc::new((length + 1).to_le_bytes().to_vec()));
-
-        Ok((
-            Cellpack {
-                target: AlkaneId {
-                    block: 6,
-                    tx: self.pool_id()?,
-                },
-                inputs: vec![
-                    0,
-                    a.block,
-                    a.tx,
-                    b.block,
-                    b.tx,
-                    context.myself.block,
-                    context.myself.tx,
-                ],
+        self.call(
+            &Cellpack {
+                target: router,
+                inputs: input,
             },
-            AlkaneTransferParcel(vec![
-                context.incoming_alkanes.0[0].clone(),
-                context.incoming_alkanes.0[1].clone(),
-            ]),
+            &AlkaneTransferParcel::default(),
             self.fuel(),
-        ))
+        )?;
+        Ok(())
+    }
+
+    pub fn swap_to_and_burn_oyl(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        let oyl_token = OylAMMFactory::oyl_token()?;
+        for alkane_transfer in context.incoming_alkanes.0 {
+            let path = self._get_path_between(&alkane_transfer.id, &oyl_token)?;
+            if path.len() != 0 {
+                self._swap_and_burn_oyl(path);
+            }
+        }
+        Ok(CallResponse::default())
     }
 }
+impl AMMFactoryBase for OylAMMFactory {}
 
 impl AlkaneResponder for OylAMMFactory {
     fn execute(&self) -> Result<CallResponse> {
