@@ -162,6 +162,7 @@ impl OylAMMPool {
         let amount_to_burn = (alkane_out_no_fees.value - alkane_out_with_fees.value)
             * FEE_TO_SWAP_TO_OYL_PER_10
             / 10;
+        println!("amount_to_burn: {}", amount_to_burn);
         if amount_to_burn != 0 {
             self.call(
                 &Cellpack {

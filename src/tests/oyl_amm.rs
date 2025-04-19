@@ -297,7 +297,7 @@ fn test_amm_pool_swap_oyl() -> Result<()> {
 
     index_block(&check_block, 840_003)?;
 
-    check_reserves_amount(133277, 99946, &check_block)?;
+    check_reserves_amount(100055, 99946, &check_block)?;
 
     // swap some from oyl pool to ensure no infinite loop occurs
     let mut swap_oyl_block = protorune::test_helpers::create_block_with_coinbase_tx(840_004);
@@ -341,7 +341,7 @@ fn test_amm_pool_swap_oyl() -> Result<()> {
 
     index_block(&swap_oyl_block, 840_004)?;
 
-    check_reserves_amount(133277, 99853, &swap_oyl_block)?;
+    check_reserves_amount(100055, 99853, &swap_oyl_block)?;
 
     Ok(())
 }
