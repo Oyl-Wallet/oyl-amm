@@ -52,7 +52,7 @@ pub enum OylAMMPoolMessage {
     GetName,
 
     #[opcode(999)]
-    #[returns(Vec<u8>)]
+    #[returns(AlkaneId, AlkaneId, u128, u128, u128, String)]
     PoolDetails,
 }
 
@@ -150,17 +150,13 @@ impl OylAMMPool {
     }
 
     pub fn swap(&self, amount_out_predicate: u128) -> Result<CallResponse> {
-        println!("inside oyl swap");
         let context = self.context()?;
         let alkane_out_with_fees =
             self.get_transfer_out_from_swap(context.incoming_alkanes.clone(), true)?;
-        println!("alkane_out_with_fees: {:?}", alkane_out_with_fees);
         let alkane_out_no_fees =
             self.get_transfer_out_from_swap(context.incoming_alkanes.clone(), false)?;
-        println!("alkane_out_no_fees: {:?}", alkane_out_no_fees);
 
         let response = AMMPoolBase::swap(self, context.incoming_alkanes, amount_out_predicate)?;
-        println!("response: {:?}", response);
 
         let factory = OylAMMPool::factory()?;
         let amount_to_burn = (alkane_out_no_fees.value - alkane_out_with_fees.value)

@@ -12,6 +12,7 @@ use init_pools::{
     assert_contracts_correct_ids, calc_lp_balance_from_pool_init, init_block_with_amm_pool,
     insert_init_pool_liquidity_txs, test_amm_pool_init_fixture,
 };
+use metashrew_support::utils::consume_u128;
 use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations, ProtoruneRuneId};
@@ -242,5 +243,55 @@ fn test_amm_pool_swap_oyl() -> Result<()> {
     )?;
 
     // TODO: check that the oyl pool now has less oyl tokens
+    let mut check_block = protorune::test_helpers::create_block_with_coinbase_tx(840_003);
+    check_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: AlkaneId { block: 2, tx: 15 },
+                inputs: vec![999],
+            }],
+            OutPoint {
+                txid: swap_block.txdata.last().unwrap().compute_txid(),
+                vout: 0,
+            },
+            false,
+        ),
+    );
+
+    index_block(&check_block, 840_003)?;
+
+    // Get the outpoint for the get path transaction
+    let outpoint = OutPoint {
+        txid: check_block.txdata[check_block.txdata.len() - 1].compute_txid(),
+        vout: 3, // The response is in vout 3
+    };
+
+    // Get the trace data for the get path transaction
+    let raw_trace_data = view::trace(&outpoint)?;
+    let trace_data: Trace = raw_trace_data.clone().try_into()?;
+    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
+    // Verify that we got the path we set
+    if let Some(return_context) = last_trace_event {
+        match return_context {
+            TraceEvent::ReturnContext(trace_response) => {
+                let data = &trace_response.inner.data;
+                let mut cursor = std::io::Cursor::<Vec<u8>>::new(data.clone());
+                let alkane_a =
+                    AlkaneId::new(consume_u128(&mut cursor)?, consume_u128(&mut cursor)?);
+                let alkane_b =
+                    AlkaneId::new(consume_u128(&mut cursor)?, consume_u128(&mut cursor)?);
+                let reserve_a = consume_u128(&mut cursor)?;
+                let reserve_b = consume_u128(&mut cursor)?;
+                println!("{:?} {} {:?} {}", alkane_a, reserve_a, alkane_b, reserve_b);
+                assert_eq!(reserve_a, 133277);
+                assert_eq!(reserve_a, 99946);
+            }
+            _ => panic!("Expected ReturnContext variant, but got a different variant"),
+        }
+    } else {
+        panic!("Failed to get last_trace_event from trace data");
+    }
+
     Ok(())
 }
