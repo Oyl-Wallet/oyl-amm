@@ -21,9 +21,9 @@ use std::fmt::Write;
 use super::common::*;
 
 pub const OYL_AMM_POOL_FACTORY_ID: u128 = 0xf041;
-pub const INIT_AMT_TOKEN1: u128 = 1000000;
-pub const INIT_AMT_TOKEN2: u128 = 2000000;
-pub const INIT_AMT_TOKEN3: u128 = 1000000;
+pub const INIT_AMT_TOKEN1: u128 = 1000000000000;
+pub const INIT_AMT_TOKEN2: u128 = 2000000000000;
+pub const INIT_AMT_TOKEN3: u128 = 1000000000000;
 
 pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeploymentIds)> {
     let pool_id = if use_oyl {
@@ -58,7 +58,7 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
         //amm factory
         Cellpack {
             target: AlkaneId { block: 1, tx: 0 },
-            inputs: vec![0, pool_id, 2, 11],
+            inputs: vec![0, pool_id, 2, 11, 2, 10, 2, 8],
         },
         // token 1 init 1 auth token and mint 1000000 owned tokens. Also deploys owned token contract at {2,2}
         Cellpack {
@@ -132,9 +132,9 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
         oyl_token_deployment: AlkaneId { block: 2, tx: 8 },
         oyl_auth_token_deployment: AlkaneId { block: 2, tx: 9 },
         amm_router_deployment: AlkaneId { block: 2, tx: 10 },
+        amm_path_provider_deployment: AlkaneId { block: 2, tx: 11 },
         amm_pool_1_deployment: AlkaneId { block: 2, tx: 13 },
         amm_pool_2_deployment: AlkaneId { block: 2, tx: 14 },
-        amm_path_provider_deployment: AlkaneId { block: 2, tx: 11 },
     };
 
     return Ok((test_block, deployed_ids));

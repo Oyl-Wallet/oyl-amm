@@ -138,14 +138,20 @@ pub trait AMMFactoryBase {
         ))
     }
 
-    fn find_existing_pool_id(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> AlkaneId {
+    fn find_existing_pool_id(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> Result<AlkaneId> {
         let (a, b) = sort_alkanes((alkane_a, alkane_b));
+        if self.pool_pointer(&a, &b).get().len() == 0 {
+            return Err(anyhow!(format!(
+                "the pool {:?} {:?} doesn't exist in the factory",
+                alkane_a, alkane_b
+            )));
+        }
         let mut cursor =
             std::io::Cursor::<Vec<u8>>::new(self.pool_pointer(&a, &b).get().as_ref().clone());
-        AlkaneId::new(
+        Ok(AlkaneId::new(
             consume_sized_int::<u128>(&mut cursor).unwrap(),
             consume_sized_int::<u128>(&mut cursor).unwrap(),
-        )
+        ))
     }
     // Get the total number of pools
     fn all_pools_length(&self) -> Result<u128> {

@@ -9,6 +9,7 @@ use alkanes_runtime::{
 };
 use alkanes_runtime_pool::{AMMPoolBase, AMMReserves};
 use alkanes_std_factory_support::MintableToken;
+use alkanes_support::cellpack::Cellpack;
 use alkanes_support::{
     context::Context,
     id::AlkaneId,
@@ -17,11 +18,13 @@ use alkanes_support::{
     utils::shift_id_or_err,
 };
 use anyhow::{anyhow, Result};
+use metashrew_support::utils::consume_u128;
 use metashrew_support::{
     compat::{to_arraybuffer_layout, to_passback_ptr},
     index_pointer::KeyValuePointer,
 };
 
+pub const FEE_TO_SWAP_TO_OYL_PER_10: u128 = 5;
 // Define a new message type for OYL-specific functionality if needed
 #[derive(MessageDispatch)]
 pub enum OylAMMPoolMessage {
@@ -57,6 +60,21 @@ pub enum OylAMMPoolMessage {
 pub struct OylAMMPool();
 
 impl OylAMMPool {
+    fn factory() -> Result<AlkaneId> {
+        let ptr = StoragePointer::from_keyword("/factory_id")
+            .get()
+            .as_ref()
+            .clone();
+        let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
+        Ok(AlkaneId::new(
+            consume_u128(&mut cursor)?,
+            consume_u128(&mut cursor)?,
+        ))
+    }
+    fn set_factory(factory_id: AlkaneId) {
+        let mut factory_id_pointer = StoragePointer::from_keyword("/factory_id");
+        factory_id_pointer.set(Arc::new(factory_id.into()));
+    }
     pub fn set_pool_name_and_symbol(&self) -> Result<()> {
         let (alkane_a, alkane_b) = self.alkanes_for_self()?;
 
@@ -117,8 +135,7 @@ impl OylAMMPool {
         let context = self.context()?;
         let result = AMMPoolBase::init_pool(self, alkane_a, alkane_b, context)?;
         let _ = self.set_pool_name_and_symbol();
-        let mut factory_id_pointer = StoragePointer::from_keyword("/factory_id");
-        factory_id_pointer.set(Arc::new(factory.into()));
+        OylAMMPool::set_factory(factory.into());
 
         Ok(result)
     }
@@ -133,9 +150,37 @@ impl OylAMMPool {
     }
 
     pub fn swap(&self, amount_out_predicate: u128) -> Result<CallResponse> {
-        println!("special swap for oyl");
+        println!("inside oyl swap");
         let context = self.context()?;
-        AMMPoolBase::swap(self, context.incoming_alkanes, amount_out_predicate)
+        let alkane_out_with_fees =
+            self.get_transfer_out_from_swap(context.incoming_alkanes.clone(), true)?;
+        println!("alkane_out_with_fees: {:?}", alkane_out_with_fees);
+        let alkane_out_no_fees =
+            self.get_transfer_out_from_swap(context.incoming_alkanes.clone(), false)?;
+        println!("alkane_out_no_fees: {:?}", alkane_out_no_fees);
+
+        let response = AMMPoolBase::swap(self, context.incoming_alkanes, amount_out_predicate)?;
+        println!("response: {:?}", response);
+
+        let factory = OylAMMPool::factory()?;
+        let amount_to_burn = (alkane_out_no_fees.value - alkane_out_with_fees.value)
+            * FEE_TO_SWAP_TO_OYL_PER_10
+            / 10;
+        if amount_to_burn != 0 {
+            self.call(
+                &Cellpack {
+                    target: factory,
+                    inputs: vec![6], // swap to and burn oyl
+                },
+                &AlkaneTransferParcel(vec![AlkaneTransfer {
+                    id: alkane_out_with_fees.id,
+                    value: amount_to_burn,
+                }]),
+                self.fuel(),
+            )?;
+        }
+
+        Ok(response)
     }
 
     pub fn forward_incoming(&self) -> Result<CallResponse> {

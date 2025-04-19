@@ -64,7 +64,7 @@ impl AMMFactory {
     ) -> Result<CallResponse> {
         let context = self.context()?;
         let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
-        response.data = AMMFactoryBase::find_existing_pool_id(self, alkane_a, alkane_b).into();
+        response.data = AMMFactoryBase::find_existing_pool_id(self, alkane_a, alkane_b)?.into();
         Ok(response)
     }
 

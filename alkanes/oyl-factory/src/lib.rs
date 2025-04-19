@@ -10,7 +10,10 @@ use alkanes_runtime::{
 };
 use alkanes_runtime_factory::{sort_alkanes, take_two, AMMFactoryBase};
 use alkanes_support::{
-    cellpack::Cellpack, context::Context, id::AlkaneId, parcel::AlkaneTransferParcel,
+    cellpack::Cellpack,
+    context::Context,
+    id::AlkaneId,
+    parcel::{AlkaneTransfer, AlkaneTransferParcel},
     response::CallResponse,
 };
 use anyhow::{anyhow, Result};
@@ -18,7 +21,6 @@ use metashrew_support::{
     compat::to_arraybuffer_layout, index_pointer::KeyValuePointer, utils::consume_u128,
 };
 
-pub const FEE_TO_SWAP_TO_OYL_PER_1000: u128 = 3;
 #[derive(MessageDispatch)]
 pub enum OylAMMFactoryMessage {
     #[opcode(0)]
@@ -135,7 +137,7 @@ impl OylAMMFactory {
     ) -> Result<CallResponse> {
         let context = self.context()?;
         let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
-        response.data = AMMFactoryBase::find_existing_pool_id(self, alkane_a, alkane_b).into();
+        response.data = AMMFactoryBase::find_existing_pool_id(self, alkane_a, alkane_b)?.into();
         Ok(response)
     }
 
@@ -186,30 +188,37 @@ impl OylAMMFactory {
         Ok(path)
     }
 
-    fn _swap_and_burn_oyl(&self, path: Vec<AlkaneId>) -> Result<()> {
+    fn _swap_and_burn_oyl(
+        &self,
+        path: Vec<AlkaneId>,
+        alkane_transfer: AlkaneTransfer,
+    ) -> Result<CallResponse> {
         let router = OylAMMFactory::router()?;
         let mut input: Vec<u128> = vec![3, path.len() as u128];
         for id in path {
             input.append(&mut id.into());
         }
+        input.push(0); // possibly use a minimum for oyl swapping
         self.call(
             &Cellpack {
                 target: router,
                 inputs: input,
             },
-            &AlkaneTransferParcel::default(),
+            &AlkaneTransferParcel(vec![alkane_transfer]),
             self.fuel(),
-        )?;
-        Ok(())
+        )
     }
 
     pub fn swap_to_and_burn_oyl(&self) -> Result<CallResponse> {
         let context = self.context()?;
         let oyl_token = OylAMMFactory::oyl_token()?;
         for alkane_transfer in context.incoming_alkanes.0 {
+            if alkane_transfer.id == oyl_token {
+                continue;
+            }
             let path = self._get_path_between(&alkane_transfer.id, &oyl_token)?;
             if path.len() != 0 {
-                self._swap_and_burn_oyl(path);
+                self._swap_and_burn_oyl(path, alkane_transfer)?; // should we abort if one fails? Or soft fail and continue
             }
         }
         Ok(CallResponse::default())
