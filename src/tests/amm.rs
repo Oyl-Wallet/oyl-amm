@@ -857,7 +857,7 @@ fn test_find_nonexisting_pool_id() -> Result<()> {
 
     common::assert_revert_context(
         &outpoint_3,
-        "ALKANES: revert: wasm `unreachable` instruction executed",
+        "Error: the pool AlkaneId { block: 12, tx: 100 } AlkaneId { block: 13, tx: 101 } doesn't exist in the factory",
     )?;
 
     Ok(())

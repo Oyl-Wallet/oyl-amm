@@ -21,9 +21,9 @@ use std::fmt::Write;
 use super::common::*;
 
 pub const OYL_AMM_POOL_FACTORY_ID: u128 = 0xf041;
-pub const INIT_AMT_TOKEN1: u128 = 1000000000000;
-pub const INIT_AMT_TOKEN2: u128 = 2000000000000;
-pub const INIT_AMT_TOKEN3: u128 = 1000000000000;
+pub const INIT_AMT_TOKEN1: u128 = 1000000;
+pub const INIT_AMT_TOKEN2: u128 = 2000000;
+pub const INIT_AMT_TOKEN3: u128 = 1000000;
 
 pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeploymentIds)> {
     let pool_id = if use_oyl {
