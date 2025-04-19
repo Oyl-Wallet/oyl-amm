@@ -185,8 +185,8 @@ fn check_reserves_amount(amount1: u128, amount2: u128, check_block: &Block) -> R
                 let reserve_a = consume_u128(&mut cursor)?;
                 let reserve_b = consume_u128(&mut cursor)?;
                 println!("{:?} {} {:?} {}", alkane_a, reserve_a, alkane_b, reserve_b);
-                // assert_eq!(reserve_a, amount1);
-                // assert_eq!(reserve_b, amount2);
+                assert_eq!(reserve_a, amount1);
+                assert_eq!(reserve_b, amount2);
             }
             _ => panic!("Expected ReturnContext variant, but got a different variant"),
         }
@@ -341,7 +341,7 @@ fn test_amm_pool_swap_oyl() -> Result<()> {
 
     index_block(&swap_oyl_block, 840_004)?;
 
-    check_reserves_amount(1, 1, &swap_oyl_block)?;
+    check_reserves_amount(133277, 99853, &swap_oyl_block)?;
 
     Ok(())
 }
