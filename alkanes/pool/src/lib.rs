@@ -142,7 +142,7 @@ impl AMMPool {
     }
 
     pub fn pool_details(&self) -> Result<CallResponse> {
-        AMMPoolBase::pool_details(self)
+        AMMPoolBase::pool_details(self, &self.context()?)
     }
 }
 

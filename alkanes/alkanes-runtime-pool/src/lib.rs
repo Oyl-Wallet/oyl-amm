@@ -147,7 +147,7 @@ pub trait AMMPoolBase: MintableToken {
         )
     }
 
-    fn pool_details(&self) -> Result<CallResponse> {
+    fn pool_details(&self, context: &Context) -> Result<CallResponse> {
         let (reserve_a, reserve_b) = self.reserves();
         let (token_a, token_b) = self.alkanes_for_self()?;
 
@@ -160,7 +160,7 @@ pub trait AMMPoolBase: MintableToken {
             pool_name: self.name(),
         };
 
-        let mut response = CallResponse::default();
+        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
         response.data = pool_info.try_to_vec();
 
         Ok(response)
