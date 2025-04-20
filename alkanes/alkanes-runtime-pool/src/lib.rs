@@ -129,26 +129,28 @@ pub trait AMMPoolBase: MintableToken {
         }
     }
     fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer);
-    fn previous_reserves(&self, parcel: &AlkaneTransferParcel) -> (AlkaneTransfer, AlkaneTransfer) {
+    fn previous_reserves(
+        &self,
+        parcel: &AlkaneTransferParcel,
+    ) -> Result<(AlkaneTransfer, AlkaneTransfer)> {
         let (reserve_a, reserve_b) = self.reserves();
-        let mut reserve_sheet: CachedBalanceSheet =
-            AlkaneTransferParcel(vec![reserve_a.clone(), reserve_b.clone()]).into();
         let incoming_sheet: CachedBalanceSheet = parcel.clone().into();
-        reserve_sheet.debit(&incoming_sheet).unwrap();
-        (
+        Ok((
             AlkaneTransfer {
                 id: reserve_a.id.clone(),
-                value: reserve_sheet.get(&reserve_a.id.clone().into()),
+                value: reserve_a.value - incoming_sheet.get(&reserve_a.id.into()),
             },
             AlkaneTransfer {
                 id: reserve_b.id.clone(),
-                value: reserve_sheet.get(&reserve_b.id.clone().into()),
+                value: reserve_b.value - incoming_sheet.get(&reserve_b.id.into()),
             },
-        )
+        ))
     }
 
     fn pool_details(&self, context: &Context) -> Result<CallResponse> {
-        let (reserve_a, reserve_b) = self.previous_reserves(&context.incoming_alkanes);
+        println!("in pool details");
+        let (reserve_a, reserve_b) = self.previous_reserves(&context.incoming_alkanes)?;
+        println!("after previous reserves");
         let (token_a, token_b) = self.alkanes_for_self()?;
 
         let pool_info = PoolInfo {
@@ -174,7 +176,7 @@ pub trait AMMPoolBase: MintableToken {
         self.check_inputs(&myself, &parcel, 2)?;
         let mut total_supply = self.total_supply();
         let (reserve_a, reserve_b) = self.reserves();
-        let (previous_a, previous_b) = self.previous_reserves(&parcel);
+        let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
         let root_k_last = checked_expr!(previous_a.value.checked_mul(previous_b.value))?.sqrt();
         let root_k = checked_expr!(reserve_a.value.checked_mul(reserve_b.value))?.sqrt();
         if root_k > root_k_last || root_k_last == 0 {
@@ -258,7 +260,7 @@ pub trait AMMPoolBase: MintableToken {
         }
         let transfer = parcel.0[0].clone();
         println!("transfer {:?}", transfer);
-        let (previous_a, previous_b) = self.previous_reserves(&parcel);
+        let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
         println!("previous {:?} {:?}", previous_a, previous_b);
         let (reserve_a, reserve_b) = self.reserves();
         println!("now {:?} {:?}", reserve_a, reserve_b);
