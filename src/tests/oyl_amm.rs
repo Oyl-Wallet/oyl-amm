@@ -1,32 +1,19 @@
-use add_liquidity::{
-    check_add_liquidity_lp_balance, insert_add_liquidity_txs, insert_add_liquidity_txs_w_router,
-};
 use alkanes_support::cellpack::Cellpack;
-use alkanes_support::response::ExtendedCallResponse;
 use alkanes_support::trace::{Trace, TraceEvent};
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::{Block, Witness};
-use common::{get_last_outpoint_sheet, get_sheet_for_outpoint};
-use init_pools::{
-    assert_contracts_correct_ids, calc_lp_balance_from_pool_init, init_block_with_amm_pool,
-    insert_init_pool_liquidity_txs, test_amm_pool_init_fixture,
-};
+use init_pools::{insert_init_pool_liquidity_txs, test_amm_pool_init_fixture};
 use metashrew_support::utils::consume_u128;
 use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations, ProtoruneRuneId};
-use protorune_support::protostone::ProtostoneEdict;
-use remove_liquidity::test_amm_burn_fixture;
-use swap::{check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_router};
+use swap::{check_swap_lp_balance, insert_swap_txs};
 
 use crate::tests::helper::*;
-use crate::tests::std::path_provider_build;
 use alkane_helpers::clear;
 use alkanes::indexer::index_block;
-use alkanes::tests::helpers::{
-    self as alkane_helpers, assert_binary_deployed_to_id, assert_token_id_has_no_deployment,
-};
+use alkanes::tests::helpers::{self as alkane_helpers};
 use alkanes::view;
 use alkanes_support::id::AlkaneId;
 #[allow(unused_imports)]
@@ -34,7 +21,6 @@ use metashrew_core::{get_cache, index_pointer::IndexPointer, println, stdio::std
 use std::fmt::Write;
 use wasm_bindgen_test::wasm_bindgen_test;
 
-use super::helper::add_liquidity::check_add_liquidity_runtime_balance;
 use super::helper::path_provider::create_path_provider_insert_path_block;
 use super::helper::swap::check_swap_runtime_balance;
 
@@ -341,7 +327,7 @@ fn test_amm_pool_swap_oyl() -> Result<()> {
 
     index_block(&swap_oyl_block, 840_004)?;
 
-    check_reserves_amount(100055, 99853, &swap_oyl_block)?;
+    check_reserves_amount(100291, 99853, &swap_oyl_block)?;
 
     Ok(())
 }

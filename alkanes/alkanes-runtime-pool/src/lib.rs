@@ -148,7 +148,7 @@ pub trait AMMPoolBase: MintableToken {
     }
 
     fn pool_details(&self, context: &Context) -> Result<CallResponse> {
-        let (reserve_a, reserve_b) = self.reserves();
+        let (reserve_a, reserve_b) = self.previous_reserves(&context.incoming_alkanes);
         let (token_a, token_b) = self.alkanes_for_self()?;
 
         let pool_info = PoolInfo {
@@ -257,8 +257,11 @@ pub trait AMMPoolBase: MintableToken {
             )));
         }
         let transfer = parcel.0[0].clone();
+        println!("transfer {:?}", transfer);
         let (previous_a, previous_b) = self.previous_reserves(&parcel);
+        println!("previous {:?} {:?}", previous_a, previous_b);
         let (reserve_a, reserve_b) = self.reserves();
+        println!("now {:?} {:?}", reserve_a, reserve_b);
 
         if &transfer.id == &reserve_a.id {
             Ok(AlkaneTransfer {
@@ -289,6 +292,7 @@ pub trait AMMPoolBase: MintableToken {
         amount_out_predicate: u128,
     ) -> Result<CallResponse> {
         let output = self.get_transfer_out_from_swap(parcel, true)?;
+        println!("output from swap: {:?}", output);
         if output.value < amount_out_predicate {
             return Err(anyhow!("predicate failed: insufficient output"));
         }
