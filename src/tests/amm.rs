@@ -7,22 +7,25 @@ use alkanes_support::trace::{Trace, TraceEvent};
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::Witness;
-use common::get_last_outpoint_sheet;
+use common::{get_last_outpoint_sheet, get_sheet_for_outpoint};
 use init_pools::{
-    calc_lp_balance_from_pool_init, init_block_with_amm_pool, insert_init_pool_liquidity_txs,
-    test_amm_pool_init_fixture,
+    assert_contracts_correct_ids, calc_lp_balance_from_pool_init, init_block_with_amm_pool,
+    insert_init_pool_liquidity_txs, test_amm_pool_init_fixture,
 };
 use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
-use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations};
+use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations, ProtoruneRuneId};
 use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
 use swap::{check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_router};
 
 use crate::tests::helper::*;
+use crate::tests::std::path_provider_build;
 use alkane_helpers::clear;
 use alkanes::indexer::index_block;
-use alkanes::tests::helpers::{self as alkane_helpers, assert_token_id_has_no_deployment};
+use alkanes::tests::helpers::{
+    self as alkane_helpers, assert_binary_deployed_to_id, assert_token_id_has_no_deployment,
+};
 use alkanes::view;
 use alkanes_support::id::AlkaneId;
 #[allow(unused_imports)]
@@ -799,8 +802,8 @@ fn test_find_existing_pool_id() -> Result<()> {
                     data[0]
                 );
                 assert_eq!(
-                    data[16], 11,
-                    "Expected second u128 of data to be 11, but got {}",
+                    data[16], 13,
+                    "Expected second u128 of data to be 13, but got {}",
                     data[16]
                 );
             }
@@ -854,7 +857,7 @@ fn test_find_nonexisting_pool_id() -> Result<()> {
 
     common::assert_revert_context(
         &outpoint_3,
-        "ALKANES: revert: wasm `unreachable` instruction executed",
+        "Error: the pool AlkaneId { block: 12, tx: 100 } AlkaneId { block: 13, tx: 101 } doesn't exist in the factory",
     )?;
 
     Ok(())

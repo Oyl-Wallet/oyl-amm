@@ -5,7 +5,11 @@ use alkanes_runtime::{
     stdio::{stdout, Write},
 };
 use alkanes_support::{
-    context::Context, id::AlkaneId, parcel::AlkaneTransfer, response::CallResponse,
+    cellpack::Cellpack,
+    context::Context,
+    id::AlkaneId,
+    parcel::{AlkaneTransfer, AlkaneTransferParcel},
+    response::CallResponse,
 };
 use anyhow::{anyhow, Result};
 use metashrew_support::{
@@ -89,16 +93,65 @@ pub trait AMMFactoryBase {
             Err(anyhow!("already initialized"))
         }
     }
-    fn create_new_pool(&self, context: Context) -> Result<CallResponse>;
+    fn create_new_pool(
+        &self,
+        context: Context,
+        next_sequence: u128,
+    ) -> Result<(Cellpack, AlkaneTransferParcel)> {
+        if context.incoming_alkanes.0.len() != 2 {
+            return Err(anyhow!("must send two runes to initialize a pool"));
+        }
+        let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
+        let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
+        let pool_id = AlkaneId::new(2, next_sequence);
+        // check if this pool already exists
+        if self.pool_pointer(&a, &b).get().len() == 0 {
+            self.pool_pointer(&a, &b).set(Arc::new(pool_id.into()));
+        } else {
+            return Err(anyhow!("pool already exists"));
+        }
 
-    fn find_existing_pool_id(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> AlkaneId {
+        // Add the new pool to the registry
+        let length = self.all_pools_length()?;
+
+        // Store the pool ID at the current index
+        StoragePointer::from_keyword("/all_pools/")
+            .select(&length.to_le_bytes().to_vec())
+            .set(Arc::new(pool_id.into()));
+
+        // Update the length
+        StoragePointer::from_keyword("/all_pools_length")
+            .set(Arc::new((length + 1).to_le_bytes().to_vec()));
+
+        Ok((
+            Cellpack {
+                target: AlkaneId {
+                    block: 6,
+                    tx: self.pool_id()?,
+                },
+                inputs: vec![0, a.block, a.tx, b.block, b.tx],
+            },
+            AlkaneTransferParcel(vec![
+                context.incoming_alkanes.0[0].clone(),
+                context.incoming_alkanes.0[1].clone(),
+            ]),
+        ))
+    }
+
+    fn find_existing_pool_id(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> Result<AlkaneId> {
         let (a, b) = sort_alkanes((alkane_a, alkane_b));
+        if self.pool_pointer(&a, &b).get().len() == 0 {
+            return Err(anyhow!(format!(
+                "the pool {:?} {:?} doesn't exist in the factory",
+                alkane_a, alkane_b
+            )));
+        }
         let mut cursor =
             std::io::Cursor::<Vec<u8>>::new(self.pool_pointer(&a, &b).get().as_ref().clone());
-        AlkaneId::new(
+        Ok(AlkaneId::new(
             consume_sized_int::<u128>(&mut cursor).unwrap(),
             consume_sized_int::<u128>(&mut cursor).unwrap(),
-        )
+        ))
     }
     // Get the total number of pools
     fn all_pools_length(&self) -> Result<u128> {

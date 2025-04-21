@@ -1,4 +1,6 @@
-use crate::tests::std::{factory_build, oyl_pool_build, pool_build, router_build};
+use crate::tests::std::{
+    oyl_factory_build, oyl_pool_build, path_provider_build, pool_build, router_build,
+};
 use alkanes::indexer::index_block;
 use alkanes::precompiled::{alkanes_std_auth_token_build, alkanes_std_owned_token_build};
 use alkanes::tests::helpers::{self as alkane_helpers, assert_binary_deployed_to_id};
@@ -56,7 +58,7 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
         //amm factory
         Cellpack {
             target: AlkaneId { block: 1, tx: 0 },
-            inputs: vec![0, pool_id],
+            inputs: vec![0, pool_id, 2, 11, 2, 10, 2, 8],
         },
         // token 1 init 1 auth token and mint 1000000 owned tokens. Also deploys owned token contract at {2,2}
         Cellpack {
@@ -83,6 +85,11 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
             target: AlkaneId { block: 1, tx: 0 },
             inputs: vec![0, 2, 1],
         },
+        // path provider
+        Cellpack {
+            target: AlkaneId { block: 1, tx: 0 },
+            inputs: vec![0],
+        },
     ]
     .into();
     let test_block = alkane_helpers::init_with_multiple_cellpacks_with_tx(
@@ -90,12 +97,13 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
             pool_build::get_bytes(),
             oyl_pool_build::get_bytes(),
             alkanes_std_auth_token_build::get_bytes(),
-            factory_build::get_bytes(),
+            oyl_factory_build::get_bytes(),
             alkanes_std_owned_token_build::get_bytes(),
             [].into(),
             [].into(),
             [].into(),
             router_build::get_bytes(),
+            path_provider_build::get_bytes(),
         ]
         .into(),
         cellpacks,
@@ -124,8 +132,9 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
         oyl_token_deployment: AlkaneId { block: 2, tx: 8 },
         oyl_auth_token_deployment: AlkaneId { block: 2, tx: 9 },
         amm_router_deployment: AlkaneId { block: 2, tx: 10 },
-        amm_pool_1_deployment: AlkaneId { block: 2, tx: 11 },
-        amm_pool_2_deployment: AlkaneId { block: 2, tx: 12 },
+        amm_path_provider_deployment: AlkaneId { block: 2, tx: 11 },
+        amm_pool_1_deployment: AlkaneId { block: 2, tx: 13 },
+        amm_pool_2_deployment: AlkaneId { block: 2, tx: 14 },
     };
 
     return Ok((test_block, deployed_ids));
@@ -155,7 +164,7 @@ pub fn assert_contracts_correct_ids(
 
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_factory_deployment.clone(),
-        factory_build::get_bytes(),
+        oyl_factory_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
         deployment_ids.owned_token_1_deployment.clone(),
@@ -200,6 +209,10 @@ pub fn assert_contracts_correct_ids(
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_router_deployment.clone(),
         router_build::get_bytes(),
+    );
+    let _ = assert_binary_deployed_to_id(
+        deployment_ids.amm_path_provider_deployment.clone(),
+        path_provider_build::get_bytes(),
     );
     Ok(())
 }

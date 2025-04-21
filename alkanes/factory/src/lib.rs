@@ -52,7 +52,9 @@ impl AMMFactory {
 
     pub fn create_new_pool(&self) -> Result<CallResponse> {
         let context = self.context()?;
-        AMMFactoryBase::create_new_pool(self, context)
+        let (cellpack, parcel) = AMMFactoryBase::create_new_pool(self, context, self.sequence())?;
+
+        self.call(&cellpack, &parcel, self.fuel())
     }
 
     pub fn find_existing_pool_id(
@@ -62,7 +64,7 @@ impl AMMFactory {
     ) -> Result<CallResponse> {
         let context = self.context()?;
         let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
-        response.data = AMMFactoryBase::find_existing_pool_id(self, alkane_a, alkane_b).into();
+        response.data = AMMFactoryBase::find_existing_pool_id(self, alkane_a, alkane_b)?.into();
         Ok(response)
     }
 
@@ -81,50 +83,7 @@ impl AMMFactory {
     }
 }
 
-impl AMMFactoryBase for AMMFactory {
-    fn create_new_pool(&self, context: Context) -> Result<CallResponse> {
-        if context.incoming_alkanes.0.len() != 2 {
-            return Err(anyhow!("must send two runes to initialize a pool"));
-        }
-        let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
-        let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
-        let next_sequence = self.sequence();
-        let pool_id = AlkaneId::new(2, next_sequence);
-        // check if this pool already exists
-        if self.pool_pointer(&a, &b).get().len() == 0 {
-            self.pool_pointer(&a, &b).set(Arc::new(pool_id.into()));
-        } else {
-            return Err(anyhow!("pool already exists"));
-        }
-
-        // Add the new pool to the registry
-        let length = self.all_pools_length()?;
-
-        // Store the pool ID at the current index
-        StoragePointer::from_keyword("/all_pools/")
-            .select(&length.to_le_bytes().to_vec())
-            .set(Arc::new(pool_id.into()));
-
-        // Update the length
-        StoragePointer::from_keyword("/all_pools_length")
-            .set(Arc::new((length + 1).to_le_bytes().to_vec()));
-
-        self.call(
-            &Cellpack {
-                target: AlkaneId {
-                    block: 6,
-                    tx: self.pool_id()?,
-                },
-                inputs: vec![0, a.block, a.tx, b.block, b.tx],
-            },
-            &AlkaneTransferParcel(vec![
-                context.incoming_alkanes.0[0].clone(),
-                context.incoming_alkanes.0[1].clone(),
-            ]),
-            self.fuel(),
-        )
-    }
-}
+impl AMMFactoryBase for AMMFactory {}
 
 impl AlkaneResponder for AMMFactory {
     fn execute(&self) -> Result<CallResponse> {

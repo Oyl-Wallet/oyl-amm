@@ -129,26 +129,28 @@ pub trait AMMPoolBase: MintableToken {
         }
     }
     fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer);
-    fn previous_reserves(&self, parcel: &AlkaneTransferParcel) -> (AlkaneTransfer, AlkaneTransfer) {
+    fn previous_reserves(
+        &self,
+        parcel: &AlkaneTransferParcel,
+    ) -> Result<(AlkaneTransfer, AlkaneTransfer)> {
         let (reserve_a, reserve_b) = self.reserves();
-        let mut reserve_sheet: CachedBalanceSheet =
-            AlkaneTransferParcel(vec![reserve_a.clone(), reserve_b.clone()]).into();
         let incoming_sheet: CachedBalanceSheet = parcel.clone().into();
-        reserve_sheet.debit(&incoming_sheet).unwrap();
-        (
+        Ok((
             AlkaneTransfer {
                 id: reserve_a.id.clone(),
-                value: reserve_sheet.get(&reserve_a.id.clone().into()),
+                value: reserve_a.value - incoming_sheet.get(&reserve_a.id.into()),
             },
             AlkaneTransfer {
                 id: reserve_b.id.clone(),
-                value: reserve_sheet.get(&reserve_b.id.clone().into()),
+                value: reserve_b.value - incoming_sheet.get(&reserve_b.id.into()),
             },
-        )
+        ))
     }
 
-    fn pool_details(&self) -> Result<CallResponse> {
-        let (reserve_a, reserve_b) = self.reserves();
+    fn pool_details(&self, context: &Context) -> Result<CallResponse> {
+        println!("in pool details");
+        let (reserve_a, reserve_b) = self.previous_reserves(&context.incoming_alkanes)?;
+        println!("after previous reserves");
         let (token_a, token_b) = self.alkanes_for_self()?;
 
         let pool_info = PoolInfo {
@@ -160,7 +162,7 @@ pub trait AMMPoolBase: MintableToken {
             pool_name: self.name(),
         };
 
-        let mut response = CallResponse::default();
+        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
         response.data = pool_info.try_to_vec();
 
         Ok(response)
@@ -174,7 +176,7 @@ pub trait AMMPoolBase: MintableToken {
         self.check_inputs(&myself, &parcel, 2)?;
         let mut total_supply = self.total_supply();
         let (reserve_a, reserve_b) = self.reserves();
-        let (previous_a, previous_b) = self.previous_reserves(&parcel);
+        let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
         let root_k_last = checked_expr!(previous_a.value.checked_mul(previous_b.value))?.sqrt();
         let root_k = checked_expr!(reserve_a.value.checked_mul(reserve_b.value))?.sqrt();
         if root_k > root_k_last || root_k_last == 0 {
@@ -228,18 +230,28 @@ pub trait AMMPoolBase: MintableToken {
         ]);
         Ok(response)
     }
-    fn get_amount_out(&self, amount: u128, reserve_from: u128, reserve_to: u128) -> Result<u128> {
-        let amount_in_with_fee =
-            U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(amount);
+    fn get_amount_out(
+        &self,
+        amount: u128,
+        reserve_from: u128,
+        reserve_to: u128,
+        use_fees: bool,
+    ) -> Result<u128> {
+        let amount_in_with_fee = if use_fees {
+            U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(amount)
+        } else {
+            U256::from(1000) * U256::from(amount)
+        };
+
         let numerator = amount_in_with_fee * U256::from(reserve_to);
         let denominator = U256::from(1000) * U256::from(reserve_from) + amount_in_with_fee;
         Ok((numerator / denominator).try_into()?)
     }
-    fn swap(
+    fn get_transfer_out_from_swap(
         &self,
         parcel: AlkaneTransferParcel,
-        amount_out_predicate: u128,
-    ) -> Result<CallResponse> {
+        use_fees: bool,
+    ) -> Result<AlkaneTransfer> {
         if parcel.0.len() != 1 {
             return Err(anyhow!(format!(
                 "payload can only include 1 alkane, sent {}",
@@ -247,20 +259,42 @@ pub trait AMMPoolBase: MintableToken {
             )));
         }
         let transfer = parcel.0[0].clone();
-        let (previous_a, previous_b) = self.previous_reserves(&parcel);
+        println!("transfer {:?}", transfer);
+        let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
+        println!("previous {:?} {:?}", previous_a, previous_b);
         let (reserve_a, reserve_b) = self.reserves();
+        println!("now {:?} {:?}", reserve_a, reserve_b);
 
-        let output = if &transfer.id == &reserve_a.id {
-            AlkaneTransfer {
+        if &transfer.id == &reserve_a.id {
+            Ok(AlkaneTransfer {
                 id: reserve_b.id,
-                value: self.get_amount_out(transfer.value, previous_a.value, previous_b.value)?,
-            }
+                value: self.get_amount_out(
+                    transfer.value,
+                    previous_a.value,
+                    previous_b.value,
+                    use_fees,
+                )?,
+            })
         } else {
-            AlkaneTransfer {
+            Ok(AlkaneTransfer {
                 id: reserve_a.id,
-                value: self.get_amount_out(transfer.value, previous_b.value, previous_a.value)?,
-            }
-        };
+                value: self.get_amount_out(
+                    transfer.value,
+                    previous_b.value,
+                    previous_a.value,
+                    use_fees,
+                )?,
+            })
+        }
+    }
+
+    fn swap(
+        &self,
+        parcel: AlkaneTransferParcel,
+        amount_out_predicate: u128,
+    ) -> Result<CallResponse> {
+        let output = self.get_transfer_out_from_swap(parcel, true)?;
+        println!("output from swap: {:?}", output);
         if output.value < amount_out_predicate {
             return Err(anyhow!("predicate failed: insufficient output"));
         }

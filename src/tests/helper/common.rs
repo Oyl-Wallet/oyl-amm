@@ -40,6 +40,7 @@ pub struct AmmTestDeploymentIds {
     pub amm_pool_1_deployment: AlkaneId,
     pub amm_pool_2_deployment: AlkaneId,
     pub amm_router_deployment: AlkaneId,
+    pub amm_path_provider_deployment: AlkaneId,
 }
 
 pub enum CellpackOrEdict {
@@ -85,7 +86,7 @@ pub fn insert_split_tx(
     test_block.txdata.push(split);
 }
 
-fn get_sheet_for_outpoint(
+pub fn get_sheet_for_outpoint(
     test_block: &Block,
     tx_num: usize,
     vout: u32,

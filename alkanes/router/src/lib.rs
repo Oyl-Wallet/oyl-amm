@@ -136,6 +136,11 @@ impl AMMRouter {
         if path.len() < 2 {
             return Err(anyhow!("Routing path must be at least two alkanes long"));
         }
+        if path[0] != context.incoming_alkanes.0[0].id {
+            return Err(anyhow!(
+                "Routing path first element must be the input token"
+            ));
+        }
         let mut this_response = CallResponse {
             alkanes: context.incoming_alkanes.clone(),
             data: vec![],
@@ -149,7 +154,6 @@ impl AMMRouter {
                 inputs: vec![3, this_amount],
             };
             this_response = self.call(&cellpack, &this_response.alkanes, self.fuel())?;
-            println!("This response for pair {}: {:?}", i, this_response);
         }
 
         Ok(this_response)
