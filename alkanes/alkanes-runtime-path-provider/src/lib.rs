@@ -64,18 +64,4 @@ pub trait AMMPathProviderBase: AuthenticatedResponder {
         self.path(&alkane_a, &alkane_b).set(Arc::from(data));
         Ok(())
     }
-
-    fn find_optimal_path(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> Vec<AlkaneId> {
-        let mut cursor =
-            std::io::Cursor::<Vec<u8>>::new(self.path(&alkane_a, &alkane_b).get().as_ref().clone());
-        let mut result: Vec<AlkaneId> = Vec::new();
-        //merge the 2 results into one
-        while let (Ok(block), Ok(tx)) = (
-            consume_sized_int::<u128>(&mut cursor),
-            consume_sized_int::<u128>(&mut cursor),
-        ) {
-            result.push(AlkaneId { block, tx })
-        }
-        result
-    }
 }

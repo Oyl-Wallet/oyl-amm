@@ -149,14 +149,10 @@ impl OylAMMPool {
         AMMPoolBase::burn(self, context.myself, context.incoming_alkanes)
     }
 
-    pub fn swap(&self, amount_out_predicate: u128) -> Result<CallResponse> {
+    fn _handle_oyl_swap_and_burn(&self, alkane_out_with_fees: AlkaneTransfer) -> Result<()> {
         let context = self.context()?;
-        let alkane_out_with_fees =
-            self.get_transfer_out_from_swap(context.incoming_alkanes.clone(), true)?;
         let alkane_out_no_fees =
             self.get_transfer_out_from_swap(context.incoming_alkanes.clone(), false)?;
-
-        let response = AMMPoolBase::swap(self, context.incoming_alkanes, amount_out_predicate)?;
 
         let factory = OylAMMPool::factory()?;
         let amount_to_burn = (alkane_out_no_fees.value - alkane_out_with_fees.value)
@@ -176,6 +172,16 @@ impl OylAMMPool {
                 self.fuel(),
             )?;
         }
+        Ok(())
+    }
+
+    pub fn swap(&self, amount_out_predicate: u128) -> Result<CallResponse> {
+        let context = self.context()?;
+
+        let response =
+            AMMPoolBase::swap(self, context.incoming_alkanes.clone(), amount_out_predicate)?;
+
+        self._handle_oyl_swap_and_burn(response.alkanes.0[0])?;
 
         Ok(response)
     }

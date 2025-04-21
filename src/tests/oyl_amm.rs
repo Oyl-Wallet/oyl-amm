@@ -220,7 +220,7 @@ fn check_reserves_amount(
 }
 
 #[wasm_bindgen_test]
-fn test_amm_pool_swap_oyl() -> Result<()> {
+fn test_amm_pool_swap_should_burn_oyl() -> Result<()> {
     clear();
     let (amount1, amount2) = (100000, 100000);
     let invariant = amount1 * amount2;
