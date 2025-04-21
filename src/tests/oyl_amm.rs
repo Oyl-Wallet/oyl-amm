@@ -147,7 +147,44 @@ fn test_amm_pool_swap_small_no_fee_burn() -> Result<()> {
     Ok(())
 }
 
-fn check_reserves_amount(amount1: u128, amount2: u128, check_block: &Block) -> Result<()> {
+fn assert_approximately_equal(a: u128, b: u128) {
+    let max = a.max(b);
+    let min = a.min(b);
+    let diff = max - min;
+    let threshold = max / 200; // 0.5% of the larger value
+
+    assert!(
+        diff <= threshold,
+        "Values are not within 0.5%: a = {}, b = {}, diff = {}, threshold = {}",
+        a,
+        b,
+        diff,
+        threshold
+    );
+}
+
+fn check_reserves_amount(
+    amount1: u128,
+    amount2: u128,
+    invariant: u128,
+    target_pool: AlkaneId,
+    previous_outpoint: OutPoint,
+) -> Result<Block> {
+    assert_approximately_equal(amount1 * amount2, invariant);
+    let mut check_block = protorune::test_helpers::create_block_with_coinbase_tx(840_003);
+    check_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: target_pool,
+                inputs: vec![999],
+            }],
+            previous_outpoint,
+            false,
+        ),
+    );
+
+    index_block(&check_block, 840_003)?;
     // Get the outpoint for the get path transaction
     let outpoint = OutPoint {
         txid: check_block.txdata[check_block.txdata.len() - 1].compute_txid(),
@@ -179,13 +216,14 @@ fn check_reserves_amount(amount1: u128, amount2: u128, check_block: &Block) -> R
     } else {
         panic!("Failed to get last_trace_event from trace data");
     }
-    Ok(())
+    Ok(check_block)
 }
 
 #[wasm_bindgen_test]
 fn test_amm_pool_swap_oyl() -> Result<()> {
     clear();
     let (amount1, amount2) = (100000, 100000);
+    let invariant = amount1 * amount2;
     let (init_block, deployment_ids, mut runtime_balances) =
         test_amm_pool_init_fixture(amount1, amount2, true)?;
 
@@ -264,26 +302,12 @@ fn test_amm_pool_swap_oyl() -> Result<()> {
     )?;
 
     let oyl_token2_pool = AlkaneId { block: 2, tx: 15 };
-
-    let mut check_block = protorune::test_helpers::create_block_with_coinbase_tx(840_003);
-    check_block.txdata.push(
-        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
-            Witness::new(),
-            vec![Cellpack {
-                target: oyl_token2_pool,
-                inputs: vec![999],
-            }],
-            OutPoint {
-                txid: swap_block.txdata.last().unwrap().compute_txid(),
-                vout: 0,
-            },
-            false,
-        ),
-    );
-
-    index_block(&check_block, 840_003)?;
-
-    check_reserves_amount(100055, 99946, &check_block)?;
+    previous_outpoint = OutPoint {
+        txid: swap_block.txdata.last().unwrap().compute_txid(),
+        vout: 0,
+    };
+    let check_block =
+        check_reserves_amount(100055, 99946, invariant, oyl_token2_pool, previous_outpoint)?;
 
     // swap some from oyl pool to ensure no infinite loop occurs
     let mut swap_oyl_block = protorune::test_helpers::create_block_with_coinbase_tx(840_004);
@@ -310,24 +334,20 @@ fn test_amm_pool_swap_oyl() -> Result<()> {
         last_outpoint,
         oyl_token2_pool,
     );
-    swap_oyl_block.txdata.push(
-        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
-            Witness::new(),
-            vec![Cellpack {
-                target: oyl_token2_pool,
-                inputs: vec![999],
-            }],
-            OutPoint {
-                txid: swap_oyl_block.txdata.last().unwrap().compute_txid(),
-                vout: 0,
-            },
-            false,
-        ),
-    );
 
     index_block(&swap_oyl_block, 840_004)?;
 
-    check_reserves_amount(100291, 99853, &swap_oyl_block)?;
+    previous_outpoint = OutPoint {
+        txid: swap_oyl_block.txdata.last().unwrap().compute_txid(),
+        vout: 0,
+    };
+    check_reserves_amount(
+        100291,
+        99853,
+        100055 * 99946,
+        oyl_token2_pool,
+        previous_outpoint,
+    )?;
 
     Ok(())
 }
