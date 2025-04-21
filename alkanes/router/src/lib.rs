@@ -8,18 +8,11 @@ use alkanes_runtime::{
     stdio::{stdout, Write},
 };
 use alkanes_support::{
-    cellpack::Cellpack,
-    context::Context,
-    id::AlkaneId,
-    parcel::AlkaneTransferParcel,
-    response::CallResponse,
-    utils::{shift_id_or_err, shift_or_err},
+    cellpack::Cellpack, id::AlkaneId, parcel::AlkaneTransferParcel, response::CallResponse,
 };
 use anyhow::{anyhow, Result};
 use metashrew_support::{
-    compat::{to_arraybuffer_layout, to_passback_ptr},
-    index_pointer::KeyValuePointer,
-    utils::consume_u128,
+    compat::to_arraybuffer_layout, index_pointer::KeyValuePointer, utils::consume_u128,
 };
 use std::sync::Arc;
 
@@ -165,16 +158,7 @@ impl AMMRouter {
     }
 }
 
-impl AlkaneResponder for AMMRouter {
-    fn execute(&self) -> Result<CallResponse> {
-        // The opcode extraction and dispatch logic is now handled by the declare_alkane macro
-        // This method is still required by the AlkaneResponder trait, but we can just return an error
-        // indicating that it should not be called directly
-        Err(anyhow!(
-            "This method should not be called directly. Use the declare_alkane macro instead."
-        ))
-    }
-}
+impl AlkaneResponder for AMMRouter {}
 
 declare_alkane! {
     impl AlkaneResponder for AMMRouter {

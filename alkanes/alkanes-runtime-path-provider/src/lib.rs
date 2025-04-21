@@ -15,17 +15,12 @@ use std::sync::Arc;
 
 pub trait AMMPathProviderBase: AuthenticatedResponder {
     fn init_path_provider(&self) -> Result<CallResponse> {
+        self.observe_initialization()?;
         let context = self.context()?;
-        let mut pointer = StoragePointer::from_keyword("/initialized");
-        if pointer.get().len() == 0 {
-            pointer.set(Arc::new(vec![0x01]));
-            let auth_token = self.deploy_auth_token(1u128)?;
-            let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
-            response.alkanes.pay(auth_token);
-            Ok(response)
-        } else {
-            Err(anyhow!("already initialized"))
-        }
+        let auth_token = self.deploy_auth_token(1u128)?;
+        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
+        response.alkanes.pay(auth_token);
+        Ok(response)
     }
 
     fn path(&self, alkane_a: &AlkaneId, alkane_b: &AlkaneId) -> StoragePointer {
