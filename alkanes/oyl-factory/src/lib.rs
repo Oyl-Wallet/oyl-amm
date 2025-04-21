@@ -8,10 +8,9 @@ use alkanes_runtime::{
     println,
     stdio::{stdout, Write},
 };
-use alkanes_runtime_factory::{sort_alkanes, take_two, AMMFactoryBase};
+use alkanes_runtime_factory::AMMFactoryBase;
 use alkanes_support::{
     cellpack::Cellpack,
-    context::Context,
     id::AlkaneId,
     parcel::{AlkaneTransfer, AlkaneTransferParcel},
     response::CallResponse,
@@ -114,8 +113,7 @@ impl OylAMMFactory {
         router_id: AlkaneId,
         oyl_token_id: AlkaneId,
     ) -> Result<CallResponse> {
-        let context = self.context()?;
-        let response = AMMFactoryBase::init_factory(self, pool_factory_id, context)?;
+        let response = AMMFactoryBase::init_factory(self, pool_factory_id)?;
         OylAMMFactory::set_path_provider(path_provider_id);
         OylAMMFactory::set_router(router_id);
         OylAMMFactory::set_oyl_token(oyl_token_id);
@@ -124,35 +122,9 @@ impl OylAMMFactory {
 
     pub fn create_new_pool(&self) -> Result<CallResponse> {
         let context = self.context()?;
-        let (mut cellpack, parcel) =
-            AMMFactoryBase::create_new_pool(self, context.clone(), self.sequence())?;
+        let (mut cellpack, parcel) = AMMFactoryBase::create_new_pool(self)?;
         cellpack.inputs.append(&mut context.clone().myself.into());
         self.call(&cellpack, &parcel, self.fuel())
-    }
-
-    pub fn find_existing_pool_id(
-        &self,
-        alkane_a: AlkaneId,
-        alkane_b: AlkaneId,
-    ) -> Result<CallResponse> {
-        let context = self.context()?;
-        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
-        response.data = AMMFactoryBase::find_existing_pool_id(self, alkane_a, alkane_b)?.into();
-        Ok(response)
-    }
-
-    pub fn get_all_pools(&self) -> Result<CallResponse> {
-        let context = self.context()?;
-        AMMFactoryBase::get_all_pools(self, context)
-    }
-
-    pub fn get_num_pools(&self) -> Result<CallResponse> {
-        let context = self.context()?;
-        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
-        response.data = AMMFactoryBase::all_pools_length(self)?
-            .to_le_bytes()
-            .to_vec();
-        Ok(response)
     }
 
     pub fn get_path_provider(&self) -> Result<CallResponse> {

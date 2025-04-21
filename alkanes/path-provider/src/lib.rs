@@ -36,12 +36,6 @@ impl AuthenticatedResponder for AMMPathProvider {}
 impl AMMPathProviderBase for AMMPathProvider {}
 
 impl AMMPathProvider {
-    // External facing methods that implement the AMMFactoryMessage interface
-    pub fn init_path_provider(&self) -> Result<CallResponse> {
-        let context = self.context()?;
-        AMMPathProviderBase::init_path_provider(self, context)
-    }
-
     pub fn get_optimal_path(&self, start: AlkaneId, end: AlkaneId) -> Result<CallResponse> {
         let context = self.context()?;
         let data: Vec<u8> = AMMPathProviderBase::path_bytes(self, &start, &end);

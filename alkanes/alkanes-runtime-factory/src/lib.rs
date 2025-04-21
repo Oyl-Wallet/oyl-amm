@@ -1,9 +1,9 @@
-use alkanes_runtime::storage::StoragePointer;
 #[allow(unused_imports)]
 use alkanes_runtime::{
     println,
     stdio::{stdout, Write},
 };
+use alkanes_runtime::{runtime::AlkaneResponder, storage::StoragePointer};
 use alkanes_support::{
     cellpack::Cellpack,
     context::Context,
@@ -42,7 +42,7 @@ pub fn join_ids_from_tuple(v: (AlkaneId, AlkaneId)) -> Vec<u8> {
     join_ids(v.0, v.1)
 }
 
-pub trait AMMFactoryBase {
+pub trait AMMFactoryBase: AlkaneResponder {
     fn pool_id(&self) -> Result<u128> {
         let ptr = StoragePointer::from_keyword("/pool_factory_id")
             .get()
@@ -81,7 +81,8 @@ pub trait AMMFactoryBase {
             ))
         }
     }
-    fn init_factory(&self, pool_factory_id: u128, context: Context) -> Result<CallResponse> {
+    fn init_factory(&self, pool_factory_id: u128) -> Result<CallResponse> {
+        let context = self.context()?;
         let mut pointer = StoragePointer::from_keyword("/initialized");
         let mut pool_factory_id_pointer = StoragePointer::from_keyword("/pool_factory_id");
         if pointer.get().len() == 0 {
@@ -93,17 +94,14 @@ pub trait AMMFactoryBase {
             Err(anyhow!("already initialized"))
         }
     }
-    fn create_new_pool(
-        &self,
-        context: Context,
-        next_sequence: u128,
-    ) -> Result<(Cellpack, AlkaneTransferParcel)> {
+    fn create_new_pool(&self) -> Result<(Cellpack, AlkaneTransferParcel)> {
+        let context = self.context()?;
         if context.incoming_alkanes.0.len() != 2 {
             return Err(anyhow!("must send two runes to initialize a pool"));
         }
         let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
         let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
-        let pool_id = AlkaneId::new(2, next_sequence);
+        let pool_id = AlkaneId::new(2, self.sequence());
         // check if this pool already exists
         if self.pool_pointer(&a, &b).get().len() == 0 {
             self.pool_pointer(&a, &b).set(Arc::new(pool_id.into()));
@@ -138,7 +136,13 @@ pub trait AMMFactoryBase {
         ))
     }
 
-    fn find_existing_pool_id(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> Result<AlkaneId> {
+    fn find_existing_pool_id(
+        &self,
+        alkane_a: AlkaneId,
+        alkane_b: AlkaneId,
+    ) -> Result<CallResponse> {
+        let context = self.context()?;
+        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
         let (a, b) = sort_alkanes((alkane_a, alkane_b));
         if self.pool_pointer(&a, &b).get().len() == 0 {
             return Err(anyhow!(format!(
@@ -148,10 +152,12 @@ pub trait AMMFactoryBase {
         }
         let mut cursor =
             std::io::Cursor::<Vec<u8>>::new(self.pool_pointer(&a, &b).get().as_ref().clone());
-        Ok(AlkaneId::new(
+        response.data = AlkaneId::new(
             consume_sized_int::<u128>(&mut cursor).unwrap(),
             consume_sized_int::<u128>(&mut cursor).unwrap(),
-        ))
+        )
+        .into();
+        Ok(response)
     }
     // Get the total number of pools
     fn all_pools_length(&self) -> Result<u128> {
@@ -188,7 +194,8 @@ pub trait AMMFactoryBase {
     }
 
     // Get all pools (returns a list of pool IDs)
-    fn get_all_pools(&self, context: Context) -> Result<CallResponse> {
+    fn get_all_pools(&self) -> Result<CallResponse> {
+        let context = self.context()?;
         let length = self.all_pools_length()?;
         let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
         let mut all_pools_data = Vec::new();
@@ -209,6 +216,14 @@ pub trait AMMFactoryBase {
         }
 
         response.data = all_pools_data;
+        Ok(response)
+    }
+    fn get_num_pools(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
+        response.data = AMMFactoryBase::all_pools_length(self)?
+            .to_le_bytes()
+            .to_vec();
         Ok(response)
     }
 }

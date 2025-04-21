@@ -1,20 +1,13 @@
-use std::sync::Arc;
-
-use alkanes_runtime::{
-    declare_alkane, message::MessageDispatch, runtime::AlkaneResponder, storage::StoragePointer,
-};
+use alkanes_runtime::{declare_alkane, message::MessageDispatch, runtime::AlkaneResponder};
 #[allow(unused_imports)]
 use alkanes_runtime::{
     println,
     stdio::{stdout, Write},
 };
-use alkanes_runtime_factory::{sort_alkanes, take_two, AMMFactoryBase};
-use alkanes_support::{
-    cellpack::Cellpack, context::Context, id::AlkaneId, parcel::AlkaneTransferParcel,
-    response::CallResponse,
-};
+use alkanes_runtime_factory::AMMFactoryBase;
+use alkanes_support::{id::AlkaneId, response::CallResponse};
 use anyhow::{anyhow, Result};
-use metashrew_support::{compat::to_arraybuffer_layout, index_pointer::KeyValuePointer};
+use metashrew_support::compat::to_arraybuffer_layout;
 
 #[derive(MessageDispatch)]
 pub enum AMMFactoryMessage {
@@ -44,42 +37,9 @@ pub enum AMMFactoryMessage {
 pub struct AMMFactory();
 
 impl AMMFactory {
-    // External facing methods that implement the AMMFactoryMessage interface
-    pub fn init_factory(&self, pool_factory_id: u128) -> Result<CallResponse> {
-        let context = self.context()?;
-        AMMFactoryBase::init_factory(self, pool_factory_id, context)
-    }
-
     pub fn create_new_pool(&self) -> Result<CallResponse> {
-        let context = self.context()?;
-        let (cellpack, parcel) = AMMFactoryBase::create_new_pool(self, context, self.sequence())?;
-
+        let (cellpack, parcel) = AMMFactoryBase::create_new_pool(self)?;
         self.call(&cellpack, &parcel, self.fuel())
-    }
-
-    pub fn find_existing_pool_id(
-        &self,
-        alkane_a: AlkaneId,
-        alkane_b: AlkaneId,
-    ) -> Result<CallResponse> {
-        let context = self.context()?;
-        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
-        response.data = AMMFactoryBase::find_existing_pool_id(self, alkane_a, alkane_b)?.into();
-        Ok(response)
-    }
-
-    pub fn get_all_pools(&self) -> Result<CallResponse> {
-        let context = self.context()?;
-        AMMFactoryBase::get_all_pools(self, context)
-    }
-
-    pub fn get_num_pools(&self) -> Result<CallResponse> {
-        let context = self.context()?;
-        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
-        response.data = AMMFactoryBase::all_pools_length(self)?
-            .to_le_bytes()
-            .to_vec();
-        Ok(response)
     }
 }
 

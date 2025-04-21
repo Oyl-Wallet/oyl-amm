@@ -72,19 +72,15 @@ impl PoolInfo {
     }
 }
 
-pub trait AMMPoolBase: MintableToken {
-    fn init_pool(
-        &self,
-        alkane_a: AlkaneId,
-        alkane_b: AlkaneId,
-        context: Context,
-    ) -> Result<CallResponse> {
+pub trait AMMPoolBase: MintableToken + AlkaneResponder {
+    fn init_pool(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> Result<CallResponse> {
         let mut pointer = StoragePointer::from_keyword("/initialized");
         if pointer.get().len() == 0 {
             pointer.set(Arc::new(vec![0x01]));
             StoragePointer::from_keyword("/alkane/0").set(Arc::new(alkane_a.into()));
             StoragePointer::from_keyword("/alkane/1").set(Arc::new(alkane_b.into()));
-            self.add_liquidity(context.myself, context.incoming_alkanes)
+            let _ = self.set_pool_name_and_symbol();
+            self.add_liquidity()
         } else {
             Err(anyhow!("already initialized"))
         }
@@ -128,7 +124,71 @@ pub trait AMMPoolBase: MintableToken {
             }
         }
     }
-    fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer);
+
+    fn set_pool_name_and_symbol(&self) -> Result<()> {
+        let (alkane_a, alkane_b) = self.alkanes_for_self()?;
+
+        // Get name for alkane_a
+        let name_a = match self.call(
+            &Cellpack {
+                target: alkane_a,
+                inputs: vec![99],
+            },
+            &AlkaneTransferParcel(vec![]),
+            self.fuel(),
+        ) {
+            Ok(response) => {
+                if response.data.is_empty() {
+                    format!("{},{}", alkane_a.block, alkane_a.tx)
+                } else {
+                    String::from_utf8_lossy(&response.data).to_string()
+                }
+            }
+            Err(_) => format!("{},{}", alkane_a.block, alkane_a.tx),
+        };
+
+        // Get name for alkane_b
+        let name_b = match self.call(
+            &Cellpack {
+                target: alkane_b,
+                inputs: vec![99],
+            },
+            &AlkaneTransferParcel(vec![]),
+            self.fuel(),
+        ) {
+            Ok(response) => {
+                if response.data.is_empty() {
+                    format!("{},{}", alkane_b.block, alkane_b.tx)
+                } else {
+                    String::from_utf8_lossy(&response.data).to_string()
+                }
+            }
+            Err(_) => format!("{},{}", alkane_b.block, alkane_b.tx),
+        };
+
+        // Format the pool name
+        let pool_name = format!("{} / {} LP", name_a, name_b);
+
+        // Set the name using MintableToken trait
+        MintableToken::name_pointer(self).set(Arc::new(pool_name.into_bytes()));
+
+        Ok(())
+    }
+
+    fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
+        let (a, b) = self.alkanes_for_self().unwrap();
+        let context = self.context().unwrap();
+        (
+            AlkaneTransfer {
+                id: a,
+                value: self.balance(&context.myself, &a),
+            },
+            AlkaneTransfer {
+                id: b,
+                value: self.balance(&context.myself, &b),
+            },
+        )
+    }
     fn previous_reserves(
         &self,
         parcel: &AlkaneTransferParcel,
@@ -147,32 +207,10 @@ pub trait AMMPoolBase: MintableToken {
         ))
     }
 
-    fn pool_details(&self, context: &Context) -> Result<CallResponse> {
-        println!("in pool details");
-        let (reserve_a, reserve_b) = self.previous_reserves(&context.incoming_alkanes)?;
-        println!("after previous reserves");
-        let (token_a, token_b) = self.alkanes_for_self()?;
-
-        let pool_info = PoolInfo {
-            token_a,
-            token_b,
-            reserve_a: reserve_a.value,
-            reserve_b: reserve_b.value,
-            total_supply: self.total_supply(),
-            pool_name: self.name(),
-        };
-
-        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
-        response.data = pool_info.try_to_vec();
-
-        Ok(response)
-    }
-
-    fn add_liquidity(
-        &self,
-        myself: AlkaneId,
-        parcel: AlkaneTransferParcel,
-    ) -> Result<CallResponse> {
+    fn add_liquidity(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        let myself = context.myself;
+        let parcel = context.incoming_alkanes;
         self.check_inputs(&myself, &parcel, 2)?;
         let mut total_supply = self.total_supply();
         let (reserve_a, reserve_b) = self.reserves();
@@ -202,7 +240,10 @@ pub trait AMMPoolBase: MintableToken {
             Err(anyhow!("root k is less than previous root k"))
         }
     }
-    fn burn(&self, myself: AlkaneId, parcel: AlkaneTransferParcel) -> Result<CallResponse> {
+    fn burn(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        let myself = context.myself;
+        let parcel = context.incoming_alkanes;
         self.check_inputs(&myself, &parcel, 1)?;
         let incoming = parcel.0[0].clone();
         if incoming.id != myself {
@@ -288,11 +329,9 @@ pub trait AMMPoolBase: MintableToken {
         }
     }
 
-    fn swap(
-        &self,
-        parcel: AlkaneTransferParcel,
-        amount_out_predicate: u128,
-    ) -> Result<CallResponse> {
+    fn swap(&self, amount_out_predicate: u128) -> Result<CallResponse> {
+        let context = self.context()?;
+        let parcel: AlkaneTransferParcel = context.incoming_alkanes;
         let output = self.get_transfer_out_from_swap(parcel, true)?;
         println!("output from swap: {:?}", output);
         if output.value < amount_out_predicate {
@@ -300,6 +339,40 @@ pub trait AMMPoolBase: MintableToken {
         }
         let mut response = CallResponse::default();
         response.alkanes = AlkaneTransferParcel(vec![output]);
+        Ok(response)
+    }
+
+    fn forward_incoming(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        Ok(CallResponse::forward(&context.incoming_alkanes))
+    }
+
+    fn get_name(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        let mut response = CallResponse::forward(&context.incoming_alkanes);
+        response.data = self.name().into_bytes().to_vec();
+        Ok(response)
+    }
+
+    fn pool_details(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        println!("in pool details");
+        let (reserve_a, reserve_b) = self.previous_reserves(&context.incoming_alkanes)?;
+        println!("after previous reserves");
+        let (token_a, token_b) = self.alkanes_for_self()?;
+
+        let pool_info = PoolInfo {
+            token_a,
+            token_b,
+            reserve_a: reserve_a.value,
+            reserve_b: reserve_b.value,
+            total_supply: self.total_supply(),
+            pool_name: self.name(),
+        };
+
+        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
+        response.data = pool_info.try_to_vec();
+
         Ok(response)
     }
     fn pull_ids(&self, v: &mut Vec<u128>) -> Option<(AlkaneId, AlkaneId)> {
@@ -313,22 +386,5 @@ pub trait AMMPoolBase: MintableToken {
         self.pull_ids(v)
             .ok_or("")
             .map_err(|_| anyhow!("AlkaneId values for pair missing from list"))
-    }
-}
-
-pub trait AMMReserves: AlkaneResponder + AMMPoolBase {
-    fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
-        let (a, b) = self.alkanes_for_self().unwrap();
-        let context = self.context().unwrap();
-        (
-            AlkaneTransfer {
-                id: a,
-                value: self.balance(&context.myself, &a),
-            },
-            AlkaneTransfer {
-                id: b,
-                value: self.balance(&context.myself, &b),
-            },
-        )
     }
 }

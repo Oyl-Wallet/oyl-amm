@@ -14,7 +14,8 @@ use metashrew_support::{
 use std::sync::Arc;
 
 pub trait AMMPathProviderBase: AuthenticatedResponder {
-    fn init_path_provider(&self, context: Context) -> Result<CallResponse> {
+    fn init_path_provider(&self) -> Result<CallResponse> {
+        let context = self.context()?;
         let mut pointer = StoragePointer::from_keyword("/initialized");
         if pointer.get().len() == 0 {
             pointer.set(Arc::new(vec![0x01]));
