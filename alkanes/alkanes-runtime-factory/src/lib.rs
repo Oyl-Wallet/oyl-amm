@@ -1,9 +1,9 @@
+use alkanes_runtime::{auth::AuthenticatedResponder, storage::StoragePointer};
 #[allow(unused_imports)]
 use alkanes_runtime::{
     println,
     stdio::{stdout, Write},
 };
-use alkanes_runtime::{runtime::AlkaneResponder, storage::StoragePointer};
 use alkanes_support::{
     cellpack::Cellpack,
     context::Context,
@@ -42,7 +42,7 @@ pub fn join_ids_from_tuple(v: (AlkaneId, AlkaneId)) -> Vec<u8> {
     join_ids(v.0, v.1)
 }
 
-pub trait AMMFactoryBase: AlkaneResponder {
+pub trait AMMFactoryBase: AuthenticatedResponder {
     fn pool_id(&self) -> Result<u128> {
         let ptr = StoragePointer::from_keyword("/pool_factory_id")
             .get()
@@ -51,7 +51,11 @@ pub trait AMMFactoryBase: AlkaneResponder {
         let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
         Ok(consume_u128(&mut cursor)?)
     }
-
+    fn set_pool_id(&self, pool_factory_id: u128) {
+        let mut pool_factory_id_pointer = StoragePointer::from_keyword("/pool_factory_id");
+        // set the address for the implementation for AMM pool
+        pool_factory_id_pointer.set(Arc::new(pool_factory_id.to_bytes()));
+    }
     fn pool_pointer(&self, a: &AlkaneId, b: &AlkaneId) -> StoragePointer {
         StoragePointer::from_keyword("/pools/")
             .select(&a.clone().into())
@@ -87,12 +91,24 @@ pub trait AMMFactoryBase: AlkaneResponder {
         let mut pool_factory_id_pointer = StoragePointer::from_keyword("/pool_factory_id");
         // set the address for the implementation for AMM pool
         pool_factory_id_pointer.set(Arc::new(pool_factory_id.to_bytes()));
+        let auth_token = self.deploy_auth_token(1u128)?;
+        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
+        response.alkanes.pay(auth_token);
+        Ok(response)
+    }
+    fn set_pool_factory_id(&self, pool_factory_id: u128) -> Result<CallResponse> {
+        self.only_owner()?;
+        let context = self.context()?;
+        self.set_pool_id(pool_factory_id);
         Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
     }
     fn create_new_pool(&self) -> Result<(Cellpack, AlkaneTransferParcel)> {
         let context = self.context()?;
         if context.incoming_alkanes.0.len() != 2 {
-            return Err(anyhow!("must send two runes to initialize a pool"));
+            return Err(anyhow!(format!(
+                "must send two runes to initialize a pool {:?}",
+                context.incoming_alkanes.0
+            )));
         }
         let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
         let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));

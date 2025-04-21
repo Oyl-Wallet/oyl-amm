@@ -24,6 +24,7 @@ pub const OYL_AMM_POOL_FACTORY_ID: u128 = 0xf041;
 pub const INIT_AMT_TOKEN1: u128 = 1000000;
 pub const INIT_AMT_TOKEN2: u128 = 2000000;
 pub const INIT_AMT_TOKEN3: u128 = 1000000;
+pub const INIT_AMT_OYL: u128 = 1000000;
 
 pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeploymentIds)> {
     let pool_id = if use_oyl {
@@ -58,7 +59,7 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
         //amm factory
         Cellpack {
             target: AlkaneId { block: 1, tx: 0 },
-            inputs: vec![0, pool_id, 2, 11, 2, 10, 2, 8],
+            inputs: vec![0, pool_id, 2, 12, 2, 11, 2, 9],
         },
         // token 1 init 1 auth token and mint 1000000 owned tokens. Also deploys owned token contract at {2,2}
         Cellpack {
@@ -67,18 +68,18 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
         },
         // token 2 init 1 auth token and mint 2000000 owned tokens
         Cellpack {
-            target: AlkaneId { block: 5, tx: 2 }, // factory creation of owned token using {2, 2} as the factory
+            target: AlkaneId { block: 5, tx: 3 }, // factory creation of owned token using {2, 2} as the factory
             inputs: vec![0, 1, INIT_AMT_TOKEN2],
         },
         // token 3 init 1 auth token and mint 1000000 owned tokens
         Cellpack {
-            target: AlkaneId { block: 5, tx: 2 }, // factory creation of owned token using {2, 2} as the factory
+            target: AlkaneId { block: 5, tx: 3 }, // factory creation of owned token using {2, 2} as the factory
             inputs: vec![0, 1, INIT_AMT_TOKEN1],
         },
         // oyl token init 1 auth token and mint 1000000 owned tokens.
         Cellpack {
-            target: AlkaneId { block: 5, tx: 2 }, // factory creation of owned token using {2, 2} as the factory
-            inputs: vec![0, 1, 1000000],
+            target: AlkaneId { block: 5, tx: 3 }, // factory creation of owned token using {2, 2} as the factory
+            inputs: vec![0, 1, INIT_AMT_OYL],
         },
         // router
         Cellpack {
@@ -122,19 +123,19 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
             block: 4,
             tx: AUTH_TOKEN_FACTORY_ID,
         },
-        amm_factory_deployment: AlkaneId { block: 2, tx: 1 },
-        owned_token_1_deployment: AlkaneId { block: 2, tx: 2 },
-        auth_token_1_deployment: AlkaneId { block: 2, tx: 3 },
-        owned_token_2_deployment: AlkaneId { block: 2, tx: 4 },
-        auth_token_2_deployment: AlkaneId { block: 2, tx: 5 },
-        owned_token_3_deployment: AlkaneId { block: 2, tx: 6 },
-        auth_token_3_deployment: AlkaneId { block: 2, tx: 7 },
-        oyl_token_deployment: AlkaneId { block: 2, tx: 8 },
-        oyl_auth_token_deployment: AlkaneId { block: 2, tx: 9 },
-        amm_router_deployment: AlkaneId { block: 2, tx: 10 },
-        amm_path_provider_deployment: AlkaneId { block: 2, tx: 11 },
-        amm_pool_1_deployment: AlkaneId { block: 2, tx: 13 },
-        amm_pool_2_deployment: AlkaneId { block: 2, tx: 14 },
+        amm_factory_deployment: AlkaneId { block: 2, tx: 1 }, // 2 is the auth token
+        owned_token_1_deployment: AlkaneId { block: 2, tx: 3 },
+        auth_token_1_deployment: AlkaneId { block: 2, tx: 4 },
+        owned_token_2_deployment: AlkaneId { block: 2, tx: 5 },
+        auth_token_2_deployment: AlkaneId { block: 2, tx: 6 },
+        owned_token_3_deployment: AlkaneId { block: 2, tx: 7 },
+        auth_token_3_deployment: AlkaneId { block: 2, tx: 8 },
+        oyl_token_deployment: AlkaneId { block: 2, tx: 9 },
+        oyl_auth_token_deployment: AlkaneId { block: 2, tx: 10 },
+        amm_router_deployment: AlkaneId { block: 2, tx: 11 },
+        amm_path_provider_deployment: AlkaneId { block: 2, tx: 12 },
+        amm_pool_1_deployment: AlkaneId { block: 2, tx: 14 },
+        amm_pool_2_deployment: AlkaneId { block: 2, tx: 15 },
     };
 
     return Ok((test_block, deployed_ids));

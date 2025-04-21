@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use alkanes_runtime::{
-    declare_alkane, message::MessageDispatch, runtime::AlkaneResponder, storage::StoragePointer,
+    auth::AuthenticatedResponder, declare_alkane, message::MessageDispatch,
+    runtime::AlkaneResponder, storage::StoragePointer,
 };
 #[allow(unused_imports)]
 use alkanes_runtime::{
@@ -53,6 +54,18 @@ pub enum OylAMMFactoryMessage {
 
     #[opcode(6)]
     SwapToAndBurnOyl,
+
+    #[opcode(7)]
+    SetPoolFactoryId { pool_factory_id: u128 },
+
+    #[opcode(8)]
+    SetPathProviderId { path_provider_id: AlkaneId },
+
+    #[opcode(9)]
+    SetRouterId { router_id: AlkaneId },
+
+    #[opcode(10)]
+    SetOylTokenId { oyl_token_id: AlkaneId },
 }
 
 // Base implementation of AMMFactory that can be used directly or extended
@@ -118,6 +131,27 @@ impl OylAMMFactory {
         OylAMMFactory::set_router(router_id);
         OylAMMFactory::set_oyl_token(oyl_token_id);
         Ok(response)
+    }
+
+    pub fn set_path_provider_id(&self, path_provider_id: AlkaneId) -> Result<CallResponse> {
+        self.only_owner()?;
+        let context = self.context()?;
+        OylAMMFactory::set_path_provider(path_provider_id);
+        Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
+    }
+
+    pub fn set_router_id(&self, router_id: AlkaneId) -> Result<CallResponse> {
+        self.only_owner()?;
+        let context = self.context()?;
+        OylAMMFactory::set_router(router_id);
+        Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
+    }
+
+    pub fn set_oyl_token_id(&self, oyl_token_id: AlkaneId) -> Result<CallResponse> {
+        self.only_owner()?;
+        let context = self.context()?;
+        OylAMMFactory::set_oyl_token(oyl_token_id);
+        Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
     }
 
     pub fn create_new_pool(&self) -> Result<CallResponse> {
@@ -199,6 +233,7 @@ impl OylAMMFactory {
 impl AMMFactoryBase for OylAMMFactory {}
 
 impl AlkaneResponder for OylAMMFactory {}
+impl AuthenticatedResponder for OylAMMFactory {}
 
 declare_alkane! {
     impl AlkaneResponder for OylAMMFactory {
