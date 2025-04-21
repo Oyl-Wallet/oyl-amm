@@ -11,6 +11,7 @@ use init_pools::{
 };
 use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations, ProtoruneRuneId};
 
+use crate::tests::helper::common::assert_revert_context;
 use crate::tests::helper::path_provider::create_path_provider_insert_path_block;
 use crate::tests::helper::*;
 use crate::tests::std::path_provider_build;
@@ -214,6 +215,53 @@ fn test_path_provider_set_and_get_path() -> Result<()> {
     } else {
         panic!("Failed to get last_trace_event from trace data");
     }
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_path_provider_only_owner() -> Result<()> {
+    clear();
+    let (test_block, deployment_ids) = init_block_with_amm_pool(false)?;
+    let block_height = 840_000;
+    index_block(&test_block, block_height)?;
+
+    // Define start and end alkanes for our path
+    let start_alkane = deployment_ids.owned_token_1_deployment;
+    let end_alkane = deployment_ids.owned_token_2_deployment;
+
+    // Define the path we want to set (a vector of AlkaneIds)
+    let path = vec![
+        start_alkane,
+        deployment_ids.amm_pool_1_deployment,
+        end_alkane,
+    ];
+
+    let previous_outpoint = OutPoint {
+        txid: test_block.txdata[0].compute_txid(), //use an outpoint that doesn't have the auth token
+        vout: 0,
+    };
+
+    // Create a new block for our path provider operations
+    let path_block = create_path_provider_insert_path_block(
+        start_alkane,
+        end_alkane,
+        path.clone(),
+        &deployment_ids,
+        previous_outpoint,
+        block_height + 1,
+    );
+
+    // Index the block with the set path transaction
+    index_block(&path_block, block_height + 1)?;
+
+    // Get the outpoint for the get path transaction
+    let outpoint = OutPoint {
+        txid: path_block.txdata[path_block.txdata.len() - 1].compute_txid(),
+        vout: 3, // The response is in vout 3
+    };
+
+    assert_revert_context(&outpoint, "Auth token is not in incoming alkanes")?;
 
     Ok(())
 }

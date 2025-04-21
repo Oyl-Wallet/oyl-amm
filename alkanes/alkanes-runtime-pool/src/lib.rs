@@ -74,16 +74,11 @@ impl PoolInfo {
 
 pub trait AMMPoolBase: MintableToken + AlkaneResponder {
     fn init_pool(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> Result<CallResponse> {
-        let mut pointer = StoragePointer::from_keyword("/initialized");
-        if pointer.get().len() == 0 {
-            pointer.set(Arc::new(vec![0x01]));
-            StoragePointer::from_keyword("/alkane/0").set(Arc::new(alkane_a.into()));
-            StoragePointer::from_keyword("/alkane/1").set(Arc::new(alkane_b.into()));
-            let _ = self.set_pool_name_and_symbol();
-            self.add_liquidity()
-        } else {
-            Err(anyhow!("already initialized"))
-        }
+        self.observe_initialization()?;
+        StoragePointer::from_keyword("/alkane/0").set(Arc::new(alkane_a.into()));
+        StoragePointer::from_keyword("/alkane/1").set(Arc::new(alkane_b.into()));
+        let _ = self.set_pool_name_and_symbol();
+        self.add_liquidity()
     }
     fn alkanes_for_self(&self) -> Result<(AlkaneId, AlkaneId)> {
         Ok((

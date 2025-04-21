@@ -82,17 +82,12 @@ pub trait AMMFactoryBase: AlkaneResponder {
         }
     }
     fn init_factory(&self, pool_factory_id: u128) -> Result<CallResponse> {
+        self.observe_initialization()?;
         let context = self.context()?;
-        let mut pointer = StoragePointer::from_keyword("/initialized");
         let mut pool_factory_id_pointer = StoragePointer::from_keyword("/pool_factory_id");
-        if pointer.get().len() == 0 {
-            pointer.set(Arc::new(vec![0x01]));
-            // set the address for the implementation for AMM pool
-            pool_factory_id_pointer.set(Arc::new(pool_factory_id.to_bytes()));
-            Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
-        } else {
-            Err(anyhow!("already initialized"))
-        }
+        // set the address for the implementation for AMM pool
+        pool_factory_id_pointer.set(Arc::new(pool_factory_id.to_bytes()));
+        Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
     }
     fn create_new_pool(&self) -> Result<(Cellpack, AlkaneTransferParcel)> {
         let context = self.context()?;

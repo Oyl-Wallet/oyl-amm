@@ -1,8 +1,4 @@
-use std::sync::Arc;
-
-use alkanes_runtime::{
-    declare_alkane, message::MessageDispatch, runtime::AlkaneResponder, storage::StoragePointer,
-};
+use alkanes_runtime::{declare_alkane, message::MessageDispatch, runtime::AlkaneResponder};
 #[allow(unused_imports)]
 use alkanes_runtime::{
     println,
@@ -10,17 +6,9 @@ use alkanes_runtime::{
 };
 use alkanes_runtime_pool::AMMPoolBase;
 use alkanes_std_factory_support::MintableToken;
-use alkanes_support::{
-    cellpack::Cellpack,
-    context::Context,
-    id::AlkaneId,
-    parcel::{AlkaneTransfer, AlkaneTransferParcel},
-    response::CallResponse,
-    utils::{overflow_error, shift, shift_or_err},
-};
-use anyhow::{anyhow, Result};
+use alkanes_support::id::AlkaneId;
+use anyhow::Result;
 use metashrew_support::compat::{to_arraybuffer_layout, to_passback_ptr};
-use metashrew_support::index_pointer::KeyValuePointer;
 
 #[derive(MessageDispatch)]
 pub enum AMMPoolMessage {
@@ -57,16 +45,7 @@ pub struct AMMPool();
 impl MintableToken for AMMPool {}
 impl AMMPoolBase for AMMPool {}
 
-impl AlkaneResponder for AMMPool {
-    fn execute(&self) -> Result<CallResponse> {
-        // The opcode extraction and dispatch logic is now handled by the declare_alkane macro
-        // This method is still required by the AlkaneResponder trait, but we can just return an error
-        // indicating that it should not be called directly
-        Err(anyhow!(
-            "This method should not be called directly. Use the declare_alkane macro instead."
-        ))
-    }
-}
+impl AlkaneResponder for AMMPool {}
 declare_alkane! {
     impl AlkaneResponder for AMMPool {
         type Message = AMMPoolMessage;
