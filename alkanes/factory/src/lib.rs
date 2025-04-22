@@ -1,4 +1,7 @@
-use alkanes_runtime::{declare_alkane, message::MessageDispatch, runtime::AlkaneResponder};
+use alkanes_runtime::{
+    auth::AuthenticatedResponder, declare_alkane, message::MessageDispatch,
+    runtime::AlkaneResponder,
+};
 #[allow(unused_imports)]
 use alkanes_runtime::{
     println,
@@ -30,6 +33,9 @@ pub enum AMMFactoryMessage {
     #[opcode(4)]
     #[returns(Vec<u8>)]
     GetNumPools,
+
+    #[opcode(7)]
+    SetPoolFactoryId { pool_factory_id: u128 },
 }
 
 // Base implementation of AMMFactory that can be used directly or extended
@@ -46,6 +52,7 @@ impl AMMFactory {
 impl AMMFactoryBase for AMMFactory {}
 
 impl AlkaneResponder for AMMFactory {}
+impl AuthenticatedResponder for AMMFactory {}
 
 declare_alkane! {
     impl AlkaneResponder for AMMFactory {
