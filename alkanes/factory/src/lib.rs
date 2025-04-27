@@ -48,7 +48,7 @@ pub struct AMMFactory();
 impl AMMFactory {
     pub fn create_new_pool(&self) -> Result<CallResponse> {
         let (cellpack, parcel) = AMMFactoryBase::create_new_pool(self)?;
-        self.call(&cellpack, &parcel, self.fuel())
+        self.call(&cellpack, &parcel,self.fuel())
     }
 }
 
