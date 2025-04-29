@@ -701,7 +701,7 @@ fn test_find_existing_pool_id() -> Result<()> {
             vec![Cellpack {
                 target: deployment_ids.amm_factory_deployment,
                 inputs: vec![
-                    2,
+                    20,
                     deployment_ids.owned_token_1_deployment.block,
                     deployment_ids.owned_token_1_deployment.tx,
                     deployment_ids.owned_token_2_deployment.block,

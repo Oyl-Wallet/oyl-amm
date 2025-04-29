@@ -57,7 +57,7 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
         //amm factory
         Cellpack {
             target: AlkaneId { block: 1, tx: 0 },
-            inputs: vec![0, pool_id, 2, 12, 2, 11, 2, 9],
+            inputs: vec![0, pool_id, 2, 11, 2, 9],
         },
         // token 1 init 1 auth token and mint 1000000 owned tokens. Also deploys owned token contract at {2,2}
         Cellpack {
