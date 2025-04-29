@@ -10,7 +10,7 @@ The core functionality includes:
 - Adding and removing liquidity
 - Routing trades through multiple pools for optimal execution
 
-The project follows a design pattern similar to Uniswap, with factory contracts that create and manage pool contracts, and a router that handles multi-hop swaps and liquidity operations.
+The project follows a design pattern similar to Uniswap, with factory contracts that create and manage pool contracts, and a factory that handles multi-hop swaps and liquidity operations.
 
 ## Technical Context
 
@@ -48,7 +48,7 @@ The system follows a modular architecture with several key components:
    - Maintains a registry of created pools
    - Ensures uniqueness of pools for token pairs
 
-3. **Router Contract**:
+3. **Factory Contract**:
    - Handles user interactions
    - Routes trades through multiple pools if necessary
    - Provides optimized paths for token swaps
@@ -89,8 +89,8 @@ The system follows a modular architecture with several key components:
    - Maintains a registry of created pools
    - Ensures uniqueness of pools for token pairs
 
-3. **router**
-   - Implements the router contract for user interactions
+3. **factory**
+   - Implements the factory contract for user interactions
    - Handles multi-hop swaps
    - Manages liquidity operations through the factory and pools
    - Provides optimized paths for token swaps

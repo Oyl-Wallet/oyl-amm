@@ -27,7 +27,7 @@ Anyone can provide liquidity to the platform by depositing token pairs, earning 
 
 ### 4. Multi-hop Swaps
 
-The router contract enables efficient trading between token pairs that don't have direct liquidity pools by routing trades through intermediate pools.
+The factory contract enables efficient trading between token pairs that don't have direct liquidity pools by routing trades through intermediate pools.
 
 ### 5. Bitcoin DeFi Expansion
 
@@ -50,7 +50,7 @@ From a technical perspective, Swap.oyl.io works through:
 
 1. **Factory Contract**: Creates and manages liquidity pools for token pairs.
 2. **Pool Contracts**: Implement the AMM logic, including swapping and liquidity management.
-3. **Router Contract**: Handles multi-hop swaps and optimizes trading paths.
+3. **Factory Contract**: Handles multi-hop swaps and optimizes trading paths.
 4. **View Functions**: Provide information about pools, tokens, and user positions.
 
 #### Factory and Pool Initialization Process
@@ -96,7 +96,7 @@ This initialization process ensures that:
 1. User selects input token, output token, and input amount
 2. System calculates expected output amount using the constant product formula
 3. User approves the transaction
-4. Router contract executes the swap, potentially through multiple pools
+4. Factory contract executes the swap, potentially through multiple pools
 5. User receives the output tokens
 
 #### Liquidity Provision

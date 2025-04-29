@@ -64,7 +64,7 @@ pub fn insert_swap_txs(
     )
 }
 
-pub fn insert_swap_txs_w_router(
+pub fn insert_swap_txs_w_factory(
     amount: u128,
     swap_path: Vec<AlkaneId>,
     min_out: u128,
@@ -76,8 +76,8 @@ pub fn insert_swap_txs_w_router(
         panic!("Swap path must be at least two alkanes long");
     }
     let mut cellpack = Cellpack {
-        target: deployment_ids.amm_router_deployment,
-        inputs: vec![3, swap_path.len() as u128],
+        target: deployment_ids.amm_factory_deployment,
+        inputs: vec![20, swap_path.len() as u128],
     };
     cellpack
         .inputs

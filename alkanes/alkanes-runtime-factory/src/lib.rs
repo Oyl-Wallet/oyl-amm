@@ -147,13 +147,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         ))
     }
 
-    fn find_existing_pool_id(
-        &self,
-        alkane_a: AlkaneId,
-        alkane_b: AlkaneId,
-    ) -> Result<CallResponse> {
-        let context = self.context()?;
-        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
+    fn _find_existing_pool_id(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> Result<AlkaneId> {
         let (a, b) = sort_alkanes((alkane_a, alkane_b));
         if self.pool_pointer(&a, &b).get().len() == 0 {
             return Err(anyhow!(format!(
@@ -163,11 +157,21 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         }
         let mut cursor =
             std::io::Cursor::<Vec<u8>>::new(self.pool_pointer(&a, &b).get().as_ref().clone());
-        response.data = AlkaneId::new(
+        Ok(AlkaneId::new(
             consume_sized_int::<u128>(&mut cursor).unwrap(),
             consume_sized_int::<u128>(&mut cursor).unwrap(),
-        )
-        .into();
+        ))
+    }
+
+    fn find_existing_pool_id(
+        &self,
+        alkane_a: AlkaneId,
+        alkane_b: AlkaneId,
+    ) -> Result<CallResponse> {
+        let context = self.context()?;
+        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
+
+        response.data = self._find_existing_pool_id(alkane_a, alkane_b)?.into();
         Ok(response)
     }
     // Get the total number of pools
@@ -236,5 +240,35 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
             .to_le_bytes()
             .to_vec();
         Ok(response)
+    }
+
+    fn swap_along_path(&self, path: Vec<AlkaneId>, amount: u128) -> Result<CallResponse> {
+        let context = self.context()?;
+
+        // swap
+        if path.len() < 2 {
+            return Err(anyhow!("Routing path must be at least two alkanes long"));
+        }
+        if path[0] != context.incoming_alkanes.0[0].id {
+            return Err(anyhow!(
+                "Routing path first element must be the input token"
+            ));
+        }
+        let mut this_response = CallResponse {
+            alkanes: context.incoming_alkanes.clone(),
+            data: vec![],
+        };
+
+        for i in 1..path.len() {
+            let pool = self._find_existing_pool_id(path[i - 1], path[i])?;
+            let this_amount = if i == path.len() - 1 { amount } else { 0 };
+            let cellpack = Cellpack {
+                target: pool,
+                inputs: vec![3, this_amount],
+            };
+            this_response = self.call(&cellpack, &this_response.alkanes, self.fuel())?;
+        }
+
+        Ok(this_response)
     }
 }

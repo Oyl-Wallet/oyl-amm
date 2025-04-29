@@ -60,33 +60,6 @@ pub fn insert_remove_liquidity_txs(
     )
 }
 
-pub fn insert_remove_liquidity_txs_w_router(
-    amount: u128,
-    test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
-    input_outpoint: OutPoint,
-    pool_address: AlkaneId,
-    token1_address: AlkaneId,
-    token2_address: AlkaneId,
-) {
-    _insert_remove_liquidity_txs(
-        amount,
-        test_block,
-        pool_address,
-        input_outpoint,
-        Cellpack {
-            target: deployment_ids.amm_router_deployment,
-            inputs: vec![
-                2,
-                token1_address.block,
-                token1_address.tx,
-                token2_address.block,
-                token2_address.tx,
-            ],
-        },
-    )
-}
-
 pub fn check_remove_liquidity_runtime_balance(
     runtime_balances: &mut BalanceSheet<IndexPointer>,
     removed_amount1: u128,
@@ -113,7 +86,7 @@ pub fn check_remove_liquidity_runtime_balance(
     Ok(())
 }
 
-pub fn test_amm_burn_fixture(amount_burn: u128, use_router: bool, use_oyl: bool) -> Result<()> {
+pub fn test_amm_burn_fixture(amount_burn: u128, use_oyl: bool) -> Result<()> {
     let (amount1, amount2) = (1000000, 1000000);
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
     let total_supply = (amount1 * amount2).sqrt();
@@ -126,24 +99,12 @@ pub fn test_amm_burn_fixture(amount_burn: u128, use_router: bool, use_oyl: bool)
         txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
         vout: 0,
     };
-    if use_router {
-        insert_remove_liquidity_txs_w_router(
-            amount_burn,
-            &mut test_block,
-            &deployment_ids,
-            input_outpoint,
-            deployment_ids.amm_pool_1_deployment,
-            deployment_ids.owned_token_1_deployment,
-            deployment_ids.owned_token_2_deployment,
-        );
-    } else {
-        insert_remove_liquidity_txs(
-            amount_burn,
-            &mut test_block,
-            input_outpoint,
-            deployment_ids.amm_pool_1_deployment,
-        );
-    }
+    insert_remove_liquidity_txs(
+        amount_burn,
+        &mut test_block,
+        input_outpoint,
+        deployment_ids.amm_pool_1_deployment,
+    );
 
     index_block(&test_block, block_height)?;
 
