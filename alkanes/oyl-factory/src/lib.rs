@@ -27,7 +27,6 @@ pub enum OylAMMFactoryMessage {
     InitFactory {
         pool_factory_id: u128,
         path_provider_id: AlkaneId,
-        router_id: AlkaneId,
         oyl_token_id: AlkaneId,
     },
 
@@ -61,11 +60,11 @@ pub enum OylAMMFactoryMessage {
     #[opcode(8)]
     SetPathProviderId { path_provider_id: AlkaneId },
 
-    #[opcode(9)]
-    SetRouterId { router_id: AlkaneId },
-
     #[opcode(10)]
     SetOylTokenId { oyl_token_id: AlkaneId },
+
+    #[opcode(20)]
+    SwapAlongPath { path: Vec<AlkaneId>, amount: u128 },
 }
 
 // Base implementation of AMMFactory that can be used directly or extended
@@ -88,21 +87,6 @@ impl OylAMMFactory {
         let mut path_provider_id_pointer = StoragePointer::from_keyword("/path_provider_id");
         path_provider_id_pointer.set(Arc::new(path_provider_id.into()));
     }
-    fn router() -> Result<AlkaneId> {
-        let ptr = StoragePointer::from_keyword("/router_id")
-            .get()
-            .as_ref()
-            .clone();
-        let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
-        Ok(AlkaneId::new(
-            consume_u128(&mut cursor)?,
-            consume_u128(&mut cursor)?,
-        ))
-    }
-    fn set_router(router_id: AlkaneId) {
-        let mut router_id_pointer = StoragePointer::from_keyword("/router_id");
-        router_id_pointer.set(Arc::new(router_id.into()));
-    }
     fn oyl_token() -> Result<AlkaneId> {
         let ptr = StoragePointer::from_keyword("/oyl_token_id")
             .get()
@@ -123,12 +107,10 @@ impl OylAMMFactory {
         &self,
         pool_factory_id: u128,
         path_provider_id: AlkaneId,
-        router_id: AlkaneId,
         oyl_token_id: AlkaneId,
     ) -> Result<CallResponse> {
         let response = AMMFactoryBase::init_factory(self, pool_factory_id)?;
         OylAMMFactory::set_path_provider(path_provider_id);
-        OylAMMFactory::set_router(router_id);
         OylAMMFactory::set_oyl_token(oyl_token_id);
         Ok(response)
     }
@@ -137,13 +119,6 @@ impl OylAMMFactory {
         self.only_owner()?;
         let context = self.context()?;
         OylAMMFactory::set_path_provider(path_provider_id);
-        Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
-    }
-
-    pub fn set_router_id(&self, router_id: AlkaneId) -> Result<CallResponse> {
-        self.only_owner()?;
-        let context = self.context()?;
-        OylAMMFactory::set_router(router_id);
         Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
     }
 
@@ -194,39 +169,23 @@ impl OylAMMFactory {
         Ok(path)
     }
 
-    fn _swap_and_burn_oyl(
-        &self,
-        path: Vec<AlkaneId>,
-        alkane_transfer: AlkaneTransfer,
-    ) -> Result<CallResponse> {
-        let router = OylAMMFactory::router()?;
-        let mut input: Vec<u128> = vec![3, path.len() as u128];
-        for id in path {
-            input.append(&mut id.into());
-        }
-        input.push(0); // possibly use a minimum for oyl swapping
-        self.call(
-            &Cellpack {
-                target: router,
-                inputs: input,
-            },
-            &AlkaneTransferParcel(vec![alkane_transfer]),
-            self.fuel(),
-        )
-    }
-
     pub fn swap_to_and_burn_oyl(&self) -> Result<CallResponse> {
         let context = self.context()?;
+        if context.incoming_alkanes.0.len() != 1 {
+            return Err(anyhow!(format!(
+                "payload can only include 1 alkane, sent {}",
+                context.incoming_alkanes.0.len()
+            )));
+        }
         let oyl_token = OylAMMFactory::oyl_token()?;
-        for alkane_transfer in context.incoming_alkanes.0 {
-            if alkane_transfer.id == oyl_token {
-                continue;
-            }
+        let alkane_transfer = context.incoming_alkanes.0[0];
+        if alkane_transfer.id != oyl_token {
             let path = self._get_path_between(&alkane_transfer.id, &oyl_token)?;
             if path.len() != 0 {
-                self._swap_and_burn_oyl(path, alkane_transfer)?; // should we abort if one fails? Or soft fail and continue
+                self.swap_along_path(path, 0)?; // should we abort if one fails? Or soft fail and continue
             }
         }
+
         Ok(CallResponse::default())
     }
 }

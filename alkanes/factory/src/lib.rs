@@ -36,6 +36,9 @@ pub enum AMMFactoryMessage {
 
     #[opcode(7)]
     SetPoolFactoryId { pool_factory_id: u128 },
+
+    #[opcode(20)]
+    SwapAlongPath { path: Vec<AlkaneId>, amount: u128 },
 }
 
 // Base implementation of AMMFactory that can be used directly or extended

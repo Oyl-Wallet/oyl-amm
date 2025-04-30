@@ -71,35 +71,6 @@ pub fn insert_add_liquidity_txs(
     )
 }
 
-pub fn insert_add_liquidity_txs_w_router(
-    amount1: u128,
-    amount2: u128,
-    token1_address: AlkaneId,
-    token2_address: AlkaneId,
-    test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
-    input_outpoint: OutPoint,
-) {
-    _insert_add_liquidity_txs(
-        amount1,
-        amount2,
-        token1_address,
-        token2_address,
-        test_block,
-        input_outpoint,
-        Cellpack {
-            target: deployment_ids.amm_router_deployment,
-            inputs: vec![
-                1,
-                token1_address.block,
-                token1_address.tx,
-                token2_address.block,
-                token2_address.tx,
-            ],
-        },
-    )
-}
-
 pub fn calc_lp_balance_from_add_liquidity(
     prev_amount1: u128,
     prev_amount2: u128,

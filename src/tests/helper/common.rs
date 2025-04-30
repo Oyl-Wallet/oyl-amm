@@ -39,7 +39,6 @@ pub struct AmmTestDeploymentIds {
     pub oyl_auth_token_deployment: AlkaneId,
     pub amm_pool_1_deployment: AlkaneId,
     pub amm_pool_2_deployment: AlkaneId,
-    pub amm_router_deployment: AlkaneId,
     pub amm_path_provider_deployment: AlkaneId,
 }
 

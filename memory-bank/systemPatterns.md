@@ -38,9 +38,9 @@ The Pool contract implements the core AMM functionality, including liquidity pro
 - Implements the `AMMPoolBase` trait
 - Uses the `declare_alkane!` macro to create the WASM contract
 
-#### 3. Router Contract
+#### 3. Factory Contract
 
-The Router contract provides high-level functions for users to interact with the system, including multi-hop swaps and optimized trading paths.
+The Factory contract provides high-level functions for users to interact with the system, including multi-hop swaps and optimized trading paths.
 
 **Key Responsibilities:**
 - Finding optimal trading paths between tokens
@@ -49,7 +49,7 @@ The Router contract provides high-level functions for users to interact with the
 - Providing a simplified interface for users
 
 **Implementation:**
-- Defined in `alkanes/router/src/lib.rs`
+- Defined in `alkanes/factory/src/lib.rs`
 - Uses the Factory contract to find pools
 - Implements the `AlkaneResponder` trait
 
@@ -71,7 +71,7 @@ The OYL-specific implementations provide customized versions of the pool and fac
 ```
 ┌─────────────────┐     ┌─────────────────┐
 │                 │     │                 │
-│  Router         │────▶│   Factory       │
+│  Factory         │────▶│   Factory       │
 │  Contract       │     │   Contract      │
 │                 │     │                 │
 └─────────────────┘     └─────────────────┘
@@ -86,9 +86,9 @@ The OYL-specific implementations provide customized versions of the pool and fac
                         └─────────────────┘
 ```
 
-1. **Router → Factory**: The Router contract calls the Factory contract to find pools for specific token pairs.
+1. **Factory → Factory**: The Factory contract calls the Factory contract to find pools for specific token pairs.
 2. **Factory → Pool**: The Factory contract creates and manages Pool contracts.
-3. **Router → Pool**: The Router contract interacts directly with Pool contracts for swaps and liquidity operations.
+3. **Factory → Pool**: The Factory contract interacts directly with Pool contracts for swaps and liquidity operations.
 
 ## Key Design Patterns
 
@@ -233,7 +233,7 @@ impl AlkaneResponder for AMMPool {
 ### 1. Pool Creation Flow
 
 ```
-1. User calls Router or Factory to create a new pool
+1. User calls Factory or Factory to create a new pool
 2. Factory checks if pool already exists for the token pair
 3. If not, Factory creates a new Pool contract
 4. Factory registers the new pool in its registry
@@ -311,9 +311,9 @@ During testing and development, we encountered several common issues:
 ### 2. Swap Flow
 
 ```
-1. User calls Router to swap tokens
-2. Router finds the optimal path for the swap
-3. Router calls the appropriate Pool(s) to execute the swap
+1. User calls Factory to swap tokens
+2. Factory finds the optimal path for the swap
+3. Factory calls the appropriate Pool(s) to execute the swap
 4. Pool calculates the output amount using the constant product formula
 5. Pool transfers the output tokens to the user
 6. Pool updates its reserves
@@ -322,7 +322,7 @@ During testing and development, we encountered several common issues:
 ### 3. Liquidity Provision Flow
 
 ```
-1. User calls Router or Pool to add liquidity
+1. User calls Factory or Pool to add liquidity
 2. Pool calculates the appropriate token ratio based on current reserves
 3. Pool accepts the tokens and adds them to reserves
 4. Pool mints LP tokens to the user proportional to their contribution
@@ -332,7 +332,7 @@ During testing and development, we encountered several common issues:
 ### 4. Liquidity Removal Flow
 
 ```
-1. User calls Router or Pool to remove liquidity
+1. User calls Factory or Pool to remove liquidity
 2. Pool calculates the amount of tokens to return based on LP tokens
 3. Pool burns the LP tokens
 4. Pool transfers the underlying tokens to the user
@@ -544,6 +544,6 @@ This pattern is essential for implementing and testing any view function in the 
 
 ## Conclusion
 
-The Swap.oyl.io system architecture follows established design patterns from the DeFi space, particularly Uniswap, while adapting them to the ALKANES metaprotocol on Bitcoin. The modular design with Factory, Pool, and Router contracts provides a flexible and extensible foundation for decentralized trading.
+The Swap.oyl.io system architecture follows established design patterns from the DeFi space, particularly Uniswap, while adapting them to the ALKANES metaprotocol on Bitcoin. The modular design with Factory, Pool, and Factory contracts provides a flexible and extensible foundation for decentralized trading.
 
 Understanding the ALKANES trace data pattern is crucial for implementing and testing view functions like "get all pools", which enhance the system by providing ways to discover and interact with the available liquidity pools.

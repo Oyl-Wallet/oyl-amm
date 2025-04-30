@@ -1,31 +1,24 @@
-use add_liquidity::{
-    check_add_liquidity_lp_balance, insert_add_liquidity_txs, insert_add_liquidity_txs_w_router,
-};
+use add_liquidity::{check_add_liquidity_lp_balance, insert_add_liquidity_txs};
 use alkanes_support::cellpack::Cellpack;
-use alkanes_support::response::ExtendedCallResponse;
 use alkanes_support::trace::{Trace, TraceEvent};
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::Witness;
-use common::{get_last_outpoint_sheet, get_sheet_for_outpoint};
+use common::get_last_outpoint_sheet;
 use init_pools::{
-    assert_contracts_correct_ids, calc_lp_balance_from_pool_init, init_block_with_amm_pool,
-    insert_init_pool_liquidity_txs, test_amm_pool_init_fixture,
+    calc_lp_balance_from_pool_init, init_block_with_amm_pool, insert_init_pool_liquidity_txs,
+    test_amm_pool_init_fixture,
 };
 use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
-use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations, ProtoruneRuneId};
 use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
-use swap::{check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_router};
+use swap::{check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_factory};
 
 use crate::tests::helper::*;
-use crate::tests::std::path_provider_build;
 use alkane_helpers::clear;
 use alkanes::indexer::index_block;
-use alkanes::tests::helpers::{
-    self as alkane_helpers, assert_binary_deployed_to_id, assert_token_id_has_no_deployment,
-};
+use alkanes::tests::helpers::{self as alkane_helpers, assert_token_id_has_no_deployment};
 use alkanes::view;
 use alkanes_support::id::AlkaneId;
 #[allow(unused_imports)]
@@ -218,7 +211,7 @@ fn test_amm_pool_bad_init() -> Result<()> {
 fn test_amm_pool_burn_all() -> Result<()> {
     clear();
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
-    test_amm_burn_fixture(total_lp, false, false)?;
+    test_amm_burn_fixture(total_lp, false)?;
     Ok(())
 }
 
@@ -227,7 +220,7 @@ fn test_amm_pool_burn_some() -> Result<()> {
     clear();
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
     let burn_amount = total_lp / 3;
-    test_amm_burn_fixture(burn_amount, false, false)?;
+    test_amm_burn_fixture(burn_amount, false)?;
     Ok(())
 }
 
@@ -235,15 +228,7 @@ fn test_amm_pool_burn_some() -> Result<()> {
 fn test_amm_pool_burn_more_than_owned() -> Result<()> {
     clear();
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
-    test_amm_burn_fixture(total_lp * 2, false, false)?;
-    Ok(())
-}
-
-#[wasm_bindgen_test]
-fn test_amm_pool_burn_all_router() -> Result<()> {
-    clear();
-    let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
-    test_amm_burn_fixture(total_lp, true, false)?;
+    test_amm_burn_fixture(total_lp * 2, false)?;
     Ok(())
 }
 
@@ -338,50 +323,6 @@ fn test_amm_pool_add_more_liquidity_to_wrong_pool() -> Result<()> {
 }
 
 #[wasm_bindgen_test]
-fn test_amm_pool_add_more_liquidity_w_router() -> Result<()> {
-    clear();
-    let (amount1, amount2) = (500000, 500000);
-    let total_supply = (amount1 * amount2).sqrt();
-    let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2, false)?;
-    let block_height = 840_001;
-    let mut add_liquidity_block = create_block_with_coinbase_tx(block_height);
-    let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
-        vout: 0,
-    };
-    insert_add_liquidity_txs_w_router(
-        amount1,
-        amount2,
-        deployment_ids.owned_token_1_deployment,
-        deployment_ids.owned_token_2_deployment,
-        &mut add_liquidity_block,
-        &deployment_ids,
-        input_outpoint,
-    );
-    index_block(&add_liquidity_block, block_height)?;
-
-    check_add_liquidity_lp_balance(
-        amount1,
-        amount2,
-        amount1,
-        amount2,
-        total_supply,
-        &add_liquidity_block,
-        deployment_ids.amm_pool_1_deployment,
-    )?;
-
-    check_add_liquidity_runtime_balance(
-        &mut runtime_balances,
-        amount1,
-        amount2,
-        0,
-        &deployment_ids,
-    )?;
-    Ok(())
-}
-
-#[wasm_bindgen_test]
 fn test_amm_pool_swap() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
@@ -462,7 +403,7 @@ fn test_amm_pool_swap_large() -> Result<()> {
 }
 
 #[wasm_bindgen_test]
-fn test_amm_pool_swap_w_router() -> Result<()> {
+fn test_amm_pool_swap_w_factory() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
     let (init_block, deployment_ids, mut runtime_balances) =
@@ -474,7 +415,7 @@ fn test_amm_pool_swap_w_router() -> Result<()> {
         vout: 0,
     };
     let amount_to_swap = 10000;
-    insert_swap_txs_w_router(
+    insert_swap_txs_w_factory(
         amount_to_swap,
         vec![
             deployment_ids.owned_token_1_deployment,
@@ -505,7 +446,7 @@ fn test_amm_pool_swap_w_router() -> Result<()> {
 }
 
 #[wasm_bindgen_test]
-fn test_amm_pool_swap_w_router_middle_path() -> Result<()> {
+fn test_amm_pool_swap_w_factory_middle_path() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
     let (init_block, deployment_ids, mut runtime_balances) =
@@ -517,7 +458,7 @@ fn test_amm_pool_swap_w_router_middle_path() -> Result<()> {
         vout: 0,
     };
     let amount_to_swap = 10000;
-    insert_swap_txs_w_router(
+    insert_swap_txs_w_factory(
         amount_to_swap,
         vec![
             deployment_ids.owned_token_1_deployment,
@@ -802,7 +743,7 @@ fn test_find_existing_pool_id() -> Result<()> {
                     data[0]
                 );
                 assert_eq!(
-                    data[16], 14,
+                    data[16], 13,
                     "Expected second u128 of data to be 14, but got {}",
                     data[16]
                 );
