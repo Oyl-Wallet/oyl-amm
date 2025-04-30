@@ -43,7 +43,7 @@ fn test_path_provider() -> Result<()> {
 
     let sheet = get_sheet_for_outpoint(&test_block, test_block.txdata.len() - 1, 0)?;
     assert_eq!(
-        sheet.get(&ProtoruneRuneId { block: 2, tx: 12 }),
+        sheet.get(&ProtoruneRuneId { block: 2, tx: 11 }),
         1,
         "No authtoken found",
     );
