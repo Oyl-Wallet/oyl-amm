@@ -701,7 +701,7 @@ fn test_find_existing_pool_id() -> Result<()> {
             vec![Cellpack {
                 target: deployment_ids.amm_factory_deployment,
                 inputs: vec![
-                    20,
+                    2,
                     deployment_ids.owned_token_1_deployment.block,
                     deployment_ids.owned_token_1_deployment.tx,
                     deployment_ids.owned_token_2_deployment.block,
@@ -743,7 +743,7 @@ fn test_find_existing_pool_id() -> Result<()> {
                     data[0]
                 );
                 assert_eq!(
-                    data[16], 14,
+                    data[16], 13,
                     "Expected second u128 of data to be 14, but got {}",
                     data[16]
                 );
