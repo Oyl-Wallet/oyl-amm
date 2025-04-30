@@ -11,6 +11,7 @@ luckycoin = []
 bellscoin = []
 fractal = []
 mainnet = []
+debug-log = ["alkanes/debug-log"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -48,7 +49,7 @@ ruint = { workspace = true }
 
 [dev-dependencies]
 alkanes = { git = "https://github.com/kungfuflex/alkanes-rs", branch="hude/v0.2.5", features = [
-    "test-utils",
+    "test-utils", "debug-log"
 ] }
 metashrew-core = { git = "https://github.com/sandshrewmetaprotocols/metashrew", features = [
     "test-utils",
