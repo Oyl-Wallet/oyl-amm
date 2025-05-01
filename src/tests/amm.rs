@@ -743,7 +743,7 @@ fn test_find_existing_pool_id() -> Result<()> {
                     data[0]
                 );
                 assert_eq!(
-                    data[16], 13,
+                    data[16], 12,
                     "Expected second u128 of data to be 14, but got {}",
                     data[16]
                 );

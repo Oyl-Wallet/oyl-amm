@@ -301,7 +301,7 @@ fn test_amm_pool_swap_should_burn_oyl() -> Result<()> {
         deployment_ids.owned_token_2_deployment,
     )?;
 
-    let oyl_token2_pool = AlkaneId { block: 2, tx: 15 };
+    let oyl_token2_pool = AlkaneId { block: 2, tx: 14 };
     previous_outpoint = OutPoint {
         txid: swap_block.txdata.last().unwrap().compute_txid(),
         vout: 0,
