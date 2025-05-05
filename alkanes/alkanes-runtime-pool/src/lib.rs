@@ -170,10 +170,10 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         Ok(())
     }
 
-    fn reserves(&self) -> (AlkaneTransfer, AlkaneTransfer) {
-        let (a, b) = self.alkanes_for_self().unwrap();
-        let context = self.context().unwrap();
-        (
+    fn reserves(&self) -> Result<(AlkaneTransfer, AlkaneTransfer)> {
+        let (a, b) = self.alkanes_for_self()?;
+        let context = self.context()?;
+        Ok((
             AlkaneTransfer {
                 id: a,
                 value: self.balance(&context.myself, &a),
@@ -182,14 +182,14 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
                 id: b,
                 value: self.balance(&context.myself, &b),
             },
-        )
+        ))
     }
     fn previous_reserves(
         &self,
         parcel: &AlkaneTransferParcel,
     ) -> Result<(AlkaneTransfer, AlkaneTransfer)> {
-        let (reserve_a, reserve_b) = self.reserves();
-        let incoming_sheet: CachedBalanceSheet = parcel.clone().into();
+        let (reserve_a, reserve_b) = self.reserves()?;
+        let incoming_sheet: CachedBalanceSheet = parcel.clone().try_into()?;
         Ok((
             AlkaneTransfer {
                 id: reserve_a.id.clone(),
@@ -208,7 +208,7 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         let parcel = context.incoming_alkanes;
         self.check_inputs(&myself, &parcel, 2)?;
         let mut total_supply = self.total_supply();
-        let (reserve_a, reserve_b) = self.reserves();
+        let (reserve_a, reserve_b) = self.reserves()?;
         let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
         let root_k_last = checked_expr!(previous_a.value.checked_mul(previous_b.value))?.sqrt();
         let root_k = checked_expr!(reserve_a.value.checked_mul(reserve_b.value))?.sqrt();
@@ -245,7 +245,7 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             return Err(anyhow!("can only burn LP alkane for this pair"));
         }
         let liquidity = incoming.value;
-        let (reserve_a, reserve_b) = self.reserves();
+        let (reserve_a, reserve_b) = self.reserves()?;
         let total_supply = self.total_supply();
         let mut response = CallResponse::default();
         let amount_a = checked_expr!(liquidity.checked_mul(reserve_a.value))? / total_supply;
@@ -298,7 +298,7 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         println!("transfer {:?}", transfer);
         let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
         println!("previous {:?} {:?}", previous_a, previous_b);
-        let (reserve_a, reserve_b) = self.reserves();
+        let (reserve_a, reserve_b) = self.reserves()?;
         println!("now {:?} {:?}", reserve_a, reserve_b);
 
         if &transfer.id == &reserve_a.id {

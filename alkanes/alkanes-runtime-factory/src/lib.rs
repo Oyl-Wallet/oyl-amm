@@ -158,8 +158,8 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         let mut cursor =
             std::io::Cursor::<Vec<u8>>::new(self.pool_pointer(&a, &b).get().as_ref().clone());
         Ok(AlkaneId::new(
-            consume_sized_int::<u128>(&mut cursor).unwrap(),
-            consume_sized_int::<u128>(&mut cursor).unwrap(),
+            consume_sized_int::<u128>(&mut cursor)?,
+            consume_sized_int::<u128>(&mut cursor)?,
         ))
     }
 
