@@ -200,7 +200,7 @@ fn test_precision_loss_attack() -> Result<()> {
 
         // Calculate a small amount to add that will cause precision loss
         let add_amount1 = attacker_token1 / 100;
-        let add_amount2 = 0u128;
+        let add_amount2 = 1u128;
 
         // Update attacker's balances
         attacker_token1 -= add_amount1;
