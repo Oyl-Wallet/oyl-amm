@@ -271,4 +271,17 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
 
         Ok(this_response)
     }
+
+    fn collect_fees(&self, pool_id: AlkaneId) -> Result<CallResponse> {
+        self.only_owner()?;
+        let context = self.context()?;
+        self.call(
+            &Cellpack {
+                target: pool_id,
+                inputs: vec![10],
+            },
+            &context.incoming_alkanes.clone(),
+            self.fuel(),
+        )
+    }
 }

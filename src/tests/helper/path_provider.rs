@@ -4,7 +4,6 @@ use alkanes_support::trace::{Trace, TraceEvent};
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::{Block, Witness};
-use common::{get_last_outpoint_sheet, get_sheet_for_outpoint};
 use init_pools::{
     assert_contracts_correct_ids, calc_lp_balance_from_pool_init, init_block_with_amm_pool,
     insert_init_pool_liquidity_txs, test_amm_pool_init_fixture,

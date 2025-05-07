@@ -60,8 +60,11 @@ pub enum OylAMMFactoryMessage {
     #[opcode(8)]
     SetPathProviderId { path_provider_id: AlkaneId },
 
-    #[opcode(10)]
+    #[opcode(9)]
     SetOylTokenId { oyl_token_id: AlkaneId },
+
+    #[opcode(10)]
+    CollectFees { pool_id: AlkaneId },
 
     #[opcode(20)]
     SwapAlongPath { path: Vec<AlkaneId>, amount: u128 },
@@ -182,7 +185,7 @@ impl OylAMMFactory {
         if alkane_transfer.id != oyl_token {
             let path = self._get_path_between(&alkane_transfer.id, &oyl_token)?;
             if path.len() != 0 {
-                self.swap_along_path(path, 0)?; // should we abort if one fails? Or soft fail and continue
+                let _ = self.swap_along_path(path, 0); // soft fail if swapping to oyl fails
             }
         }
 

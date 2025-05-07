@@ -3,7 +3,10 @@ use crate::tests::std::{
 };
 use alkanes::indexer::index_block;
 use alkanes::precompiled::{alkanes_std_auth_token_build, alkanes_std_owned_token_build};
-use alkanes::tests::helpers::{self as alkane_helpers, assert_binary_deployed_to_id};
+use alkanes::tests::helpers::{
+    self as alkane_helpers, assert_binary_deployed_to_id, get_last_outpoint_sheet,
+    get_lazy_sheet_for_runtime, get_sheet_for_runtime,
+};
 use alkanes_runtime_pool::MINIMUM_LIQUIDITY;
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::constants::{AMM_FACTORY_ID, AUTH_TOKEN_FACTORY_ID};
@@ -21,10 +24,10 @@ use std::fmt::Write;
 use super::common::*;
 
 pub const OYL_AMM_POOL_FACTORY_ID: u128 = 0xf041;
-pub const INIT_AMT_TOKEN1: u128 = 1000000;
-pub const INIT_AMT_TOKEN2: u128 = 2000000;
-pub const INIT_AMT_TOKEN3: u128 = 1000000;
-pub const INIT_AMT_OYL: u128 = 1000000;
+pub const INIT_AMT_TOKEN1: u128 = 1_000_000_000_000_000_000_000u128;
+pub const INIT_AMT_TOKEN2: u128 = 2_000_000_000_000_000_000_000u128;
+pub const INIT_AMT_TOKEN3: u128 = 1_000_000_000_000_000_000_000u128;
+pub const INIT_AMT_OYL: u128 = 1_000_000_000_000_000_000_000u128;
 
 pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeploymentIds)> {
     let pool_id = if use_oyl {

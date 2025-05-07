@@ -3,17 +3,18 @@ use alkanes_support::trace::{Trace, TraceEvent};
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::Witness;
-use common::get_sheet_for_outpoint;
 use init_pools::init_block_with_amm_pool;
 use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations, ProtoruneRuneId};
 
-use crate::tests::helper::common::assert_revert_context;
 use crate::tests::helper::path_provider::create_path_provider_insert_path_block;
 use crate::tests::helper::*;
 use crate::tests::std::path_provider_build;
 use alkane_helpers::clear;
 use alkanes::indexer::index_block;
-use alkanes::tests::helpers::{self as alkane_helpers, assert_binary_deployed_to_id};
+use alkanes::tests::helpers::{
+    self as alkane_helpers, assert_binary_deployed_to_id, assert_revert_context,
+    get_last_outpoint_sheet,
+};
 use alkanes::view;
 #[allow(unused_imports)]
 use metashrew_core::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
@@ -34,7 +35,7 @@ fn test_path_provider() -> Result<()> {
         path_provider_build::get_bytes(),
     );
 
-    let sheet = get_sheet_for_outpoint(&test_block, test_block.txdata.len() - 1, 0)?;
+    let sheet = get_last_outpoint_sheet(&test_block)?;
     assert_eq!(
         sheet.get(&ProtoruneRuneId { block: 2, tx: 11 }),
         1,

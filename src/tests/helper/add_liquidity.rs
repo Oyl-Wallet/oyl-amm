@@ -1,4 +1,7 @@
 use crate::tests::helper::common::create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers;
+use alkanes::tests::helpers::{
+    get_last_outpoint_sheet, get_lazy_sheet_for_runtime, get_sheet_for_runtime,
+};
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::id::AlkaneId;
 use anyhow::Result;
@@ -10,6 +13,7 @@ use protorune_support::protostone::ProtostoneEdict;
 
 #[allow(unused_imports)]
 use metashrew_core::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
+use std::cmp::min;
 use std::fmt::Write;
 
 use super::common::*;
@@ -78,11 +82,10 @@ pub fn calc_lp_balance_from_add_liquidity(
     added_amount2: u128,
     total_supply: u128,
 ) -> u128 {
-    let root_k = ((prev_amount1 + added_amount1) * (prev_amount2 + added_amount2)).sqrt();
-    let root_k_last = (prev_amount1 * prev_amount2).sqrt();
-    let numerator = total_supply * (root_k - root_k_last);
-    let denominator = root_k * 5 + root_k_last;
-    numerator / denominator
+    min(
+        total_supply * added_amount1 / prev_amount1,
+        total_supply * added_amount2 / prev_amount2,
+    )
 }
 
 pub fn check_add_liquidity_lp_balance(
