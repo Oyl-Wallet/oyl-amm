@@ -248,13 +248,12 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         ))
     }
 
-    fn _mint_fee(&self, parcel: AlkaneTransferParcel) -> Result<()> {
+    fn _mint_fee(&self, previous_a: u128, previous_b: u128) -> Result<()> {
         let total_supply = self.total_supply();
-        let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
         let k_last = self.k_last();
         if k_last != 0 {
             let root_k_last = k_last.sqrt();
-            let root_k = checked_expr!(previous_a.value.checked_mul(previous_b.value))?.sqrt();
+            let root_k = checked_expr!(previous_a.checked_mul(previous_b))?.sqrt();
             if (root_k > root_k_last) {
                 let liquidity;
                 let root_k_diff = checked_expr!(root_k.checked_sub(root_k_last))?;
@@ -295,7 +294,7 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             reserve_a.value - previous_a.value,
             reserve_b.value - previous_b.value,
         );
-        self._mint_fee(parcel)?;
+        self._mint_fee(previous_a.value, previous_b.value)?;
         let total_supply = self.total_supply(); // must be defined here since totalSupply can update in _mintFee
         let liquidity;
         if total_supply == 0 {
@@ -328,6 +327,8 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         if incoming.id != myself {
             return Err(anyhow!("can only burn LP alkane for this pair"));
         }
+        let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
+        self._mint_fee(previous_a.value, previous_b.value)?;
         let liquidity = incoming.value;
         let (reserve_a, reserve_b) = self.reserves()?;
         let total_supply = self.total_supply();
@@ -382,11 +383,8 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             )));
         }
         let transfer = parcel.0[0].clone();
-        println!("transfer {:?}", transfer);
         let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
-        println!("previous {:?} {:?}", previous_a, previous_b);
         let (reserve_a, reserve_b) = self.reserves()?;
-        println!("now {:?} {:?}", reserve_a, reserve_b);
 
         if &transfer.id == &reserve_a.id {
             Ok(AlkaneTransfer {
@@ -411,16 +409,38 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         }
     }
 
+    fn _check_k_increasing(
+        &self,
+        input_parcel: &AlkaneTransferParcel,
+        output_parcel: &AlkaneTransferParcel,
+    ) -> Result<()> {
+        let (a, b) = self.reserves()?;
+        let (previous_a, previous_b) = self.previous_reserves(&input_parcel)?;
+        let outgoing_sheet: CachedBalanceSheet = output_parcel.clone().try_into()?;
+        let prev_k = U256::from(previous_a.value) * U256::from(previous_b.value);
+        let new_a = U256::from(a.value) - U256::from(outgoing_sheet.get(&a.id.into()));
+        let new_b = U256::from(b.value) - U256::from(outgoing_sheet.get(&b.id.into()));
+        let new_k = new_a * new_b;
+        if new_k < prev_k {
+            return Err(anyhow!(format!(
+                "New k ({}) is not >= prev k ({})",
+                new_k, prev_k
+            )));
+        }
+        Ok(())
+    }
+
     fn swap(&self, amount_out_predicate: u128) -> Result<CallResponse> {
         let context = self.context()?;
         let parcel: AlkaneTransferParcel = context.incoming_alkanes;
-        let output = self.get_transfer_out_from_swap(parcel, true)?;
-        println!("output from swap: {:?}", output);
+        let output = self.get_transfer_out_from_swap(parcel.clone(), true)?;
         if output.value < amount_out_predicate {
             return Err(anyhow!("predicate failed: insufficient output"));
         }
+        let output_parcel: AlkaneTransferParcel = AlkaneTransferParcel(vec![output]);
+        self._check_k_increasing(&parcel, &output_parcel)?;
         let mut response = CallResponse::default();
-        response.alkanes = AlkaneTransferParcel(vec![output]);
+        response.alkanes = output_parcel;
         Ok(response)
     }
 
