@@ -310,6 +310,9 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
                 liquidity_b / previous_b.value,
             );
         }
+        if liquidity == 0 {
+            return Err(anyhow!("INSUFFICIENT_LIQUIDITY_MINTED"));
+        }
         let mut response = CallResponse::default();
         response.alkanes.pay(self.mint(&context, liquidity)?);
         let new_k = checked_expr!(reserve_a.value.checked_mul(reserve_b.value))?;
@@ -331,6 +334,9 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         let mut response = CallResponse::default();
         let amount_a = checked_expr!(liquidity.checked_mul(reserve_a.value))? / total_supply;
         let amount_b = checked_expr!(liquidity.checked_mul(reserve_b.value))? / total_supply;
+        if amount_a == 0 || amount_b == 0 {
+            return Err(anyhow!("INSUFFICIENT_LIQUIDITY_BURNED"));
+        }
         self.set_total_supply(checked_expr!(total_supply.checked_sub(liquidity))?);
         response.alkanes = AlkaneTransferParcel(vec![
             AlkaneTransfer {
