@@ -158,7 +158,32 @@ fn test_amm_pool_skewed_init() -> Result<()> {
 #[wasm_bindgen_test]
 fn test_amm_pool_zero_init() -> Result<()> {
     clear();
-    test_amm_pool_init_fixture(1000000, 1, false)?;
+    let block_height = 840_000;
+    let (mut test_block, deployment_ids) = init_block_with_amm_pool(false)?;
+    let mut previous_outpoint = OutPoint {
+        txid: test_block.txdata.last().unwrap().compute_txid(),
+        vout: 0,
+    };
+    insert_init_pool_liquidity_txs(
+        1000000,
+        1,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
+        &mut test_block,
+        &deployment_ids,
+        previous_outpoint,
+    );
+    index_block(&test_block, block_height)?;
+
+    let outpoint = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        vout: 4,
+    };
+    assert_revert_context(
+        &outpoint,
+        "Extcall failed: ALKANES: revert: Error: INSUFFICIENT_LIQUIDITY_MINTED",
+    )?;
+
     Ok(())
 }
 
