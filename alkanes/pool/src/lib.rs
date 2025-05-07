@@ -16,6 +16,7 @@ pub enum AMMPoolMessage {
     InitPool {
         alkane_a: AlkaneId,
         alkane_b: AlkaneId,
+        factory: AlkaneId,
     },
 
     #[opcode(1)]
@@ -26,6 +27,9 @@ pub enum AMMPoolMessage {
 
     #[opcode(3)]
     Swap { amount_out_predicate: u128 },
+
+    #[opcode(10)]
+    CollectFees {},
 
     #[opcode(50)]
     ForwardIncoming,

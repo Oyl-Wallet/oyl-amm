@@ -44,6 +44,9 @@ pub enum OylAMMPoolMessage {
     #[opcode(3)]
     Swap { amount_out_predicate: u128 },
 
+    #[opcode(10)]
+    CollectFees {},
+
     #[opcode(50)]
     ForwardIncoming,
 
@@ -60,37 +63,12 @@ pub enum OylAMMPoolMessage {
 pub struct OylAMMPool();
 
 impl OylAMMPool {
-    fn factory() -> Result<AlkaneId> {
-        let ptr = StoragePointer::from_keyword("/factory_id")
-            .get()
-            .as_ref()
-            .clone();
-        let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
-        Ok(AlkaneId::new(
-            consume_u128(&mut cursor)?,
-            consume_u128(&mut cursor)?,
-        ))
-    }
-    fn set_factory(factory_id: AlkaneId) {
-        let mut factory_id_pointer = StoragePointer::from_keyword("/factory_id");
-        factory_id_pointer.set(Arc::new(factory_id.into()));
-    }
-    pub fn init_pool(
-        &self,
-        alkane_a: AlkaneId,
-        alkane_b: AlkaneId,
-        factory: AlkaneId,
-    ) -> Result<CallResponse> {
-        OylAMMPool::set_factory(factory.into());
-        AMMPoolBase::init_pool(self, alkane_a, alkane_b)
-    }
-
     fn _handle_oyl_swap_and_burn(&self, alkane_out_with_fees: AlkaneTransfer) -> Result<()> {
         let context = self.context()?;
         let alkane_out_no_fees =
             self.get_transfer_out_from_swap(context.incoming_alkanes.clone(), false)?;
 
-        let factory = OylAMMPool::factory()?;
+        let factory = self.factory()?;
         let amount_to_burn = (alkane_out_no_fees.value - alkane_out_with_fees.value)
             * FEE_TO_SWAP_TO_OYL_PER_10
             / 10;

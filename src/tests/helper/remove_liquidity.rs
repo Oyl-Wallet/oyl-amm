@@ -1,8 +1,11 @@
 use crate::tests::helper::init_pools::{
-    calc_lp_balance_from_pool_init, test_amm_pool_init_fixture,
+    calc_lp_balance_from_pool_init, test_amm_pool_init_fixture, INIT_AMT_TOKEN1, INIT_AMT_TOKEN2,
 };
 use alkanes::indexer::index_block;
-use alkanes::tests::helpers::{self as alkane_helpers};
+use alkanes::tests::helpers::{
+    self as alkane_helpers, get_last_outpoint_sheet, get_lazy_sheet_for_runtime,
+    get_sheet_for_runtime,
+};
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::id::AlkaneId;
 use anyhow::Result;
@@ -88,6 +91,8 @@ pub fn check_remove_liquidity_runtime_balance(
 
 pub fn test_amm_burn_fixture(amount_burn: u128, use_oyl: bool) -> Result<()> {
     let (amount1, amount2) = (1000000, 1000000);
+    let (amount1_leftover, amount2_leftover) =
+        (INIT_AMT_TOKEN1 - amount1, INIT_AMT_TOKEN2 - 2 * amount2);
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
     let total_supply = (amount1 * amount2).sqrt();
     let (mut init_block, deployment_ids, mut runtime_balances) =
@@ -118,12 +123,14 @@ pub fn test_amm_burn_fixture(amount_burn: u128, use_oyl: bool) -> Result<()> {
     let owned_alkane_sheets = get_last_outpoint_sheet(&test_block)?;
     let amount_returned_1 = amount_burned_true * amount1 / total_supply;
     assert_eq!(
-        owned_alkane_sheets.get_cached(&deployment_ids.owned_token_1_deployment.into()),
+        owned_alkane_sheets.get_cached(&deployment_ids.owned_token_1_deployment.into())
+            - amount1_leftover,
         amount_returned_1
     );
     let amount_returned_2 = amount_burned_true * amount2 / total_supply;
     assert_eq!(
-        owned_alkane_sheets.get_cached(&deployment_ids.owned_token_2_deployment.into()),
+        owned_alkane_sheets.get_cached(&deployment_ids.owned_token_2_deployment.into())
+            - amount2_leftover,
         amount_returned_2
     );
     check_remove_liquidity_runtime_balance(

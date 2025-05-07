@@ -37,6 +37,9 @@ pub enum AMMFactoryMessage {
     #[opcode(7)]
     SetPoolFactoryId { pool_factory_id: u128 },
 
+    #[opcode(10)]
+    CollectFees { pool_id: AlkaneId },
+
     #[opcode(20)]
     SwapAlongPath { path: Vec<AlkaneId>, amount: u128 },
 }
@@ -48,7 +51,7 @@ pub struct AMMFactory();
 impl AMMFactory {
     pub fn create_new_pool(&self) -> Result<CallResponse> {
         let (cellpack, parcel) = AMMFactoryBase::create_new_pool(self)?;
-        self.call(&cellpack, &parcel,self.fuel())
+        self.call(&cellpack, &parcel, self.fuel())
     }
 }
 

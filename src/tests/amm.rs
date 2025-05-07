@@ -4,7 +4,6 @@ use alkanes_support::trace::{Trace, TraceEvent};
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::Witness;
-use common::get_last_outpoint_sheet;
 use init_pools::{
     calc_lp_balance_from_pool_init, init_block_with_amm_pool, insert_init_pool_liquidity_txs,
     test_amm_pool_init_fixture,
@@ -18,7 +17,10 @@ use swap::{check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_factory};
 use crate::tests::helper::*;
 use alkane_helpers::clear;
 use alkanes::indexer::index_block;
-use alkanes::tests::helpers::{self as alkane_helpers, assert_token_id_has_no_deployment};
+use alkanes::tests::helpers::{
+    self as alkane_helpers, assert_revert_context, assert_revert_context_at_index,
+    assert_token_id_has_no_deployment, get_last_outpoint_sheet,
+};
 use alkanes::view;
 use alkanes_support::id::AlkaneId;
 #[allow(unused_imports)]
@@ -57,7 +59,7 @@ fn test_amm_factory_double_init_fail() -> Result<()> {
     );
     index_block(&test_block, block_height)?;
 
-    common::assert_revert_context(
+    assert_revert_context(
         &(OutPoint {
             txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
             vout: 3,
@@ -96,7 +98,7 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
     );
     index_block(&test_block, block_height)?;
 
-    common::assert_revert_context(
+    assert_revert_context(
         &(OutPoint {
             txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
             vout: 4,
@@ -141,7 +143,7 @@ fn test_amm_factory_duplicate_pool_fail() -> Result<()> {
         trace_data.0.lock().expect("Mutex poisoned").last()
     );
 
-    common::assert_revert_context(&outpoint, "ALKANES: revert: Error: pool already exists")?;
+    assert_revert_context(&outpoint, "ALKANES: revert: Error: pool already exists")?;
 
     Ok(())
 }
@@ -156,7 +158,32 @@ fn test_amm_pool_skewed_init() -> Result<()> {
 #[wasm_bindgen_test]
 fn test_amm_pool_zero_init() -> Result<()> {
     clear();
-    test_amm_pool_init_fixture(1000000, 1, false)?;
+    let block_height = 840_000;
+    let (mut test_block, deployment_ids) = init_block_with_amm_pool(false)?;
+    let mut previous_outpoint = OutPoint {
+        txid: test_block.txdata.last().unwrap().compute_txid(),
+        vout: 0,
+    };
+    insert_init_pool_liquidity_txs(
+        1000000,
+        1,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
+        &mut test_block,
+        &deployment_ids,
+        previous_outpoint,
+    );
+    index_block(&test_block, block_height)?;
+
+    let outpoint = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        vout: 4,
+    };
+    assert_revert_context(
+        &outpoint,
+        "Extcall failed: ALKANES: revert: Error: INSUFFICIENT_LIQUIDITY_MINTED",
+    )?;
+
     Ok(())
 }
 
@@ -192,14 +219,14 @@ fn test_amm_pool_bad_init() -> Result<()> {
     };
 
     // Check the second-to-last trace event
-    common::assert_revert_context_at_index(
+    assert_revert_context_at_index(
         &outpoint,
         "Overflow error in expression: root_k.checked_sub(MINIMUM_LIQUIDITY)",
         Some(-2),
     )?;
 
     // Check the last trace event
-    common::assert_revert_context(
+    assert_revert_context(
         &outpoint,
         "Extcall failed: ALKANES: revert: Error: Overflow error in expression: root_k.checked_sub(MINIMUM_LIQUIDITY)"
     )?;
@@ -277,6 +304,44 @@ fn test_amm_pool_add_more_liquidity() -> Result<()> {
 }
 
 #[wasm_bindgen_test]
+fn test_amm_pool_add_more_liquidity_one_sided() -> Result<()> {
+    clear();
+    let (amount1, amount2) = (500000, 500000);
+    let total_supply = (amount1 * amount2).sqrt();
+    let (init_block, deployment_ids, mut runtime_balances) =
+        test_amm_pool_init_fixture(amount1, amount2, false)?;
+    let block_height = 840_001;
+    let mut add_liquidity_block = create_block_with_coinbase_tx(block_height);
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    insert_add_liquidity_txs(
+        amount1,
+        1,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
+        deployment_ids.amm_pool_1_deployment,
+        &mut add_liquidity_block,
+        input_outpoint,
+    );
+    index_block(&add_liquidity_block, block_height)?;
+
+    check_add_liquidity_lp_balance(
+        amount1,
+        amount2,
+        amount1,
+        1,
+        total_supply,
+        &add_liquidity_block,
+        deployment_ids.amm_pool_1_deployment,
+    )?;
+
+    check_add_liquidity_runtime_balance(&mut runtime_balances, amount1, 1, 0, &deployment_ids)?;
+    Ok(())
+}
+
+#[wasm_bindgen_test]
 fn test_amm_pool_add_more_liquidity_to_wrong_pool() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
@@ -312,7 +377,7 @@ fn test_amm_pool_add_more_liquidity_to_wrong_pool() -> Result<()> {
 
     check_add_liquidity_runtime_balance(&mut runtime_balances, 0, 0, 0, &deployment_ids)?;
 
-    common::assert_revert_context(
+    assert_revert_context(
         &(OutPoint {
             txid: add_liquidity_block.txdata[add_liquidity_block.txdata.len() - 1].compute_txid(),
             vout: 5,
@@ -796,7 +861,7 @@ fn test_find_nonexisting_pool_id() -> Result<()> {
         trace_data.0.lock().expect("Mutex poisoned").last()
     );
 
-    common::assert_revert_context(
+    assert_revert_context(
         &outpoint_3,
         "Error: the pool AlkaneId { block: 12, tx: 100 } AlkaneId { block: 13, tx: 101 } doesn't exist in the factory",
     )?;
