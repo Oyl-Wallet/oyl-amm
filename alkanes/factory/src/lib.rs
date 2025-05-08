@@ -15,7 +15,10 @@ use metashrew_support::compat::to_arraybuffer_layout;
 #[derive(MessageDispatch)]
 pub enum AMMFactoryMessage {
     #[opcode(0)]
-    InitFactory { pool_factory_id: u128 },
+    InitFactory {
+        pool_factory_id: u128,
+        auth_token_units: u128,
+    },
 
     #[opcode(1)]
     CreateNewPool,

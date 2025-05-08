@@ -85,13 +85,13 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
             ))
         }
     }
-    fn init_factory(&self, pool_factory_id: u128) -> Result<CallResponse> {
+    fn init_factory(&self, pool_factory_id: u128, auth_token_units: u128) -> Result<CallResponse> {
         self.observe_initialization()?;
         let context = self.context()?;
         let mut pool_factory_id_pointer = StoragePointer::from_keyword("/pool_factory_id");
         // set the address for the implementation for AMM pool
         pool_factory_id_pointer.set(Arc::new(pool_factory_id.to_bytes()));
-        let auth_token = self.deploy_auth_token(1u128)?;
+        let auth_token = self.deploy_auth_token(auth_token_units)?;
         let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
         response.alkanes.pay(auth_token);
         Ok(response)

@@ -92,6 +92,7 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
             inputs: vec![
                 0,
                 pool_id,
+                10, // 10 auth tokens
                 deployed_ids.amm_path_provider_deployment.block,
                 deployed_ids.amm_path_provider_deployment.tx,
                 deployed_ids.oyl_token_deployment.block,
@@ -132,7 +133,7 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
         // path provider
         Cellpack {
             target: AlkaneId { block: 1, tx: 0 },
-            inputs: vec![0],
+            inputs: vec![0, 10], // 10 auth token units
         },
     ]
     .into();
