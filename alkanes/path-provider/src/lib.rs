@@ -15,7 +15,7 @@ use metashrew_support::compat::to_arraybuffer_layout;
 #[derive(MessageDispatch)]
 pub enum AMMPathProviderMessage {
     #[opcode(0)]
-    InitPathProvider,
+    InitPathProvider { auth_token_units: u128 },
     #[opcode(1)]
     #[returns(Vec<AlkaneId>)]
     GetOptimalPath { start: AlkaneId, end: AlkaneId },

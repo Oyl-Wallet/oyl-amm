@@ -26,6 +26,7 @@ pub enum OylAMMFactoryMessage {
     #[opcode(0)]
     InitFactory {
         pool_factory_id: u128,
+        auth_token_units: u128,
         path_provider_id: AlkaneId,
         oyl_token_id: AlkaneId,
     },
@@ -109,10 +110,11 @@ impl OylAMMFactory {
     pub fn init_factory(
         &self,
         pool_factory_id: u128,
+        auth_token_units: u128,
         path_provider_id: AlkaneId,
         oyl_token_id: AlkaneId,
     ) -> Result<CallResponse> {
-        let response = AMMFactoryBase::init_factory(self, pool_factory_id)?;
+        let response = AMMFactoryBase::init_factory(self, pool_factory_id, auth_token_units)?;
         OylAMMFactory::set_path_provider(path_provider_id);
         OylAMMFactory::set_oyl_token(oyl_token_id);
         Ok(response)

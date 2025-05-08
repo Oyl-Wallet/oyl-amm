@@ -14,10 +14,10 @@ use metashrew_support::{
 use std::sync::Arc;
 
 pub trait AMMPathProviderBase: AuthenticatedResponder {
-    fn init_path_provider(&self) -> Result<CallResponse> {
+    fn init_path_provider(&self, auth_token_units: u128) -> Result<CallResponse> {
         self.observe_initialization()?;
         let context = self.context()?;
-        let auth_token = self.deploy_auth_token(1u128)?;
+        let auth_token = self.deploy_auth_token(auth_token_units)?;
         let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
         response.alkanes.pay(auth_token);
         Ok(response)
