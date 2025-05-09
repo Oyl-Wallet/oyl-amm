@@ -38,14 +38,30 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
     let (amount1, amount2) = (500000000, 500000000);
     let (init_block, deployment_ids, mut runtime_balances) =
         test_amm_pool_init_fixture(amount1, amount2)?;
-    let total_lp = calc_lp_balance_from_pool_init(amount1, amount2);
-    let block_height = 840_001;
-    let mut swap_block = create_block_with_coinbase_tx(block_height);
+    let mut add_liquidity_block = create_block_with_coinbase_tx(840_001);
     let input_outpoint = OutPoint {
         txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
         vout: 0,
     };
-    let amount_to_swap = 10000000000;
+    insert_add_liquidity_txs(
+        amount1,
+        amount2,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
+        deployment_ids.amm_pool_1_deployment,
+        &mut add_liquidity_block,
+        input_outpoint,
+    );
+    index_block(&add_liquidity_block, 840_001)?;
+
+    let block_height = 840_002;
+
+    let mut swap_block = create_block_with_coinbase_tx(block_height);
+    let input_outpoint = OutPoint {
+        txid: add_liquidity_block.txdata[add_liquidity_block.txdata.len() - 1].compute_txid(),
+        vout: 2,
+    };
+    let amount_to_swap = 10000000000_000;
     insert_swap_txs(
         amount_to_swap,
         deployment_ids.owned_token_1_deployment,
@@ -63,7 +79,7 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
     };
     let first_swap_sheet = get_last_outpoint_sheet(&swap_block)?;
     insert_swap_txs(
-        477028818,
+        first_swap_sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()) * 1005 / 1000,
         deployment_ids.owned_token_2_deployment,
         0,
         &mut swap_block2,
@@ -113,11 +129,11 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
         true,
     );
     insert_remove_liquidity_txs(
-        total_lp,
+        amount1,
         &mut burn_block,
         OutPoint {
-            txid: collect_block.txdata[collect_block.txdata.len() - 1].compute_txid(),
-            vout: 2,
+            txid: add_liquidity_block.txdata[add_liquidity_block.txdata.len() - 1].compute_txid(),
+            vout: 0,
         },
         deployment_ids.amm_pool_1_deployment,
         true,

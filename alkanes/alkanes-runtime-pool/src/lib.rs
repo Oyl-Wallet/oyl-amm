@@ -254,14 +254,13 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         if k_last != 0 {
             let root_k_last = k_last.sqrt();
             let root_k = checked_expr!(previous_a.checked_mul(previous_b))?.sqrt();
+            println!("last {} current {}", root_k_last, root_k);
             if (root_k > root_k_last) {
-                let liquidity;
-                let root_k_diff = checked_expr!(root_k.checked_sub(root_k_last))?;
-                let numerator = checked_expr!(total_supply.checked_mul(root_k_diff))?;
-                let root_k_times_5 = checked_expr!(root_k.checked_mul(3))? / 2; // assuming 2/5 of 0.5% fee goes to protocol
-                let denominator = checked_expr!(root_k_times_5.checked_add(root_k_last))?;
-                liquidity = numerator / denominator;
-                self.set_total_supply(checked_expr!(total_supply.checked_add(liquidity))?);
+                let numerator = checked_expr!(total_supply.checked_mul(root_k - root_k_last))?;
+                let root_k_fee_adj = checked_expr!(root_k.checked_mul(5))?; // assuming 2/5 of 0.5% fee goes to protocol
+                let denominator = checked_expr!(root_k_fee_adj.checked_add(root_k_last))?;
+                let liquidity = numerator / denominator;
+                self.increase_total_supply(liquidity)?;
                 self.set_claimable_fees(checked_expr!(self
                     .claimable_fees()
                     .checked_add(liquidity))?);
@@ -282,6 +281,8 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             value: self.claimable_fees(),
         });
         self.set_claimable_fees(0);
+        let new_k = checked_expr!(previous_a.value.checked_mul(previous_b.value))?;
+        self.set_k_last(new_k);
         Ok(response)
     }
 
@@ -352,7 +353,8 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             },
         ]);
 
-        let new_k = checked_expr!(reserve_a.value.checked_mul(reserve_b.value))?;
+        let new_k =
+            checked_expr!((reserve_a.value - amount_a).checked_mul(reserve_b.value - amount_b))?;
         self.set_k_last(new_k);
         Ok(response)
     }
