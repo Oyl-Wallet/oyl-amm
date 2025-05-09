@@ -254,10 +254,9 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         if k_last != 0 {
             let root_k_last = k_last.sqrt();
             let root_k = checked_expr!(previous_a.checked_mul(previous_b))?.sqrt();
-            println!("last {} current {}", root_k_last, root_k);
             if (root_k > root_k_last) {
                 let numerator = checked_expr!(total_supply.checked_mul(root_k - root_k_last))?;
-                let root_k_fee_adj = checked_expr!(root_k.checked_mul(5))?; // assuming 2/5 of 0.5% fee goes to protocol
+                let root_k_fee_adj = checked_expr!(root_k.checked_mul(3))? / 2; // assuming 2/5 of 0.5% fee goes to protocol
                 let denominator = checked_expr!(root_k_fee_adj.checked_add(root_k_last))?;
                 let liquidity = numerator / denominator;
                 self.increase_total_supply(liquidity)?;

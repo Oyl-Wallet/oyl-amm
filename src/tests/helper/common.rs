@@ -227,3 +227,21 @@ pub fn create_multiple_cellpack_with_witness_and_in_with_edicts(
         false,
     )
 }
+
+pub fn divide_round_u128(numerator: u128, denominator: u128) -> u128 {
+    // Check if denominator is non-zero (safe to divide)
+    if denominator == 0 {
+        panic!("Division by zero is not allowed!");
+    }
+
+    // Calculate quotient and remainder
+    let quotient = numerator / denominator;
+    let remainder = numerator % denominator;
+
+    // Round if the remainder is greater than or equal to half the denominator
+    if remainder * 2 >= denominator {
+        quotient + 1
+    } else {
+        quotient
+    }
+}

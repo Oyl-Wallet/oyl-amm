@@ -14,6 +14,7 @@ use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
 use swap::{check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_factory};
 
+use crate::tests::helper::common::divide_round_u128;
 use crate::tests::helper::remove_liquidity::insert_remove_liquidity_txs;
 use crate::tests::helper::*;
 use alkane_helpers::clear;
@@ -61,7 +62,7 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
         txid: add_liquidity_block.txdata[add_liquidity_block.txdata.len() - 1].compute_txid(),
         vout: 2,
     };
-    let amount_to_swap = 10000000000_000;
+    let amount_to_swap = 10000000;
     insert_swap_txs(
         amount_to_swap,
         deployment_ids.owned_token_1_deployment,
@@ -143,6 +144,25 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
 
     let fees_sheet = get_sheet_for_outpoint(&burn_block, burn_block.txdata.len() - 2, 0)?;
     let lp_sheet = get_last_outpoint_sheet(&burn_block)?;
+
+    let user_fees_earned_a =
+        lp_sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()) - amount1;
+    let user_fees_earned_b =
+        lp_sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()) - amount2;
+
+    let implied_total_fees_a =
+        fees_sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()) * 10 / 4;
+    let implied_total_fees_b =
+        fees_sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()) * 10 / 4;
+
+    assert_eq!(
+        divide_round_u128(implied_total_fees_a * 6 / 10 / 2, 1000), // 60% goes to LPs, half of that goes to this LP position, then we take 3 digits of
+        divide_round_u128(user_fees_earned_a, 1000)
+    );
+    assert_eq!(
+        divide_round_u128(implied_total_fees_b * 6 / 10 / 2, 1000),
+        divide_round_u128(user_fees_earned_b, 1000)
+    );
 
     Ok(())
 }
