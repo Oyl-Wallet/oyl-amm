@@ -21,7 +21,6 @@ use std::fmt::Write;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use super::helper::add_liquidity::{calc_lp_balance_from_add_liquidity, insert_add_liquidity_txs};
-use super::helper::path_provider::create_path_provider_insert_path_block;
 use super::helper::remove_liquidity::insert_remove_liquidity_txs;
 use super::helper::swap::check_swap_runtime_balance;
 
@@ -36,7 +35,7 @@ fn test_precision_loss_attack() -> Result<()> {
 
     // Initialize the pool
     let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2, true)?;
+        test_amm_pool_init_fixture(amount1, amount2)?;
 
     // Calculate the initial invariant (k = x * y)
     let initial_invariant = amount1 * amount2;
@@ -120,6 +119,7 @@ fn test_precision_loss_attack() -> Result<()> {
             &mut remove_liquidity_block,
             input_outpoint,
             deployment_ids.amm_pool_1_deployment,
+            false,
         );
 
         // Process the block

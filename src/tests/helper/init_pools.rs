@@ -1,6 +1,4 @@
-use crate::tests::std::{
-    oyl_factory_build, oyl_pool_build, oyl_token_build, path_provider_build, pool_build,
-};
+use crate::tests::std::{factory_build, oyl_token_build, pool_build};
 use alkanes::indexer::index_block;
 use alkanes::precompiled::{alkanes_std_auth_token_build, alkanes_std_owned_token_build};
 use alkanes::tests::helpers::{
@@ -23,34 +21,24 @@ use std::fmt::Write;
 
 use super::common::*;
 
-pub const OYL_AMM_POOL_FACTORY_ID: u128 = 0xf041;
 pub const INIT_AMT_TOKEN1: u128 = 1_000_000_000_000_000_000_000u128;
 pub const INIT_AMT_TOKEN2: u128 = 2_000_000_000_000_000_000_000u128;
 pub const INIT_AMT_TOKEN3: u128 = 1_000_000_000_000_000_000_000u128;
 pub const INIT_AMT_OYL: u128 = 1_000_000_000_000_000_000_000u128;
 
-pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeploymentIds)> {
-    let pool_id = if use_oyl {
-        OYL_AMM_POOL_FACTORY_ID
-    } else {
-        AMM_FACTORY_ID
-    };
-
+pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
     // note: the order that these are defined matters, since the tx_terator will increment by one
     let deployed_ids = AmmTestDeploymentIds {
         amm_pool_factory: AlkaneId {
             block: 4,
             tx: AMM_FACTORY_ID,
         },
-        oyl_amm_pool_factory: AlkaneId {
-            block: 4,
-            tx: OYL_AMM_POOL_FACTORY_ID,
-        },
         auth_token_factory: AlkaneId {
             block: 4,
             tx: AUTH_TOKEN_FACTORY_ID,
         },
-        amm_factory_deployment: AlkaneId { block: 2, tx: 1 }, // 2 is the auth token
+        amm_factory_deployment: AlkaneId { block: 2, tx: 1 },
+        amm_factory_auth_token: AlkaneId { block: 2, tx: 2 },
         owned_token_1_deployment: AlkaneId { block: 2, tx: 3 },
         auth_token_1_deployment: AlkaneId { block: 2, tx: 4 },
         owned_token_2_deployment: AlkaneId { block: 2, tx: 5 },
@@ -58,9 +46,8 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
         owned_token_3_deployment: AlkaneId { block: 2, tx: 7 },
         auth_token_3_deployment: AlkaneId { block: 2, tx: 8 },
         oyl_token_deployment: AlkaneId { block: 2, tx: 9 },
-        amm_path_provider_deployment: AlkaneId { block: 2, tx: 10 },
-        amm_pool_1_deployment: AlkaneId { block: 2, tx: 12 },
-        amm_pool_2_deployment: AlkaneId { block: 2, tx: 13 },
+        amm_pool_1_deployment: AlkaneId { block: 2, tx: 10 },
+        amm_pool_2_deployment: AlkaneId { block: 2, tx: 11 },
     };
     let cellpacks: Vec<Cellpack> = [
         //amm pool init (in factory space so new pools can copy this code)
@@ -68,13 +55,6 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
             target: AlkaneId {
                 block: 3,
                 tx: AMM_FACTORY_ID,
-            },
-            inputs: vec![50],
-        },
-        Cellpack {
-            target: AlkaneId {
-                block: 3,
-                tx: OYL_AMM_POOL_FACTORY_ID,
             },
             inputs: vec![50],
         },
@@ -91,12 +71,8 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
             target: AlkaneId { block: 1, tx: 0 },
             inputs: vec![
                 0,
-                pool_id,
+                AMM_FACTORY_ID,
                 10, // 10 auth tokens
-                deployed_ids.amm_path_provider_deployment.block,
-                deployed_ids.amm_path_provider_deployment.tx,
-                deployed_ids.oyl_token_deployment.block,
-                deployed_ids.oyl_token_deployment.tx,
             ],
         },
         // token 1 init 1 auth token and mint 1000000 owned tokens. Also deploys owned token contract at {2,2}
@@ -130,24 +106,17 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
                 u128::from_le_bytes(*b"OYL\0\0\0\0\0\0\0\0\0\0\0\0\0"),
             ],
         },
-        // path provider
-        Cellpack {
-            target: AlkaneId { block: 1, tx: 0 },
-            inputs: vec![0, 10], // 10 auth token units
-        },
     ]
     .into();
     let test_block = alkane_helpers::init_with_multiple_cellpacks_with_tx(
         [
             pool_build::get_bytes(),
-            oyl_pool_build::get_bytes(),
             alkanes_std_auth_token_build::get_bytes(),
-            oyl_factory_build::get_bytes(),
+            factory_build::get_bytes(),
             alkanes_std_owned_token_build::get_bytes(),
             [].into(),
             [].into(),
             oyl_token_build::get_bytes(),
-            path_provider_build::get_bytes(),
         ]
         .into(),
         cellpacks,
@@ -156,22 +125,10 @@ pub fn init_block_with_amm_pool(use_oyl: bool) -> Result<(Block, AmmTestDeployme
     return Ok((test_block, deployed_ids));
 }
 
-pub fn assert_contracts_correct_ids(
-    deployment_ids: &AmmTestDeploymentIds,
-    use_oyl: bool,
-) -> Result<()> {
-    let pool_binary = if use_oyl {
-        oyl_pool_build::get_bytes()
-    } else {
-        pool_build::get_bytes()
-    };
+pub fn assert_contracts_correct_ids(deployment_ids: &AmmTestDeploymentIds) -> Result<()> {
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_pool_factory.clone(),
         pool_build::get_bytes(),
-    );
-    let _ = assert_binary_deployed_to_id(
-        deployment_ids.oyl_amm_pool_factory.clone(),
-        oyl_pool_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
         deployment_ids.auth_token_factory.clone(),
@@ -180,7 +137,7 @@ pub fn assert_contracts_correct_ids(
 
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_factory_deployment.clone(),
-        oyl_factory_build::get_bytes(),
+        factory_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
         deployment_ids.owned_token_1_deployment.clone(),
@@ -212,15 +169,11 @@ pub fn assert_contracts_correct_ids(
     );
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_pool_1_deployment.clone(),
-        pool_binary.clone(),
+        pool_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_pool_2_deployment.clone(),
-        pool_binary.clone(),
-    );
-    let _ = assert_binary_deployed_to_id(
-        deployment_ids.amm_path_provider_deployment.clone(),
-        path_provider_build::get_bytes(),
+        pool_build::get_bytes(),
     );
     Ok(())
 }
@@ -268,7 +221,7 @@ pub fn calc_lp_balance_from_pool_init(amount1: u128, amount2: u128) -> u128 {
     return (amount1 * amount2).sqrt() - MINIMUM_LIQUIDITY;
 }
 
-pub fn check_init_liquidity_lp_1_balance(
+pub fn check_init_liquidity_balance(
     amount1: u128,
     amount2: u128,
     test_block: &Block,
@@ -286,29 +239,12 @@ pub fn check_init_liquidity_lp_1_balance(
         expected_amount
     );
     assert_eq!(
-        sheet.get(&deployment_ids.owned_token_1_deployment.into()),
-        INIT_AMT_TOKEN1 - amount1
-    );
-    assert_eq!(
-        sheet.get(&deployment_ids.owned_token_2_deployment.into()),
-        INIT_AMT_TOKEN2 - amount1 - amount2
-    );
-
-    Ok(())
-}
-
-pub fn check_init_liquidity_lp_2_balance(
-    amount1: u128,
-    amount2: u128,
-    test_block: &Block,
-    deployment_ids: &AmmTestDeploymentIds,
-) -> Result<()> {
-    let sheet = get_last_outpoint_sheet(test_block)?;
-    let expected_amount = calc_lp_balance_from_pool_init(amount1, amount2);
-    println!("expected amt from init {:?}", expected_amount);
-    assert_eq!(
         sheet.get_cached(&deployment_ids.amm_pool_2_deployment.into()),
         expected_amount
+    );
+    assert_eq!(
+        sheet.get(&deployment_ids.owned_token_1_deployment.into()),
+        INIT_AMT_TOKEN1 - amount1
     );
     assert_eq!(
         sheet.get(&deployment_ids.owned_token_2_deployment.into()),
@@ -318,6 +254,7 @@ pub fn check_init_liquidity_lp_2_balance(
         sheet.get(&deployment_ids.owned_token_3_deployment.into()),
         INIT_AMT_TOKEN3 - amount2
     );
+
     Ok(())
 }
 
@@ -344,10 +281,9 @@ pub fn check_and_get_init_liquidity_runtime_balance(
 pub fn test_amm_pool_init_fixture(
     amount1: u128,
     amount2: u128,
-    use_oyl: bool,
 ) -> Result<(Block, AmmTestDeploymentIds, BalanceSheet<IndexPointer>)> {
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool(use_oyl)?;
+    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
     let mut previous_outpoint = OutPoint {
         txid: test_block.txdata.last().unwrap().compute_txid(),
         vout: 0,
@@ -377,9 +313,8 @@ pub fn test_amm_pool_init_fixture(
     );
 
     index_block(&test_block, block_height)?;
-    assert_contracts_correct_ids(&deployment_ids, use_oyl)?;
-    check_init_liquidity_lp_1_balance(amount1, amount2, &test_block, &deployment_ids)?;
-    check_init_liquidity_lp_2_balance(amount1, amount2, &test_block, &deployment_ids)?;
+    assert_contracts_correct_ids(&deployment_ids)?;
+    check_init_liquidity_balance(amount1, amount2, &test_block, &deployment_ids)?;
     let init_runtime_balance =
         check_and_get_init_liquidity_runtime_balance(amount1, amount2, &deployment_ids)?;
     Ok((test_block, deployment_ids, init_runtime_balance))

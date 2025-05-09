@@ -26,9 +26,9 @@ use std::str::FromStr;
 
 pub struct AmmTestDeploymentIds {
     pub amm_pool_factory: AlkaneId,
-    pub oyl_amm_pool_factory: AlkaneId,
     pub auth_token_factory: AlkaneId,
     pub amm_factory_deployment: AlkaneId,
+    pub amm_factory_auth_token: AlkaneId,
     pub owned_token_1_deployment: AlkaneId,
     pub auth_token_1_deployment: AlkaneId,
     pub owned_token_2_deployment: AlkaneId,
@@ -38,7 +38,6 @@ pub struct AmmTestDeploymentIds {
     pub oyl_token_deployment: AlkaneId,
     pub amm_pool_1_deployment: AlkaneId,
     pub amm_pool_2_deployment: AlkaneId,
-    pub amm_path_provider_deployment: AlkaneId,
 }
 
 pub enum CellpackOrEdict {
@@ -227,4 +226,22 @@ pub fn create_multiple_cellpack_with_witness_and_in_with_edicts(
         etch,
         false,
     )
+}
+
+pub fn divide_round_u128(numerator: u128, denominator: u128) -> u128 {
+    // Check if denominator is non-zero (safe to divide)
+    if denominator == 0 {
+        panic!("Division by zero is not allowed!");
+    }
+
+    // Calculate quotient and remainder
+    let quotient = numerator / denominator;
+    let remainder = numerator % denominator;
+
+    // Round if the remainder is greater than or equal to half the denominator
+    if remainder * 2 >= denominator {
+        quotient + 1
+    } else {
+        quotient
+    }
 }
