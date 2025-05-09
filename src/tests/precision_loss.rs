@@ -119,6 +119,7 @@ fn test_precision_loss_attack() -> Result<()> {
             &mut remove_liquidity_block,
             input_outpoint,
             deployment_ids.amm_pool_1_deployment,
+            false,
         );
 
         // Process the block

@@ -21,7 +21,6 @@ use std::fmt::Write;
 
 use super::common::*;
 
-pub const OYL_AMM_POOL_FACTORY_ID: u128 = 0xf041;
 pub const INIT_AMT_TOKEN1: u128 = 1_000_000_000_000_000_000_000u128;
 pub const INIT_AMT_TOKEN2: u128 = 2_000_000_000_000_000_000_000u128;
 pub const INIT_AMT_TOKEN3: u128 = 1_000_000_000_000_000_000_000u128;
@@ -38,7 +37,8 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
             block: 4,
             tx: AUTH_TOKEN_FACTORY_ID,
         },
-        amm_factory_deployment: AlkaneId { block: 2, tx: 1 }, // 2 is the auth token
+        amm_factory_deployment: AlkaneId { block: 2, tx: 1 },
+        amm_factory_auth_token: AlkaneId { block: 2, tx: 2 },
         owned_token_1_deployment: AlkaneId { block: 2, tx: 3 },
         auth_token_1_deployment: AlkaneId { block: 2, tx: 4 },
         owned_token_2_deployment: AlkaneId { block: 2, tx: 5 },
@@ -55,13 +55,6 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
             target: AlkaneId {
                 block: 3,
                 tx: AMM_FACTORY_ID,
-            },
-            inputs: vec![50],
-        },
-        Cellpack {
-            target: AlkaneId {
-                block: 3,
-                tx: OYL_AMM_POOL_FACTORY_ID,
             },
             inputs: vec![50],
         },
@@ -228,7 +221,7 @@ pub fn calc_lp_balance_from_pool_init(amount1: u128, amount2: u128) -> u128 {
     return (amount1 * amount2).sqrt() - MINIMUM_LIQUIDITY;
 }
 
-pub fn check_init_liquidity_lp_1_balance(
+pub fn check_init_liquidity_balance(
     amount1: u128,
     amount2: u128,
     test_block: &Block,
@@ -246,29 +239,12 @@ pub fn check_init_liquidity_lp_1_balance(
         expected_amount
     );
     assert_eq!(
-        sheet.get(&deployment_ids.owned_token_1_deployment.into()),
-        INIT_AMT_TOKEN1 - amount1
-    );
-    assert_eq!(
-        sheet.get(&deployment_ids.owned_token_2_deployment.into()),
-        INIT_AMT_TOKEN2 - amount1 - amount2
-    );
-
-    Ok(())
-}
-
-pub fn check_init_liquidity_lp_2_balance(
-    amount1: u128,
-    amount2: u128,
-    test_block: &Block,
-    deployment_ids: &AmmTestDeploymentIds,
-) -> Result<()> {
-    let sheet = get_last_outpoint_sheet(test_block)?;
-    let expected_amount = calc_lp_balance_from_pool_init(amount1, amount2);
-    println!("expected amt from init {:?}", expected_amount);
-    assert_eq!(
         sheet.get_cached(&deployment_ids.amm_pool_2_deployment.into()),
         expected_amount
+    );
+    assert_eq!(
+        sheet.get(&deployment_ids.owned_token_1_deployment.into()),
+        INIT_AMT_TOKEN1 - amount1
     );
     assert_eq!(
         sheet.get(&deployment_ids.owned_token_2_deployment.into()),
@@ -278,6 +254,7 @@ pub fn check_init_liquidity_lp_2_balance(
         sheet.get(&deployment_ids.owned_token_3_deployment.into()),
         INIT_AMT_TOKEN3 - amount2
     );
+
     Ok(())
 }
 
@@ -337,8 +314,7 @@ pub fn test_amm_pool_init_fixture(
 
     index_block(&test_block, block_height)?;
     assert_contracts_correct_ids(&deployment_ids)?;
-    check_init_liquidity_lp_1_balance(amount1, amount2, &test_block, &deployment_ids)?;
-    check_init_liquidity_lp_2_balance(amount1, amount2, &test_block, &deployment_ids)?;
+    check_init_liquidity_balance(amount1, amount2, &test_block, &deployment_ids)?;
     let init_runtime_balance =
         check_and_get_init_liquidity_runtime_balance(amount1, amount2, &deployment_ids)?;
     Ok((test_block, deployment_ids, init_runtime_balance))

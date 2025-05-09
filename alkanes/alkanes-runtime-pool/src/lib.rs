@@ -273,6 +273,8 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
     fn collect_fees(&self) -> Result<CallResponse> {
         self._only_factory_caller()?;
         let context = self.context()?;
+        let (previous_a, previous_b) = self.previous_reserves(&context.incoming_alkanes)?;
+        self._mint_fee(previous_a.value, previous_b.value)?;
         let myself = context.myself;
         let mut response = CallResponse::forward(&context.incoming_alkanes);
         response.alkanes.pay(AlkaneTransfer {

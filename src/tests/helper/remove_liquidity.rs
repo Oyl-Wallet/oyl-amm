@@ -21,16 +21,15 @@ use std::fmt::Write;
 
 use super::common::*;
 
-fn _insert_remove_liquidity_txs(
+pub fn insert_remove_liquidity_txs(
     amount: u128,
     test_block: &mut Block,
-    pool_address: AlkaneId,
     input_outpoint: OutPoint,
-    cellpack: Cellpack,
+    pool_address: AlkaneId,
+    separate_leftovers: bool,
 ) {
-    test_block
-        .txdata
-        .push(create_multiple_cellpack_with_witness_and_in_with_edicts(
+    test_block.txdata.push(
+        create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers(
             Witness::new(),
             vec![
                 CellpackOrEdict::Edict(vec![ProtostoneEdict {
@@ -38,29 +37,16 @@ fn _insert_remove_liquidity_txs(
                     amount: amount,
                     output: 0,
                 }]),
-                CellpackOrEdict::Cellpack(cellpack),
+                CellpackOrEdict::Cellpack(Cellpack {
+                    target: pool_address,
+                    inputs: vec![2],
+                }),
             ],
             input_outpoint,
             false,
-        ));
-}
-
-pub fn insert_remove_liquidity_txs(
-    amount: u128,
-    test_block: &mut Block,
-    input_outpoint: OutPoint,
-    pool_address: AlkaneId,
-) {
-    _insert_remove_liquidity_txs(
-        amount,
-        test_block,
-        pool_address,
-        input_outpoint,
-        Cellpack {
-            target: pool_address,
-            inputs: vec![2],
-        },
-    )
+            separate_leftovers,
+        ),
+    );
 }
 
 pub fn check_remove_liquidity_runtime_balance(
@@ -89,7 +75,7 @@ pub fn check_remove_liquidity_runtime_balance(
     Ok(())
 }
 
-pub fn test_amm_burn_fixture(amount_burn: u128, use_oyl: bool) -> Result<()> {
+pub fn test_amm_burn_fixture(amount_burn: u128) -> Result<()> {
     let (amount1, amount2) = (1000000, 1000000);
     let (amount1_leftover, amount2_leftover) =
         (INIT_AMT_TOKEN1 - amount1, INIT_AMT_TOKEN2 - 2 * amount2);
@@ -109,6 +95,7 @@ pub fn test_amm_burn_fixture(amount_burn: u128, use_oyl: bool) -> Result<()> {
         &mut test_block,
         input_outpoint,
         deployment_ids.amm_pool_1_deployment,
+        false,
     );
 
     index_block(&test_block, block_height)?;
@@ -120,17 +107,14 @@ pub fn test_amm_burn_fixture(amount_burn: u128, use_oyl: bool) -> Result<()> {
         total_lp - amount_burned_true
     );
 
-    let owned_alkane_sheets = get_last_outpoint_sheet(&test_block)?;
     let amount_returned_1 = amount_burned_true * amount1 / total_supply;
     assert_eq!(
-        owned_alkane_sheets.get_cached(&deployment_ids.owned_token_1_deployment.into())
-            - amount1_leftover,
+        sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()) - amount1_leftover,
         amount_returned_1
     );
     let amount_returned_2 = amount_burned_true * amount2 / total_supply;
     assert_eq!(
-        owned_alkane_sheets.get_cached(&deployment_ids.owned_token_2_deployment.into())
-            - amount2_leftover,
+        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()) - amount2_leftover,
         amount_returned_2
     );
     check_remove_liquidity_runtime_balance(

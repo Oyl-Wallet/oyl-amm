@@ -238,7 +238,7 @@ fn test_amm_pool_bad_init() -> Result<()> {
 fn test_amm_pool_burn_all() -> Result<()> {
     clear();
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
-    test_amm_burn_fixture(total_lp, false)?;
+    test_amm_burn_fixture(total_lp)?;
     Ok(())
 }
 
@@ -247,7 +247,7 @@ fn test_amm_pool_burn_some() -> Result<()> {
     clear();
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
     let burn_amount = total_lp / 3;
-    test_amm_burn_fixture(burn_amount, false)?;
+    test_amm_burn_fixture(burn_amount)?;
     Ok(())
 }
 
@@ -255,7 +255,7 @@ fn test_amm_pool_burn_some() -> Result<()> {
 fn test_amm_pool_burn_more_than_owned() -> Result<()> {
     clear();
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
-    test_amm_burn_fixture(total_lp * 2, false)?;
+    test_amm_burn_fixture(total_lp * 2)?;
     Ok(())
 }
 
@@ -553,37 +553,6 @@ fn test_amm_pool_swap_w_factory_middle_path() -> Result<()> {
     )?;
     Ok(())
 }
-
-// #[wasm_bindgen_test]
-// fn test_amm_pool_swap_oyl() -> Result<()> {
-//     clear();
-//     let (amount1, amount2) = (500000, 500000);
-//     let (init_block, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2, true)?;
-//     let block_height = 840_001;
-//     let mut swap_block = create_block_with_coinbase_tx(block_height);
-//     let input_outpoint = OutPoint {
-//         txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
-//         vout: 0,
-//     };
-//     let amount_to_swap = 10000;
-//     insert_swap_txs(
-//         amount_to_swap,
-//         deployment_ids.owned_token_1_deployment,
-//         0,
-//         &mut swap_block,
-//         input_outpoint,
-//         deployment_ids.amm_pool_1_deployment,
-//     );
-//     index_block(&swap_block, block_height)?;
-
-//     check_swap_lp_balance(
-//         vec![amount1, amount2],
-//         amount_to_swap,
-//         deployment_ids.owned_token_2_deployment,
-//         &swap_block,
-//     )?;
-//     Ok(())
-// }
 
 #[wasm_bindgen_test]
 fn test_amm_pool_name() -> Result<()> {
