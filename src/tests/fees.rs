@@ -63,7 +63,7 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
     };
     let first_swap_sheet = get_last_outpoint_sheet(&swap_block)?;
     insert_swap_txs(
-        first_swap_sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
+        477028818,
         deployment_ids.owned_token_2_deployment,
         0,
         &mut swap_block2,
