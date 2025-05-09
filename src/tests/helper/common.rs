@@ -26,7 +26,6 @@ use std::str::FromStr;
 
 pub struct AmmTestDeploymentIds {
     pub amm_pool_factory: AlkaneId,
-    pub oyl_amm_pool_factory: AlkaneId,
     pub auth_token_factory: AlkaneId,
     pub amm_factory_deployment: AlkaneId,
     pub owned_token_1_deployment: AlkaneId,
@@ -38,7 +37,6 @@ pub struct AmmTestDeploymentIds {
     pub oyl_token_deployment: AlkaneId,
     pub amm_pool_1_deployment: AlkaneId,
     pub amm_pool_2_deployment: AlkaneId,
-    pub amm_path_provider_deployment: AlkaneId,
 }
 
 pub enum CellpackOrEdict {

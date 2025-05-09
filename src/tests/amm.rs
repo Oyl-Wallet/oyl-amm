@@ -34,7 +34,7 @@ use super::helper::swap::check_swap_runtime_balance;
 #[wasm_bindgen_test]
 fn test_amm_pool_normal_init() -> Result<()> {
     clear();
-    test_amm_pool_init_fixture(1000000, 1000000, false)?;
+    test_amm_pool_init_fixture(1000000, 1000000)?;
     Ok(())
 }
 
@@ -42,7 +42,7 @@ fn test_amm_pool_normal_init() -> Result<()> {
 fn test_amm_factory_double_init_fail() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool(false)?;
+    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
     test_block.txdata.push(
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
@@ -74,7 +74,7 @@ fn test_amm_factory_double_init_fail() -> Result<()> {
 fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool(false)?;
+    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
     test_block.txdata.push(
         common::create_multiple_cellpack_with_witness_and_in_with_edicts(
             Witness::new(),
@@ -113,7 +113,7 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
 fn test_amm_factory_duplicate_pool_fail() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, deployment_ids, _) = test_amm_pool_init_fixture(amount1, amount2, false)?;
+    let (init_block, deployment_ids, _) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut init_block_2 = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -151,7 +151,7 @@ fn test_amm_factory_duplicate_pool_fail() -> Result<()> {
 #[wasm_bindgen_test]
 fn test_amm_pool_skewed_init() -> Result<()> {
     clear();
-    test_amm_pool_init_fixture(1000000 / 2, 1000000, false)?;
+    test_amm_pool_init_fixture(1000000 / 2, 1000000)?;
     Ok(())
 }
 
@@ -159,7 +159,7 @@ fn test_amm_pool_skewed_init() -> Result<()> {
 fn test_amm_pool_zero_init() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool(false)?;
+    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
     let mut previous_outpoint = OutPoint {
         txid: test_block.txdata.last().unwrap().compute_txid(),
         vout: 0,
@@ -191,7 +191,7 @@ fn test_amm_pool_zero_init() -> Result<()> {
 fn test_amm_pool_bad_init() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool(false)?;
+    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
     let previous_outpoint = OutPoint {
         txid: test_block.txdata.last().unwrap().compute_txid(),
         vout: 0,
@@ -265,7 +265,7 @@ fn test_amm_pool_add_more_liquidity() -> Result<()> {
     let (amount1, amount2) = (500000, 500000);
     let total_supply = (amount1 * amount2).sqrt();
     let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2, false)?;
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut add_liquidity_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -309,7 +309,7 @@ fn test_amm_pool_add_more_liquidity_one_sided() -> Result<()> {
     let (amount1, amount2) = (500000, 500000);
     let total_supply = (amount1 * amount2).sqrt();
     let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2, false)?;
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut add_liquidity_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -347,7 +347,7 @@ fn test_amm_pool_add_more_liquidity_to_wrong_pool() -> Result<()> {
     let (amount1, amount2) = (500000, 500000);
     let total_supply = (amount1 * amount2).sqrt();
     let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2, false)?;
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut add_liquidity_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -392,7 +392,7 @@ fn test_amm_pool_swap() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
     let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2, false)?;
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -432,7 +432,7 @@ fn test_amm_pool_swap_large() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
     let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2, false)?;
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -472,7 +472,7 @@ fn test_amm_pool_swap_w_factory() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
     let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2, false)?;
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -515,7 +515,7 @@ fn test_amm_pool_swap_w_factory_middle_path() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
     let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2, false)?;
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -589,7 +589,7 @@ fn test_amm_pool_swap_w_factory_middle_path() -> Result<()> {
 fn test_amm_pool_name() -> Result<()> {
     clear();
     // Initialize a pool
-    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
+    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     // Create a new block for testing the name
     let block_height = 840_001;
@@ -641,7 +641,7 @@ fn test_amm_pool_name() -> Result<()> {
 fn test_amm_pool_details() -> Result<()> {
     clear();
     // Initialize a pool
-    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
+    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     // Create a new block for testing the pool details
     let block_height = 840_001;
@@ -692,7 +692,7 @@ fn test_amm_pool_details() -> Result<()> {
 #[wasm_bindgen_test]
 fn test_get_num_pools() -> Result<()> {
     clear();
-    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
+    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     let block_height = 840_000;
 
@@ -754,7 +754,7 @@ fn test_get_num_pools() -> Result<()> {
 #[wasm_bindgen_test]
 fn test_find_existing_pool_id() -> Result<()> {
     clear();
-    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
+    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     let block_height = 840_000;
 
@@ -825,7 +825,7 @@ fn test_find_existing_pool_id() -> Result<()> {
 #[wasm_bindgen_test]
 fn test_find_nonexisting_pool_id() -> Result<()> {
     clear();
-    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
+    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     let block_height = 840_000;
 
@@ -872,7 +872,7 @@ fn test_find_nonexisting_pool_id() -> Result<()> {
 #[wasm_bindgen_test]
 fn test_get_all_pools() -> Result<()> {
     clear();
-    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000, false)?;
+    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     let block_height = 840_000;
 

@@ -102,7 +102,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         self.set_pool_id(pool_factory_id);
         Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
     }
-    fn create_new_pool(&self) -> Result<(Cellpack, AlkaneTransferParcel)> {
+    fn create_new_pool(&self) -> Result<CallResponse> {
         let context = self.context()?;
         if context.incoming_alkanes.0.len() != 2 {
             return Err(anyhow!(format!(
@@ -132,19 +132,28 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         StoragePointer::from_keyword("/all_pools_length")
             .set(Arc::new((length + 1).to_le_bytes().to_vec()));
 
-        Ok((
-            Cellpack {
+        self.call(
+            &Cellpack {
                 target: AlkaneId {
                     block: 6,
                     tx: self.pool_id()?,
                 },
-                inputs: vec![0, a.block, a.tx, b.block, b.tx],
+                inputs: vec![
+                    0,
+                    a.block,
+                    a.tx,
+                    b.block,
+                    b.tx,
+                    context.myself.block,
+                    context.myself.tx,
+                ],
             },
-            AlkaneTransferParcel(vec![
+            &AlkaneTransferParcel(vec![
                 context.incoming_alkanes.0[0].clone(),
                 context.incoming_alkanes.0[1].clone(),
             ]),
-        ))
+            self.fuel(),
+        )
     }
 
     fn _find_existing_pool_id(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> Result<AlkaneId> {
