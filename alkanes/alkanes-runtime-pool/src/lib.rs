@@ -29,6 +29,37 @@ pub const MINIMUM_LIQUIDITY: u128 = 1000;
 pub const DEFAULT_FEE_AMOUNT_PER_1000: u128 = 5;
 
 type U256 = Uint<256, 4>;
+struct Lock {}
+impl Lock {
+    fn lock_pointer() -> StoragePointer {
+        StoragePointer::from_keyword("/lock")
+    }
+    fn get_lock() -> u128 {
+        Lock::lock_pointer().get_value::<u128>()
+    }
+    fn set_lock(v: u128) {
+        Lock::lock_pointer().set_value::<u128>(v);
+    }
+    fn lock<F>(func: F) -> Result<CallResponse>
+    where
+        F: FnOnce() -> Result<CallResponse>,
+    {
+        if Lock::lock_pointer().get().len() != 0 && Lock::get_lock() == 1 {
+            return Err(anyhow!("LOCKED"));
+        }
+
+        // Locking the resource
+        Lock::set_lock(1);
+
+        // Run the function (this is the _ in Solidity)
+        let ret = func();
+
+        // Unlocking after function execution
+        Lock::set_lock(0);
+
+        ret
+    }
+}
 
 #[derive(Default)]
 pub struct PoolInfo {
@@ -286,76 +317,81 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
     }
 
     fn add_liquidity(&self) -> Result<CallResponse> {
-        let context = self.context()?;
-        let myself = context.myself;
-        let parcel = context.incoming_alkanes.clone();
-        self.check_inputs(&myself, &parcel, 2)?;
-        let (reserve_a, reserve_b) = self.reserves()?;
-        let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
-        let (amount_a_in, amount_b_in) = (
-            reserve_a.value - previous_a.value,
-            reserve_b.value - previous_b.value,
-        );
-        self._mint_fee(previous_a.value, previous_b.value)?;
-        let total_supply = self.total_supply(); // must be defined here since totalSupply can update in _mintFee
-        let liquidity;
-        if total_supply == 0 {
-            let root_k = checked_expr!(amount_a_in.checked_mul(amount_b_in))?.sqrt();
-            liquidity = checked_expr!(root_k.checked_sub(MINIMUM_LIQUIDITY))?;
-            self.set_total_supply(MINIMUM_LIQUIDITY);
-        } else {
-            let liquidity_a = checked_expr!(amount_a_in.checked_mul(total_supply))?;
-            let liquidity_b = checked_expr!(amount_b_in.checked_mul(total_supply))?;
-            liquidity = min(
-                liquidity_a / previous_a.value,
-                liquidity_b / previous_b.value,
+        Lock::lock(|| {
+            let context = self.context()?;
+            let myself = context.myself;
+            let parcel = context.incoming_alkanes.clone();
+            self.check_inputs(&myself, &parcel, 2)?;
+            let (reserve_a, reserve_b) = self.reserves()?;
+            let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
+            let (amount_a_in, amount_b_in) = (
+                reserve_a.value - previous_a.value,
+                reserve_b.value - previous_b.value,
             );
-        }
-        if liquidity == 0 {
-            return Err(anyhow!("INSUFFICIENT_LIQUIDITY_MINTED"));
-        }
-        let mut response = CallResponse::default();
-        response.alkanes.pay(self.mint(&context, liquidity)?);
-        let new_k = checked_expr!(reserve_a.value.checked_mul(reserve_b.value))?;
-        self.set_k_last(new_k);
-        Ok(response)
+            self._mint_fee(previous_a.value, previous_b.value)?;
+            let total_supply = self.total_supply(); // must be defined here since totalSupply can update in _mintFee
+            let liquidity;
+            if total_supply == 0 {
+                let root_k = checked_expr!(amount_a_in.checked_mul(amount_b_in))?.sqrt();
+                liquidity = checked_expr!(root_k.checked_sub(MINIMUM_LIQUIDITY))?;
+                self.set_total_supply(MINIMUM_LIQUIDITY);
+            } else {
+                let liquidity_a = checked_expr!(amount_a_in.checked_mul(total_supply))?;
+                let liquidity_b = checked_expr!(amount_b_in.checked_mul(total_supply))?;
+                liquidity = min(
+                    liquidity_a / previous_a.value,
+                    liquidity_b / previous_b.value,
+                );
+            }
+            if liquidity == 0 {
+                return Err(anyhow!("INSUFFICIENT_LIQUIDITY_MINTED"));
+            }
+            let mut response = CallResponse::default();
+            response.alkanes.pay(self.mint(&context, liquidity)?);
+            let new_k = checked_expr!(reserve_a.value.checked_mul(reserve_b.value))?;
+            self.set_k_last(new_k);
+            Ok(response)
+        })
     }
     fn burn(&self) -> Result<CallResponse> {
-        let context = self.context()?;
-        let myself = context.myself;
-        let parcel = context.incoming_alkanes;
-        self.check_inputs(&myself, &parcel, 1)?;
-        let incoming = parcel.0[0].clone();
-        if incoming.id != myself {
-            return Err(anyhow!("can only burn LP alkane for this pair"));
-        }
-        let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
-        self._mint_fee(previous_a.value, previous_b.value)?;
-        let liquidity = incoming.value;
-        let (reserve_a, reserve_b) = self.reserves()?;
-        let total_supply = self.total_supply();
-        let mut response = CallResponse::default();
-        let amount_a = checked_expr!(liquidity.checked_mul(reserve_a.value))? / total_supply;
-        let amount_b = checked_expr!(liquidity.checked_mul(reserve_b.value))? / total_supply;
-        if amount_a == 0 || amount_b == 0 {
-            return Err(anyhow!("INSUFFICIENT_LIQUIDITY_BURNED"));
-        }
-        self.set_total_supply(checked_expr!(total_supply.checked_sub(liquidity))?);
-        response.alkanes = AlkaneTransferParcel(vec![
-            AlkaneTransfer {
-                id: reserve_a.id,
-                value: amount_a,
-            },
-            AlkaneTransfer {
-                id: reserve_b.id,
-                value: amount_b,
-            },
-        ]);
+        Lock::lock(|| {
+            let context = self.context()?;
+            let myself = context.myself;
+            let parcel = context.incoming_alkanes;
+            self.check_inputs(&myself, &parcel, 1)?;
+            let incoming = parcel.0[0].clone();
+            if incoming.id != myself {
+                return Err(anyhow!("can only burn LP alkane for this pair"));
+            }
+            let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
+            self._mint_fee(previous_a.value, previous_b.value)?;
+            let liquidity = incoming.value;
+            let (reserve_a, reserve_b) = self.reserves()?;
+            let total_supply = self.total_supply();
+            let mut response = CallResponse::default();
+            let amount_a = checked_expr!(liquidity.checked_mul(reserve_a.value))? / total_supply;
+            let amount_b = checked_expr!(liquidity.checked_mul(reserve_b.value))? / total_supply;
+            if amount_a == 0 || amount_b == 0 {
+                return Err(anyhow!("INSUFFICIENT_LIQUIDITY_BURNED"));
+            }
+            self.decrease_total_supply(liquidity)?;
+            response.alkanes = AlkaneTransferParcel(vec![
+                AlkaneTransfer {
+                    id: reserve_a.id,
+                    value: amount_a,
+                },
+                AlkaneTransfer {
+                    id: reserve_b.id,
+                    value: amount_b,
+                },
+            ]);
 
-        let new_k =
-            checked_expr!((reserve_a.value - amount_a).checked_mul(reserve_b.value - amount_b))?;
-        self.set_k_last(new_k);
-        Ok(response)
+            let new_k = checked_expr!(
+                (reserve_a.value - amount_a).checked_mul(reserve_b.value - amount_b)
+            )?;
+            self.set_k_last(new_k);
+            Ok(response)
+        })
     }
     fn get_amount_out(
         &self,
@@ -434,17 +470,19 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
     }
 
     fn swap(&self, amount_out_predicate: u128) -> Result<CallResponse> {
-        let context = self.context()?;
-        let parcel: AlkaneTransferParcel = context.incoming_alkanes;
-        let output = self.get_transfer_out_from_swap(parcel.clone(), true)?;
-        if output.value < amount_out_predicate {
-            return Err(anyhow!("predicate failed: insufficient output"));
-        }
-        let output_parcel: AlkaneTransferParcel = AlkaneTransferParcel(vec![output]);
-        self._check_k_increasing(&parcel, &output_parcel)?;
-        let mut response = CallResponse::default();
-        response.alkanes = output_parcel;
-        Ok(response)
+        Lock::lock(|| {
+            let context = self.context()?;
+            let parcel: AlkaneTransferParcel = context.incoming_alkanes;
+            let output = self.get_transfer_out_from_swap(parcel.clone(), true)?;
+            if output.value < amount_out_predicate {
+                return Err(anyhow!("predicate failed: insufficient output"));
+            }
+            let output_parcel: AlkaneTransferParcel = AlkaneTransferParcel(vec![output]);
+            self._check_k_increasing(&parcel, &output_parcel)?;
+            let mut response = CallResponse::default();
+            response.alkanes = output_parcel;
+            Ok(response)
+        })
     }
 
     fn forward_incoming(&self) -> Result<CallResponse> {
