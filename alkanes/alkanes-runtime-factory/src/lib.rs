@@ -251,6 +251,98 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         Ok(response)
     }
 
+    // fn get_amount_out(
+    //     &self,
+    //     amount: u128,
+    //     reserve_from: u128,
+    //     reserve_to: u128,
+    //     use_fees: bool,
+    // ) -> Result<u128> {
+    //     let amount_in_with_fee = if use_fees {
+    //         U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(amount)
+    //     } else {
+    //         U256::from(1000) * U256::from(amount)
+    //     };
+
+    //     let numerator = amount_in_with_fee * U256::from(reserve_to);
+    //     let denominator = U256::from(1000) * U256::from(reserve_from) + amount_in_with_fee;
+    //     Ok((numerator / denominator).try_into()?)
+    // }
+    // fn get_transfer_out_from_swap(
+    //     &self,
+    //     parcel: AlkaneTransferParcel,
+    //     use_fees: bool,
+    // ) -> Result<AlkaneTransfer> {
+    //     if parcel.0.len() != 1 {
+    //         return Err(anyhow!(format!(
+    //             "payload can only include 1 alkane, sent {}",
+    //             parcel.0.len()
+    //         )));
+    //     }
+    //     let transfer = parcel.0[0].clone();
+    //     let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
+    //     let (reserve_a, reserve_b) = self.reserves()?;
+
+    //     if &transfer.id == &reserve_a.id {
+    //         Ok(AlkaneTransfer {
+    //             id: reserve_b.id,
+    //             value: self.get_amount_out(
+    //                 transfer.value,
+    //                 previous_a.value,
+    //                 previous_b.value,
+    //                 use_fees,
+    //             )?,
+    //         })
+    //     } else {
+    //         Ok(AlkaneTransfer {
+    //             id: reserve_a.id,
+    //             value: self.get_amount_out(
+    //                 transfer.value,
+    //                 previous_b.value,
+    //                 previous_a.value,
+    //                 use_fees,
+    //             )?,
+    //         })
+    //     }
+    // }
+
+    // fn _check_k_increasing(
+    //     &self,
+    //     input_parcel: &AlkaneTransferParcel,
+    //     output_parcel: &AlkaneTransferParcel,
+    // ) -> Result<()> {
+    //     let (a, b) = self.reserves()?;
+    //     let (previous_a, previous_b) = self.previous_reserves(&input_parcel)?;
+    //     let outgoing_sheet: CachedBalanceSheet = output_parcel.clone().try_into()?;
+    //     let prev_k = U256::from(previous_a.value) * U256::from(previous_b.value);
+    //     let new_a = U256::from(a.value) - U256::from(outgoing_sheet.get(&a.id.into()));
+    //     let new_b = U256::from(b.value) - U256::from(outgoing_sheet.get(&b.id.into()));
+    //     let new_k = new_a * new_b;
+    //     if new_k < prev_k {
+    //         return Err(anyhow!(format!(
+    //             "New k ({}) is not >= prev k ({})",
+    //             new_k, prev_k
+    //         )));
+    //     }
+    //     Ok(())
+    // }
+
+    // fn swap_exact_tokens_for_tokens(&self, amount_out_predicate: u128) -> Result<CallResponse> {
+    //     Lock::lock(|| {
+    //         let context = self.context()?;
+    //         let parcel: AlkaneTransferParcel = context.incoming_alkanes;
+    //         let output = self.get_transfer_out_from_swap(parcel.clone(), true)?;
+    //         if output.value < amount_out_predicate {
+    //             return Err(anyhow!("predicate failed: insufficient output"));
+    //         }
+    //         let output_parcel: AlkaneTransferParcel = AlkaneTransferParcel(vec![output]);
+    //         self._check_k_increasing(&parcel, &output_parcel)?;
+    //         let mut response = CallResponse::default();
+    //         response.alkanes = output_parcel;
+    //         Ok(response)
+    //     })
+    // }
+
     fn swap_along_path(&self, path: Vec<AlkaneId>, amount: u128) -> Result<CallResponse> {
         let context = self.context()?;
 

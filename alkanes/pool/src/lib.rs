@@ -26,7 +26,12 @@ pub enum AMMPoolMessage {
     Burn,
 
     #[opcode(3)]
-    Swap { amount_out_predicate: u128 },
+    Swap {
+        amount_0_out: u128,
+        amount_1_out: u128,
+        to: AlkaneId,
+        data: Vec<u128>,
+    },
 
     #[opcode(10)]
     CollectFees {},

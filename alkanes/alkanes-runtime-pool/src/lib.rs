@@ -27,6 +27,7 @@ use std::{cmp::min, sync::Arc};
 // per uniswap docs, the first 1e3 wei of lp token minted are burned to mitigate attacks where the value of a lp token is raised too high easily
 pub const MINIMUM_LIQUIDITY: u128 = 1000;
 pub const DEFAULT_FEE_AMOUNT_PER_1000: u128 = 5;
+pub const SWAP_EXTCALL_OPCODE: u128 = 73776170;
 
 type U256 = Uint<256, 4>;
 struct Lock {}
@@ -393,94 +394,115 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             Ok(response)
         })
     }
-    fn get_amount_out(
+
+    fn swap(
         &self,
-        amount: u128,
-        reserve_from: u128,
-        reserve_to: u128,
-        use_fees: bool,
-    ) -> Result<u128> {
-        let amount_in_with_fee = if use_fees {
-            U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(amount)
-        } else {
-            U256::from(1000) * U256::from(amount)
-        };
-
-        let numerator = amount_in_with_fee * U256::from(reserve_to);
-        let denominator = U256::from(1000) * U256::from(reserve_from) + amount_in_with_fee;
-        Ok((numerator / denominator).try_into()?)
-    }
-    fn get_transfer_out_from_swap(
-        &self,
-        parcel: AlkaneTransferParcel,
-        use_fees: bool,
-    ) -> Result<AlkaneTransfer> {
-        if parcel.0.len() != 1 {
-            return Err(anyhow!(format!(
-                "payload can only include 1 alkane, sent {}",
-                parcel.0.len()
-            )));
-        }
-        let transfer = parcel.0[0].clone();
-        let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
-        let (reserve_a, reserve_b) = self.reserves()?;
-
-        if &transfer.id == &reserve_a.id {
-            Ok(AlkaneTransfer {
-                id: reserve_b.id,
-                value: self.get_amount_out(
-                    transfer.value,
-                    previous_a.value,
-                    previous_b.value,
-                    use_fees,
-                )?,
-            })
-        } else {
-            Ok(AlkaneTransfer {
-                id: reserve_a.id,
-                value: self.get_amount_out(
-                    transfer.value,
-                    previous_b.value,
-                    previous_a.value,
-                    use_fees,
-                )?,
-            })
-        }
-    }
-
-    fn _check_k_increasing(
-        &self,
-        input_parcel: &AlkaneTransferParcel,
-        output_parcel: &AlkaneTransferParcel,
-    ) -> Result<()> {
-        let (a, b) = self.reserves()?;
-        let (previous_a, previous_b) = self.previous_reserves(&input_parcel)?;
-        let outgoing_sheet: CachedBalanceSheet = output_parcel.clone().try_into()?;
-        let prev_k = U256::from(previous_a.value) * U256::from(previous_b.value);
-        let new_a = U256::from(a.value) - U256::from(outgoing_sheet.get(&a.id.into()));
-        let new_b = U256::from(b.value) - U256::from(outgoing_sheet.get(&b.id.into()));
-        let new_k = new_a * new_b;
-        if new_k < prev_k {
-            return Err(anyhow!(format!(
-                "New k ({}) is not >= prev k ({})",
-                new_k, prev_k
-            )));
-        }
-        Ok(())
-    }
-
-    fn swap(&self, amount_out_predicate: u128) -> Result<CallResponse> {
+        amount_0_out: u128,
+        amount_1_out: u128,
+        to: AlkaneId, // goes to this address if not zero and if data is not empty, otherwise goes to caller
+        data: Vec<u128>,
+    ) -> Result<CallResponse> {
         Lock::lock(|| {
-            let context = self.context()?;
-            let parcel: AlkaneTransferParcel = context.incoming_alkanes;
-            let output = self.get_transfer_out_from_swap(parcel.clone(), true)?;
-            if output.value < amount_out_predicate {
-                return Err(anyhow!("predicate failed: insufficient output"));
+            if amount_0_out == 0 && amount_1_out == 0 {
+                return Err(anyhow!("INSUFFICIENT_OUTPUT_AMOUNT"));
             }
-            let output_parcel: AlkaneTransferParcel = AlkaneTransferParcel(vec![output]);
-            self._check_k_increasing(&parcel, &output_parcel)?;
+            let context = self.context()?;
+            let parcel = context.incoming_alkanes.clone();
+
+            let (reserve_0, reserve_1) = self.previous_reserves(&parcel)?;
+            if amount_0_out >= reserve_0.value || amount_1_out >= reserve_1.value {
+                return Err(anyhow!("INSUFFICIENT_LIQUIDITY"));
+            }
+
+            if to == reserve_0.id || to == reserve_1.id {
+                return Err(anyhow!("INVALID_TO"));
+            }
+
+            let mut alkane_transfer = AlkaneTransferParcel::default();
+
+            // Optimistically transfer tokens
+            if amount_0_out > 0 {
+                alkane_transfer.0.push(AlkaneTransfer {
+                    id: reserve_0.id.clone(),
+                    value: amount_0_out,
+                });
+            }
+
+            if amount_1_out > 0 {
+                alkane_transfer.0.push(AlkaneTransfer {
+                    id: reserve_1.id.clone(),
+                    value: amount_1_out,
+                });
+            }
+
             let mut response = CallResponse::default();
-            response.alkanes = output_parcel;
+            // If data is provided, call the recipient with the data
+            let should_send_to_extcall = !data.is_empty() && to != AlkaneId::new(0, 0);
+            if should_send_to_extcall {
+                let mut extcall_input: Vec<u128> = vec![SWAP_EXTCALL_OPCODE];
+                extcall_input.append(&mut context.caller.clone().into());
+                extcall_input.push(amount_0_out);
+                extcall_input.push(amount_1_out);
+                extcall_input.append(&mut data.clone());
+
+                self.call(
+                    &Cellpack {
+                        target: to.clone(),
+                        inputs: extcall_input,
+                    },
+                    &alkane_transfer.clone(),
+                    self.fuel(),
+                )?;
+            } else {
+                response.alkanes = alkane_transfer;
+            }
+
+            // Get the new balances after transfers
+            let (mut balance_0, mut balance_1) = self.reserves()?;
+            if !should_send_to_extcall {
+                // haven't sent the tokens yet in this case
+                balance_0.value -= amount_0_out;
+                balance_1.value -= amount_1_out;
+            }
+
+            // Calculate input amounts
+            let amount_0_in = if balance_0.value > reserve_0.value - amount_0_out {
+                balance_0.value - (reserve_0.value - amount_0_out)
+            } else {
+                0
+            };
+
+            let amount_1_in = if balance_1.value > reserve_1.value - amount_1_out {
+                balance_1.value - (reserve_1.value - amount_1_out)
+            } else {
+                0
+            };
+
+            // Check that at least one input amount is greater than 0
+            if amount_0_in == 0 && amount_1_in == 0 {
+                return Err(anyhow!("INSUFFICIENT_INPUT_AMOUNT"));
+            }
+
+            // Check K value (constant product formula)
+            // In Uniswap: balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2)
+            let balance_0_adjusted = U256::from(balance_0.value) * U256::from(1000)
+                - U256::from(amount_0_in) * U256::from(DEFAULT_FEE_AMOUNT_PER_1000);
+            let balance_1_adjusted = U256::from(balance_1.value) * U256::from(1000)
+                - U256::from(amount_1_in) * U256::from(DEFAULT_FEE_AMOUNT_PER_1000);
+
+            if balance_0_adjusted * balance_1_adjusted
+                < U256::from(reserve_0.value)
+                    * U256::from(reserve_1.value)
+                    * U256::from(1000 * 1000)
+            {
+                return Err(anyhow!("K is not increasing"));
+            }
+
+            // Update reserves with new balances
+            let new_k = checked_expr!(balance_0.value.checked_mul(balance_1.value))?;
+            self.set_k_last(new_k);
+
+            // Return response with transfers
             Ok(response)
         })
     }
