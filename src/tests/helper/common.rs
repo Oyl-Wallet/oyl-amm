@@ -38,6 +38,7 @@ pub struct AmmTestDeploymentIds {
     pub oyl_token_deployment: AlkaneId,
     pub amm_pool_1_deployment: AlkaneId,
     pub amm_pool_2_deployment: AlkaneId,
+    pub example_flashswap: AlkaneId,
 }
 
 pub enum CellpackOrEdict {

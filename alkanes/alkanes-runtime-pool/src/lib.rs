@@ -443,6 +443,7 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
                 extcall_input.append(&mut context.caller.clone().into());
                 extcall_input.push(amount_0_out);
                 extcall_input.push(amount_1_out);
+                extcall_input.push(data.len() as u128);
                 extcall_input.append(&mut data.clone());
 
                 self.call(
@@ -464,6 +465,7 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
                 balance_0.value -= amount_0_out;
                 balance_1.value -= amount_1_out;
             }
+            println!("balance_0 {:?} balance_1 {:?}", balance_0, balance_1);
 
             // Calculate input amounts
             let amount_0_in = if balance_0.value > reserve_0.value - amount_0_out {
@@ -482,6 +484,10 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             if amount_0_in == 0 && amount_1_in == 0 {
                 return Err(anyhow!("INSUFFICIENT_INPUT_AMOUNT"));
             }
+            println!(
+                "amount_0_in {:?} amount_1_in {:?}",
+                amount_0_in, amount_1_in
+            );
 
             // Check K value (constant product formula)
             // In Uniswap: balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2)
@@ -489,6 +495,11 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
                 - U256::from(amount_0_in) * U256::from(DEFAULT_FEE_AMOUNT_PER_1000);
             let balance_1_adjusted = U256::from(balance_1.value) * U256::from(1000)
                 - U256::from(amount_1_in) * U256::from(DEFAULT_FEE_AMOUNT_PER_1000);
+            println!(
+                "adjusted balance_0 {:?} balance_1 {:?}",
+                balance_0_adjusted, balance_1_adjusted
+            );
+            println!("reserve_0 {:?} reserve_1 {:?}", reserve_0, reserve_1);
 
             if balance_0_adjusted * balance_1_adjusted
                 < U256::from(reserve_0.value)
