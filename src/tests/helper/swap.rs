@@ -20,6 +20,40 @@ use super::common::{
     CellpackOrEdict,
 };
 
+pub fn insert_low_level_swap_txs(
+    input_edicts: Vec<ProtostoneEdict>,
+    test_block: &mut Block,
+    input_outpoint: OutPoint,
+    pool_address: AlkaneId,
+    amount_0_out: u128,
+    amount_1_out: u128,
+    to: AlkaneId,
+    data: Vec<u128>,
+) {
+    let mut inputs: Vec<u128> = vec![20];
+
+    inputs.push(amount_0_out);
+    inputs.push(amount_1_out);
+    inputs.append(&mut to.clone().into());
+    inputs.push(data.len() as u128);
+    inputs.append(&mut data.clone());
+    test_block.txdata.push(
+        create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers(
+            Witness::new(),
+            vec![
+                CellpackOrEdict::Edict(input_edicts),
+                CellpackOrEdict::Cellpack(Cellpack {
+                    target: pool_address,
+                    inputs: inputs,
+                }),
+            ],
+            input_outpoint,
+            false,
+            true,
+        ),
+    );
+}
+
 fn _insert_swap_txs(
     amount: u128,
     swap_from_token: AlkaneId,

@@ -1,4 +1,4 @@
-use crate::tests::std::{factory_build, oyl_token_build, pool_build};
+use crate::tests::std::{example_flashswap_build, factory_build, oyl_token_build, pool_build};
 use alkanes::indexer::index_block;
 use alkanes::precompiled::{alkanes_std_auth_token_build, alkanes_std_owned_token_build};
 use alkanes::tests::helpers::{
@@ -46,8 +46,9 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
         owned_token_3_deployment: AlkaneId { block: 2, tx: 7 },
         auth_token_3_deployment: AlkaneId { block: 2, tx: 8 },
         oyl_token_deployment: AlkaneId { block: 2, tx: 9 },
-        amm_pool_1_deployment: AlkaneId { block: 2, tx: 10 },
-        amm_pool_2_deployment: AlkaneId { block: 2, tx: 11 },
+        example_flashswap: AlkaneId { block: 2, tx: 10 },
+        amm_pool_1_deployment: AlkaneId { block: 2, tx: 11 },
+        amm_pool_2_deployment: AlkaneId { block: 2, tx: 12 },
     };
     let cellpacks: Vec<Cellpack> = [
         //amm pool init (in factory space so new pools can copy this code)
@@ -106,6 +107,10 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
                 u128::from_le_bytes(*b"OYL\0\0\0\0\0\0\0\0\0\0\0\0\0"),
             ],
         },
+        Cellpack {
+            target: AlkaneId { block: 1, tx: 0 },
+            inputs: vec![0],
+        },
     ]
     .into();
     let test_block = alkane_helpers::init_with_multiple_cellpacks_with_tx(
@@ -117,6 +122,7 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
             [].into(),
             [].into(),
             oyl_token_build::get_bytes(),
+            example_flashswap_build::get_bytes(),
         ]
         .into(),
         cellpacks,
