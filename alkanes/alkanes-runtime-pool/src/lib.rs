@@ -498,13 +498,51 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
                 return Err(anyhow!("K is not increasing"));
             }
 
-            // Update reserves with new balances
-            let new_k = checked_expr!(balance_0.value.checked_mul(balance_1.value))?;
-            self.set_k_last(new_k);
-
             // Return response with transfers
             Ok(response)
         })
+    }
+
+    fn _get_amount_out(&self, amount: u128, reserve_from: u128, reserve_to: u128) -> Result<u128> {
+        let amount_in_with_fee =
+            U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(amount);
+
+        let numerator = amount_in_with_fee * U256::from(reserve_to);
+        let denominator = U256::from(1000) * U256::from(reserve_from) + amount_in_with_fee;
+        Ok((numerator / denominator).try_into()?)
+    }
+    fn get_amount_out(&self, parcel: AlkaneTransferParcel) -> Result<(u128, u128)> {
+        if parcel.0.len() != 1 {
+            return Err(anyhow!(format!(
+                "payload can only include 1 alkane, sent {}",
+                parcel.0.len()
+            )));
+        }
+        let transfer = parcel.0[0].clone();
+        let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
+        let (reserve_a, reserve_b) = self.alkanes_for_self()?;
+
+        if &transfer.id == &reserve_a {
+            Ok((
+                0,
+                self._get_amount_out(transfer.value, previous_a.value, previous_b.value)?,
+            ))
+        } else {
+            Ok((
+                self._get_amount_out(transfer.value, previous_b.value, previous_a.value)?,
+                0,
+            ))
+        }
+    }
+
+    fn swap_exact_tokens_for_tokens(&self, amount_out_predicate: u128) -> Result<CallResponse> {
+        let context = self.context()?;
+        let parcel: AlkaneTransferParcel = context.incoming_alkanes;
+        let (amount_0_out, amount_1_out) = self.get_amount_out(parcel.clone())?;
+        if amount_0_out < amount_out_predicate && amount_1_out < amount_out_predicate {
+            return Err(anyhow!("predicate failed: insufficient output"));
+        }
+        self.swap(amount_0_out, amount_1_out, context.caller, vec![])
     }
 
     fn forward_incoming(&self) -> Result<CallResponse> {

@@ -26,15 +26,19 @@ pub enum AMMPoolMessage {
     Burn,
 
     #[opcode(3)]
+    SwapExactTokensForTokens { amount_out_predicate: u128 },
+
+    #[opcode(10)]
+    CollectFees {},
+
+    // this low level function should generally not be called directly unless the user is experienced with alkanes contracts
+    #[opcode(20)]
     Swap {
         amount_0_out: u128,
         amount_1_out: u128,
         to: AlkaneId,
         data: Vec<u128>,
     },
-
-    #[opcode(10)]
-    CollectFees {},
 
     #[opcode(50)]
     ForwardIncoming,
