@@ -467,20 +467,33 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             }
             println!("balance_0 {:?} balance_1 {:?}", balance_0, balance_1);
 
-            // Calculate input amounts. Slightly differs from uniswap: balance_0.value - (reserve_0.value - amount_0_out)
-            // we don't want to charge fees on input amounts that go back out (treated as a refund).
-            // Ex: input 5000 of token0, output 5000 token0. Should not take any fee on that input since it's treated as a refund
-            let amount_0_in = if balance_0.value > reserve_0.value {
-                balance_0.value - reserve_0.value
+            // Calculate input amounts.
+            let mut amount_0_in = if balance_0.value > reserve_0.value - amount_0_out {
+                balance_0.value - (reserve_0.value - amount_0_out)
             } else {
                 0
             };
 
-            let amount_1_in = if balance_1.value > reserve_1.value {
-                balance_1.value - reserve_1.value
+            let mut amount_1_in = if balance_1.value > reserve_1.value - amount_1_out {
+                balance_1.value - (reserve_1.value - amount_1_out)
             } else {
                 0
             };
+
+            if !should_send_to_extcall {
+                // we don't want to charge fees on input amounts that go back out and not used for flashswaps (treated as a refund).
+                // Ex: input 5000 of token0, output 5000 token0. Should not take any fee on that input since it's treated as a refund
+                amount_0_in = if amount_0_in >= amount_0_out {
+                    amount_0_in - amount_0_out
+                } else {
+                    amount_0_in
+                };
+                amount_1_in = if amount_1_in >= amount_1_out {
+                    amount_1_in - amount_1_out
+                } else {
+                    amount_1_in
+                };
+            }
 
             // Check that at least one input amount is greater than 0
             if amount_0_in == 0 && amount_1_in == 0 {

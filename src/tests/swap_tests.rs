@@ -686,7 +686,7 @@ fn test_amm_pool_swap_tokens_for_exact_2() -> Result<()> {
         5000
     );
     assert_eq!(
-        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
+        sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
         4924
     );
     Ok(())
