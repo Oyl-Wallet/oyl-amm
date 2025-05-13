@@ -777,9 +777,9 @@ fn test_find_existing_pool_id() -> Result<()> {
                     data[0]
                 );
                 assert_eq!(
-                    data[16], 10,
-                    "Expected second u128 of data to be 10, but got {}",
-                    data[16]
+                    data[16] as u128, deployment_ids.amm_pool_1_deployment.tx,
+                    "Expected second u128 of data to be {}, but got {}",
+                    deployment_ids.amm_pool_1_deployment.tx, data[16]
                 );
             }
             _ => panic!("Expected ReturnContext variant, but got a different variant"),
