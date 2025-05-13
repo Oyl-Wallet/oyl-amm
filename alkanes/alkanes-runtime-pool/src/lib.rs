@@ -178,9 +178,9 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         parcel: &AlkaneTransferParcel,
         n: usize,
     ) -> Result<()> {
-        if parcel.0.len() > n {
+        if parcel.0.len() != n {
             Err(anyhow!(format!(
-                "{} alkanes sent but maximum {} supported",
+                "{} alkanes sent but expected {} alkane inputs",
                 parcel.0.len(),
                 n
             )))
@@ -467,18 +467,33 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             }
             println!("balance_0 {:?} balance_1 {:?}", balance_0, balance_1);
 
-            // Calculate input amounts
-            let amount_0_in = if balance_0.value > reserve_0.value - amount_0_out {
+            // Calculate input amounts.
+            let mut amount_0_in = if balance_0.value > reserve_0.value - amount_0_out {
                 balance_0.value - (reserve_0.value - amount_0_out)
             } else {
                 0
             };
 
-            let amount_1_in = if balance_1.value > reserve_1.value - amount_1_out {
+            let mut amount_1_in = if balance_1.value > reserve_1.value - amount_1_out {
                 balance_1.value - (reserve_1.value - amount_1_out)
             } else {
                 0
             };
+
+            if !should_send_to_extcall {
+                // we don't want to charge fees on input amounts that go back out and not used for flashswaps (treated as a refund).
+                // Ex: input 5000 of token0, output 5000 token0. Should not take any fee on that input since it's treated as a refund
+                amount_0_in = if amount_0_in >= amount_0_out {
+                    amount_0_in - amount_0_out
+                } else {
+                    amount_0_in
+                };
+                amount_1_in = if amount_1_in >= amount_1_out {
+                    amount_1_in - amount_1_out
+                } else {
+                    amount_1_in
+                };
+            }
 
             // Check that at least one input amount is greater than 0
             if amount_0_in == 0 && amount_1_in == 0 {
@@ -514,21 +529,20 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         })
     }
 
-    fn _get_amount_out(&self, amount: u128, reserve_from: u128, reserve_to: u128) -> Result<u128> {
+    fn _get_amount_out(
+        &self,
+        amount_in: u128,
+        reserve_in: u128,
+        reserve_out: u128,
+    ) -> Result<u128> {
         let amount_in_with_fee =
-            U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(amount);
+            U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(amount_in);
 
-        let numerator = amount_in_with_fee * U256::from(reserve_to);
-        let denominator = U256::from(1000) * U256::from(reserve_from) + amount_in_with_fee;
+        let numerator = amount_in_with_fee * U256::from(reserve_out);
+        let denominator = U256::from(1000) * U256::from(reserve_in) + amount_in_with_fee;
         Ok((numerator / denominator).try_into()?)
     }
     fn get_amount_out(&self, parcel: AlkaneTransferParcel) -> Result<(u128, u128)> {
-        if parcel.0.len() != 1 {
-            return Err(anyhow!(format!(
-                "payload can only include 1 alkane, sent {}",
-                parcel.0.len()
-            )));
-        }
         let transfer = parcel.0[0].clone();
         let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
         let (reserve_a, reserve_b) = self.alkanes_for_self()?;
@@ -549,11 +563,65 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
     fn swap_exact_tokens_for_tokens(&self, amount_out_predicate: u128) -> Result<CallResponse> {
         let context = self.context()?;
         let parcel: AlkaneTransferParcel = context.incoming_alkanes;
+        self.check_inputs(&context.myself, &parcel, 1)?;
         let (amount_0_out, amount_1_out) = self.get_amount_out(parcel.clone())?;
         if amount_0_out < amount_out_predicate && amount_1_out < amount_out_predicate {
             return Err(anyhow!("predicate failed: insufficient output"));
         }
         self.swap(amount_0_out, amount_1_out, context.caller, vec![])
+    }
+
+    fn get_amount_in(&self, amount_out: u128, reserve_in: u128, reserve_out: u128) -> Result<u128> {
+        if amount_out == 0 {
+            return Err(anyhow!("INSUFFICIENT_OUTPUT_AMOUNT"));
+        }
+        if reserve_in == 0 || reserve_out == 0 {
+            return Err(anyhow!("INSUFFICIENT_LIQUIDITY"));
+        }
+        let numerator = U256::from(1000) * U256::from(reserve_in) * U256::from(amount_out);
+        let denominator =
+            U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(reserve_out - amount_out);
+        Ok((numerator / denominator + U256::from(1)).try_into()?)
+    }
+
+    fn swap_tokens_for_exact_tokens(
+        &self,
+        desired_amount_out: u128,
+        amount_in_max: u128,
+    ) -> Result<CallResponse> {
+        let context = self.context()?;
+        let parcel: AlkaneTransferParcel = context.incoming_alkanes;
+        self.check_inputs(&context.myself, &parcel, 1)?;
+        let transfer = parcel.0[0].clone();
+        if transfer.value < amount_in_max {
+            return Err(anyhow!("amount_in_max is higher than input amount"));
+        }
+        let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
+        let (reserve_a, reserve_b) = self.alkanes_for_self()?;
+
+        let amount_in = if &transfer.id == &reserve_a {
+            self.get_amount_in(desired_amount_out, previous_a.value, previous_b.value)?
+        } else {
+            self.get_amount_in(desired_amount_out, previous_b.value, previous_a.value)?
+        };
+        if amount_in > amount_in_max {
+            return Err(anyhow!("EXCESSIVE_INPUT_AMOUNT"));
+        }
+        if &transfer.id == &reserve_a {
+            self.swap(
+                transfer.value - amount_in,
+                desired_amount_out,
+                context.caller,
+                vec![],
+            )
+        } else {
+            self.swap(
+                desired_amount_out,
+                transfer.value - amount_in,
+                context.caller,
+                vec![],
+            )
+        }
     }
 
     fn forward_incoming(&self) -> Result<CallResponse> {
