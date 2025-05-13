@@ -12,7 +12,9 @@ use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
-use swap::{check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_factory};
+use swap::{
+    check_swap_lp_balance, insert_swap_exact_tokens_for_tokens_txs, insert_swap_txs_w_factory,
+};
 
 use crate::tests::helper::*;
 use alkane_helpers::clear;
@@ -400,7 +402,7 @@ fn test_amm_pool_swap() -> Result<()> {
         vout: 0,
     };
     let amount_to_swap = 10000;
-    insert_swap_txs(
+    insert_swap_exact_tokens_for_tokens_txs(
         amount_to_swap,
         deployment_ids.owned_token_1_deployment,
         0,
@@ -440,7 +442,7 @@ fn test_amm_pool_swap_large() -> Result<()> {
         vout: 0,
     };
     let amount_to_swap = 500000;
-    insert_swap_txs(
+    insert_swap_exact_tokens_for_tokens_txs(
         amount_to_swap,
         deployment_ids.owned_token_1_deployment,
         0,

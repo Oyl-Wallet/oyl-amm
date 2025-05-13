@@ -12,10 +12,14 @@ use init_pools::{
 };
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::protostone::ProtostoneEdict;
-use swap::{check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_factory};
+use swap::{
+    check_swap_lp_balance, insert_swap_exact_tokens_for_tokens_txs, insert_swap_txs_w_factory,
+};
 use wasm_bindgen_test::wasm_bindgen_test;
 
-use super::helper::swap::{check_swap_runtime_balance, insert_low_level_swap_txs};
+use super::helper::swap::{
+    check_swap_runtime_balance, insert_low_level_swap_txs, insert_swap_tokens_for_exact_tokens_txs,
+};
 use crate::tests::helper::*;
 use alkane_helpers::clear;
 #[allow(unused_imports)]
@@ -612,6 +616,151 @@ fn test_amm_pool_swap_with_reentrancy_swap() -> Result<()> {
     };
 
     assert_revert_context(&outpoint, "ALKANES: revert: Error: LOCKED")?;
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_pool_swap_tokens_for_exact_1() -> Result<()> {
+    clear();
+    let (amount1, amount2) = (500000, 500000);
+    let (init_block, deployment_ids, mut runtime_balances) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
+    let block_height = 840_001;
+    let mut swap_block = create_block_with_coinbase_tx(block_height);
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    let amount_to_swap = 10000;
+    insert_swap_tokens_for_exact_tokens_txs(
+        amount_to_swap,
+        deployment_ids.owned_token_1_deployment,
+        5000,
+        10000,
+        &mut swap_block,
+        input_outpoint,
+        deployment_ids.amm_pool_1_deployment,
+    );
+    index_block(&swap_block, block_height)?;
+
+    let sheet = get_last_outpoint_sheet(&swap_block)?;
+    assert_eq!(
+        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
+        5000
+    );
+    assert_eq!(
+        sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
+        4924
+    );
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_pool_swap_tokens_for_exact_2() -> Result<()> {
+    clear();
+    let (amount1, amount2) = (500000, 500000);
+    let (init_block, deployment_ids, mut runtime_balances) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
+    let block_height = 840_001;
+    let mut swap_block = create_block_with_coinbase_tx(block_height);
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    let amount_to_swap = 10000;
+    insert_swap_tokens_for_exact_tokens_txs(
+        amount_to_swap,
+        deployment_ids.owned_token_1_deployment,
+        5000,
+        5076,
+        &mut swap_block,
+        input_outpoint,
+        deployment_ids.amm_pool_1_deployment,
+    );
+    index_block(&swap_block, block_height)?;
+
+    let sheet = get_last_outpoint_sheet(&swap_block)?;
+    assert_eq!(
+        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
+        5000
+    );
+    assert_eq!(
+        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
+        4924
+    );
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_pool_swap_tokens_for_exact_3() -> Result<()> {
+    clear();
+    let (amount1, amount2) = (500000, 500000);
+    let (init_block, deployment_ids, mut runtime_balances) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
+    let block_height = 840_001;
+    let mut swap_block = create_block_with_coinbase_tx(block_height);
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    let amount_to_swap = 10000;
+    insert_swap_tokens_for_exact_tokens_txs(
+        amount_to_swap,
+        deployment_ids.owned_token_1_deployment,
+        5000,
+        5075,
+        &mut swap_block,
+        input_outpoint,
+        deployment_ids.amm_pool_1_deployment,
+    );
+    index_block(&swap_block, block_height)?;
+
+    // Check that the transaction reverted with the expected error
+    let outpoint = OutPoint {
+        txid: swap_block.txdata[swap_block.txdata.len() - 1].compute_txid(),
+        vout: 5,
+    };
+
+    assert_revert_context(&outpoint, "ALKANES: revert: Error: EXCESSIVE_INPUT_AMOUNT")?;
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_pool_swap_tokens_for_exact_4() -> Result<()> {
+    clear();
+    let (amount1, amount2) = (500000, 500000);
+    let (init_block, deployment_ids, mut runtime_balances) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
+    let block_height = 840_001;
+    let mut swap_block = create_block_with_coinbase_tx(block_height);
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    let amount_to_swap = 10000;
+    insert_swap_tokens_for_exact_tokens_txs(
+        amount_to_swap,
+        deployment_ids.owned_token_1_deployment,
+        5000,
+        10001,
+        &mut swap_block,
+        input_outpoint,
+        deployment_ids.amm_pool_1_deployment,
+    );
+    index_block(&swap_block, block_height)?;
+
+    // Check that the transaction reverted with the expected error
+    let outpoint = OutPoint {
+        txid: swap_block.txdata[swap_block.txdata.len() - 1].compute_txid(),
+        vout: 5,
+    };
+
+    assert_revert_context(
+        &outpoint,
+        "ALKANES: revert: Error: amount_in_max is higher than input amount",
+    )?;
 
     Ok(())
 }

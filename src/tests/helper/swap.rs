@@ -20,6 +20,26 @@ use super::common::{
     CellpackOrEdict,
 };
 
+fn _insert_swap_txs(
+    input_edicts: Vec<ProtostoneEdict>,
+    test_block: &mut Block,
+    input_outpoint: OutPoint,
+    cellpack: Cellpack,
+) {
+    test_block.txdata.push(
+        create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers(
+            Witness::new(),
+            vec![
+                CellpackOrEdict::Edict(input_edicts),
+                CellpackOrEdict::Cellpack(cellpack),
+            ],
+            input_outpoint,
+            false,
+            true,
+        ),
+    );
+}
+
 pub fn insert_low_level_swap_txs(
     input_edicts: Vec<ProtostoneEdict>,
     test_block: &mut Block,
@@ -37,49 +57,18 @@ pub fn insert_low_level_swap_txs(
     inputs.append(&mut to.clone().into());
     inputs.push(data.len() as u128);
     inputs.append(&mut data.clone());
-    test_block.txdata.push(
-        create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers(
-            Witness::new(),
-            vec![
-                CellpackOrEdict::Edict(input_edicts),
-                CellpackOrEdict::Cellpack(Cellpack {
-                    target: pool_address,
-                    inputs: inputs,
-                }),
-            ],
-            input_outpoint,
-            false,
-            true,
-        ),
-    );
+    _insert_swap_txs(
+        input_edicts,
+        test_block,
+        input_outpoint,
+        Cellpack {
+            target: pool_address,
+            inputs: inputs,
+        },
+    )
 }
 
-fn _insert_swap_txs(
-    amount: u128,
-    swap_from_token: AlkaneId,
-    test_block: &mut Block,
-    input_outpoint: OutPoint,
-    cellpack: Cellpack,
-) {
-    test_block.txdata.push(
-        create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers(
-            Witness::new(),
-            vec![
-                CellpackOrEdict::Edict(vec![ProtostoneEdict {
-                    id: swap_from_token.into(),
-                    amount: amount,
-                    output: 0,
-                }]),
-                CellpackOrEdict::Cellpack(cellpack),
-            ],
-            input_outpoint,
-            false,
-            true,
-        ),
-    );
-}
-
-pub fn insert_swap_txs(
+pub fn insert_swap_exact_tokens_for_tokens_txs(
     amount: u128,
     swap_from_token: AlkaneId,
     min_out: u128,
@@ -88,13 +77,40 @@ pub fn insert_swap_txs(
     pool_address: AlkaneId,
 ) {
     _insert_swap_txs(
-        amount,
-        swap_from_token,
+        vec![ProtostoneEdict {
+            id: swap_from_token.into(),
+            amount: amount,
+            output: 0,
+        }],
         test_block,
         input_outpoint,
         Cellpack {
             target: pool_address,
             inputs: vec![3, min_out],
+        },
+    )
+}
+
+pub fn insert_swap_tokens_for_exact_tokens_txs(
+    amount: u128,
+    swap_from_token: AlkaneId,
+    desired_out: u128,
+    max_in: u128,
+    test_block: &mut Block,
+    input_outpoint: OutPoint,
+    pool_address: AlkaneId,
+) {
+    _insert_swap_txs(
+        vec![ProtostoneEdict {
+            id: swap_from_token.into(),
+            amount: amount,
+            output: 0,
+        }],
+        test_block,
+        input_outpoint,
+        Cellpack {
+            target: pool_address,
+            inputs: vec![4, desired_out, max_in],
         },
     )
 }
@@ -119,7 +135,16 @@ pub fn insert_swap_txs_w_factory(
         .extend(swap_path.iter().flat_map(|s| vec![s.block, s.tx]));
     cellpack.inputs.push(min_out);
 
-    _insert_swap_txs(amount, swap_path[0], test_block, input_outpoint, cellpack)
+    _insert_swap_txs(
+        vec![ProtostoneEdict {
+            id: swap_path[0].into(),
+            amount: amount,
+            output: 0,
+        }],
+        test_block,
+        input_outpoint,
+        cellpack,
+    )
 }
 
 fn calc_swapped_balance(amount: u128, reserve_from: u128, reserve_to: u128) -> Result<u128> {

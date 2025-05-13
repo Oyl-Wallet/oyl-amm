@@ -12,7 +12,9 @@ use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
-use swap::{check_swap_lp_balance, insert_swap_txs, insert_swap_txs_w_factory};
+use swap::{
+    check_swap_lp_balance, insert_swap_exact_tokens_for_tokens_txs, insert_swap_txs_w_factory,
+};
 
 use crate::tests::helper::common::divide_round_u128;
 use crate::tests::helper::remove_liquidity::insert_remove_liquidity_txs;
@@ -63,7 +65,7 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
         vout: 2,
     };
     let amount_to_swap = 10000000;
-    insert_swap_txs(
+    insert_swap_exact_tokens_for_tokens_txs(
         amount_to_swap,
         deployment_ids.owned_token_1_deployment,
         0,
@@ -79,7 +81,7 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
         vout: 2,
     };
     let first_swap_sheet = get_last_outpoint_sheet(&swap_block)?;
-    insert_swap_txs(
+    insert_swap_exact_tokens_for_tokens_txs(
         first_swap_sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()) * 1005 / 1000,
         deployment_ids.owned_token_2_deployment,
         0,
