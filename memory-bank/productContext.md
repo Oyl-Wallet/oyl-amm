@@ -1,187 +1,65 @@
-# Swap.oyl.io Product Context
+# Product Context: swap.oyl.io
 
 ## Why This Project Exists
 
-Swap.oyl.io is a decentralized exchange (DEX) platform built on the ALKANES metaprotocol for Bitcoin. It exists to provide a secure, efficient, and decentralized way to trade cryptocurrencies without relying on centralized exchanges. By implementing an Automated Market Maker (AMM) system, it enables permissionless trading of tokens on the Bitcoin blockchain.
+The swap.oyl.io project exists to bring decentralized exchange (DEX) functionality to Bitcoin-based blockchains using the Automated Market Maker (AMM) model. While AMMs like Uniswap have become standard on Ethereum and other smart contract platforms, Bitcoin has traditionally lacked these capabilities due to its limited scripting language.
 
-The project addresses several key problems in the cryptocurrency space:
-
-1. **Centralization Risk**: Traditional exchanges represent single points of failure and are vulnerable to hacks, regulatory pressure, and mismanagement.
-2. **Custody Risk**: Users must trust centralized exchanges with their funds, exposing them to potential loss.
-3. **Limited Access**: Many centralized exchanges have geographical restrictions or complex KYC requirements.
-4. **Lack of Bitcoin DeFi**: While Ethereum and other chains have robust DeFi ecosystems, Bitcoin has historically lacked native DeFi capabilities.
+This project leverages the Alkanes framework to implement AMM functionality on Bitcoin or Bitcoin-related blockchains, enabling users to:
+- Swap tokens without relying on centralized exchanges
+- Provide liquidity and earn fees
+- Create markets for new token pairs
+- Perform multi-hop swaps across different token pairs
 
 ## Problems It Solves
 
-### 1. Decentralized Trading
+1. **Centralization Risk**: Traditional exchanges require users to trust a central authority with their funds, creating security risks and single points of failure. swap.oyl.io eliminates this risk by enabling trustless, on-chain trading.
 
-Swap.oyl.io enables peer-to-peer trading without intermediaries. Users maintain custody of their funds until the moment of trade execution, reducing counterparty risk.
+2. **Limited Bitcoin Functionality**: Bitcoin's scripting language is intentionally limited, making complex applications like AMMs challenging to implement. This project uses the Alkanes framework to overcome these limitations.
 
-### 2. Automated Liquidity
+3. **Liquidity Fragmentation**: In traditional markets, liquidity is often fragmented across multiple venues. The AMM model aggregates liquidity into pools, making it more efficient for all participants.
 
-The AMM model eliminates the need for traditional order books and market makers. Liquidity is provided by users who deposit token pairs into pools, and pricing is determined algorithmically using the constant product formula (x * y = k).
+4. **Price Discovery**: New tokens often struggle with price discovery. The AMM model provides an automatic pricing mechanism based on the ratio of tokens in each pool.
 
-### 3. Permissionless Liquidity Provision
-
-Anyone can provide liquidity to the platform by depositing token pairs, earning fees in proportion to their share of the pool.
-
-### 4. Multi-hop Swaps
-
-The factory contract enables efficient trading between token pairs that don't have direct liquidity pools by routing trades through intermediate pools.
-
-### 5. Bitcoin DeFi Expansion
-
-By building on the ALKANES metaprotocol, Swap.oyl.io extends DeFi capabilities to the Bitcoin ecosystem, allowing Bitcoin users to participate in decentralized trading without moving to other blockchains.
+5. **Accessibility**: Traditional finance often has high barriers to entry. swap.oyl.io allows anyone to participate as a trader or liquidity provider without permission.
 
 ## How It Should Work
 
-### User Perspective
+### Core Mechanics
 
-From a user's perspective, Swap.oyl.io should provide:
+1. **Pool Creation**:
+   - Users can create new liquidity pools for any pair of tokens
+   - Each pool maintains a balance of two tokens
+   - The product of the token quantities (x * y = k) remains constant during swaps
 
-1. **Simple Trading Interface**: Users should be able to easily swap one token for another with minimal friction.
-2. **Liquidity Provision**: Users should be able to add liquidity to pools and earn fees.
-3. **Pool Information**: Users should be able to view pool details, including liquidity, volume, and fees.
-4. **Portfolio Management**: Users should be able to track their liquidity positions and trading history.
+2. **Liquidity Provision**:
+   - Users can add liquidity by depositing both tokens in the correct ratio
+   - Liquidity providers receive LP tokens representing their share of the pool
+   - LP tokens can be redeemed later to withdraw liquidity plus accumulated fees
 
-### Technical Perspective
+3. **Token Swapping**:
+   - Users can swap one token for another using the pools
+   - The exchange rate is determined by the ratio of tokens in the pool
+   - A small fee is taken from each swap and distributed to liquidity providers
+   - Multi-hop swaps allow trading between tokens that don't have a direct pool
 
-From a technical perspective, Swap.oyl.io works through:
+4. **Factory Management**:
+   - The factory contract manages the creation and tracking of all pools
+   - It provides functions to find existing pools and facilitate multi-hop swaps
 
-1. **Factory Contract**: Creates and manages liquidity pools for token pairs.
-2. **Pool Contracts**: Implement the AMM logic, including swapping and liquidity management.
-3. **Factory Contract**: Handles multi-hop swaps and optimizes trading paths.
-4. **View Functions**: Provide information about pools, tokens, and user positions.
+### User Flow
 
-#### Factory and Pool Initialization Process
-
-The initialization process is a critical foundation of the Swap.oyl.io system:
-
-1. **Factory Deployment**:
-   - The Factory contract is deployed once to the blockchain
-   - It's initialized with the implementation address for Pool contracts
-   - This initialization can only happen once
-
-2. **Pool Creation**:
-   - When users want to create a new liquidity pool:
-     - They select two tokens to pair
-     - They provide initial liquidity for both tokens
-     - The Factory creates a new Pool contract for this specific pair
-   - The Factory ensures only one pool exists per token pair
-   - The Factory registers the new pool in its registry for future discovery
-
-3. **Pool Registry**:
-   - All created pools are tracked in the Factory's registry
-   - This registry enables:
-     - Pool discovery by token pair
-     - Enumeration of all available pools
-     - Multi-hop routing through connected pools
-
-4. **Pool Initialization**:
-   - Each Pool is initialized with:
-     - The addresses of its two tokens
-     - Initial liquidity amounts
-     - Fee parameters
-   - The Pool mints LP tokens to the creator proportional to the initial liquidity
-
-This initialization process ensures that:
-- Each token pair has exactly one official pool
-- All pools can be discovered through the Factory
-- The system maintains a consistent state across all components
-
-### Core Workflows
-
-#### Token Swapping
-
-1. User selects input token, output token, and input amount
-2. System calculates expected output amount using the constant product formula
-3. User approves the transaction
-4. Factory contract executes the swap, potentially through multiple pools
-5. User receives the output tokens
-
-#### Liquidity Provision
-
-1. User selects a token pair and amounts to deposit
-2. System calculates the appropriate ratio based on current pool reserves
-3. User approves the transaction
-4. Factory contract routes the request to the appropriate pool
-5. Pool mints LP tokens representing the user's share of the pool
-
-#### Liquidity Removal
-
-1. User selects a pool and the amount of LP tokens to redeem
-2. System calculates the amount of underlying tokens to return
-3. User approves the transaction
-4. Pool burns the LP tokens and returns the underlying tokens
+1. User connects their Bitcoin wallet to the swap.oyl.io interface
+2. User selects tokens to swap or provide liquidity for
+3. User approves the transaction and signs it with their wallet
+4. The transaction is submitted to the Bitcoin network
+5. Once confirmed, the swap or liquidity operation is executed on-chain
+6. User receives their tokens or LP tokens in their wallet
 
 ## User Experience Goals
 
-### 1. Simplicity
-
-The platform should be intuitive and easy to use, even for users who are new to DeFi. Complex operations should be abstracted away behind a simple interface.
-
-### 2. Transparency
-
-Users should have clear visibility into:
-- Current exchange rates
-- Price impact of their trades
-- Fees they will pay
-- Composition and performance of liquidity pools
-
-### 3. Security
-
-The platform should prioritize security at all levels:
-- Smart contract security
-- Transaction security
-- User interface security
-- Clear warnings about risks
-
-### 4. Efficiency
-
-The platform should optimize for:
-- Low slippage on trades
-- Efficient routing through multiple pools
-- Minimized transaction fees
-- Fast transaction confirmation
-
-### 5. Accessibility
-
-The platform should be accessible to a wide range of users:
-- Support for various wallet types
-- Clear documentation and guides
-- Responsive design for different devices
-- Internationalization support
-
-## Target Audience
-
-### 1. Cryptocurrency Traders
-
-Users looking to swap between different tokens on the Bitcoin blockchain with minimal fees and slippage.
-
-### 2. Liquidity Providers
-
-Users looking to earn passive income by providing liquidity to token pairs.
-
-### 3. DeFi Enthusiasts
-
-Users interested in participating in decentralized finance on the Bitcoin blockchain.
-
-### 4. Bitcoin Holders
-
-Long-term Bitcoin holders looking to put their assets to work in DeFi without leaving the Bitcoin ecosystem.
-
-### 5. Developers
-
-Blockchain developers looking to build applications that integrate with a decentralized exchange on Bitcoin.
-
-## Future Vision
-
-The long-term vision for Swap.oyl.io includes:
-
-1. **Expanded Token Support**: Supporting a wide range of tokens on the Bitcoin blockchain.
-2. **Advanced Trading Features**: Limit orders, stop-loss orders, and other advanced trading features.
-3. **Cross-Chain Integration**: Bridges to other blockchain networks for seamless asset transfer.
-4. **Governance Mechanism**: Community governance for protocol upgrades and parameter adjustments.
-5. **Additional DeFi Primitives**: Lending, borrowing, and other DeFi capabilities built on top of the core AMM functionality.
-
-By focusing on these goals and continuously improving the platform, Swap.oyl.io aims to become a cornerstone of the Bitcoin DeFi ecosystem.
+1. **Simplicity**: Make decentralized trading as simple as possible, even for users new to DeFi
+2. **Transparency**: Provide clear information about exchange rates, fees, and slippage
+3. **Security**: Ensure user funds are always secure and transactions are reliable
+4. **Efficiency**: Minimize transaction costs and maximize capital efficiency
+5. **Accessibility**: Make the platform accessible to users with varying levels of technical knowledge
+6. **Reliability**: Ensure the system works consistently and predictably under all conditions
