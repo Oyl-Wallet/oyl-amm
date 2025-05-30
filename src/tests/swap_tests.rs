@@ -592,7 +592,7 @@ fn test_amm_pool_swap_with_reentrancy_swap() -> Result<()> {
         + 1;
 
     println!("amount needed to cover fee: {}", amount_fee_cover);
-
+    let deadline = swap_block.header.time as u128;
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
             id: deployment_ids.owned_token_1_deployment.into(),
@@ -605,7 +605,7 @@ fn test_amm_pool_swap_with_reentrancy_swap() -> Result<()> {
         0,
         swap_out,
         deployment_ids.example_flashswap,
-        vec![2, deployment_ids.amm_pool_1_deployment.tx, 3, 0], // swap
+        vec![2, deployment_ids.amm_pool_1_deployment.tx, 3, 0, deadline], // swap
     );
 
     index_block(&swap_block, block_height)?;

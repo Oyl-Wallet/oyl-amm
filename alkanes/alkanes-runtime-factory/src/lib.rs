@@ -251,7 +251,12 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         Ok(response)
     }
 
-    fn swap_along_path(&self, path: Vec<AlkaneId>, amount: u128) -> Result<CallResponse> {
+    fn swap_exact_tokens_for_tokens_along_path(
+        &self,
+        path: Vec<AlkaneId>,
+        amount: u128,
+        deadline: u128,
+    ) -> Result<CallResponse> {
         let context = self.context()?;
 
         // swap
@@ -273,7 +278,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
             let this_amount = if i == path.len() - 1 { amount } else { 0 };
             let cellpack = Cellpack {
                 target: pool,
-                inputs: vec![3, this_amount],
+                inputs: vec![3, this_amount, deadline],
             };
             this_response = self.call(&cellpack, &this_response.alkanes, self.fuel())?;
         }

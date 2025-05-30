@@ -13,7 +13,8 @@ use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
 use swap::{
-    check_swap_lp_balance, insert_swap_exact_tokens_for_tokens_txs, insert_swap_txs_w_factory,
+    check_swap_lp_balance, insert_swap_exact_tokens_for_tokens_txs,
+    insert_swap_exact_tokens_for_tokens_txs_deadline, insert_swap_txs_w_factory,
 };
 
 use crate::tests::helper::*;
@@ -426,6 +427,41 @@ fn test_amm_pool_swap() -> Result<()> {
         deployment_ids.owned_token_1_deployment,
         deployment_ids.owned_token_2_deployment,
     )?;
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_pool_swap_deadline_fail() -> Result<()> {
+    clear();
+    let (amount1, amount2) = (500000, 500000);
+    let (init_block, deployment_ids, mut runtime_balances) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
+    let block_height = 840_001;
+    let mut swap_block = create_block_with_coinbase_tx(block_height);
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    let amount_to_swap = 10000;
+    let deadline = swap_block.header.time - 1;
+    insert_swap_exact_tokens_for_tokens_txs_deadline(
+        amount_to_swap,
+        deployment_ids.owned_token_1_deployment,
+        0,
+        &mut swap_block,
+        input_outpoint,
+        deployment_ids.amm_pool_1_deployment,
+        deadline,
+    );
+    index_block(&swap_block, block_height)?;
+
+    let outpoint = OutPoint {
+        txid: swap_block.txdata[swap_block.txdata.len() - 1].compute_txid(),
+        vout: 5,
+    };
+
+    // Check the last trace event
+    assert_revert_context(&outpoint, "EXPIRED deadline")?;
     Ok(())
 }
 

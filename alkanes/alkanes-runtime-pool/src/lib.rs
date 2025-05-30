@@ -18,9 +18,11 @@ use alkanes_support::{
     utils::{overflow_error, shift, shift_or_err},
 };
 use anyhow::{anyhow, Result};
+use bitcoin::Block;
 use metashrew_support::{index_pointer::KeyValuePointer, utils::consume_u128};
 use num::integer::Roots;
 use protorune_support::balance_sheet::{BalanceSheetOperations, CachedBalanceSheet};
+use protorune_support::utils::consensus_decode;
 use ruint::Uint;
 use std::{cmp::min, sync::Arc};
 
@@ -560,7 +562,21 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         }
     }
 
-    fn swap_exact_tokens_for_tokens(&self, amount_out_predicate: u128) -> Result<CallResponse> {
+    fn _check_deadline(&self, deadline: u128) -> Result<()> {
+        let block = consensus_decode::<Block>(&mut std::io::Cursor::new(self.block()))?;
+        if block.header.time as u128 > deadline {
+            Err(anyhow!("EXPIRED deadline"))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn swap_exact_tokens_for_tokens(
+        &self,
+        amount_out_predicate: u128,
+        deadline: u128,
+    ) -> Result<CallResponse> {
+        self._check_deadline(deadline)?;
         let context = self.context()?;
         let parcel: AlkaneTransferParcel = context.incoming_alkanes;
         self.check_inputs(&context.myself, &parcel, 1)?;
@@ -588,7 +604,9 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         &self,
         desired_amount_out: u128,
         amount_in_max: u128,
+        deadline: u128,
     ) -> Result<CallResponse> {
+        self._check_deadline(deadline)?;
         let context = self.context()?;
         let parcel: AlkaneTransferParcel = context.incoming_alkanes;
         self.check_inputs(&context.myself, &parcel, 1)?;
