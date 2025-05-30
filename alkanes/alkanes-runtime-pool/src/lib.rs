@@ -21,6 +21,7 @@ use anyhow::{anyhow, Result};
 use bitcoin::Block;
 use metashrew_support::{index_pointer::KeyValuePointer, utils::consume_u128};
 use num::integer::Roots;
+use oylswap_library::{Lock, PoolInfo, DEFAULT_FEE_AMOUNT_PER_1000, U256};
 use protorune_support::balance_sheet::{BalanceSheetOperations, CachedBalanceSheet};
 use protorune_support::utils::consensus_decode;
 use ruint::Uint;
@@ -28,83 +29,7 @@ use std::{cmp::min, sync::Arc};
 
 // per uniswap docs, the first 1e3 wei of lp token minted are burned to mitigate attacks where the value of a lp token is raised too high easily
 pub const MINIMUM_LIQUIDITY: u128 = 1000;
-pub const DEFAULT_FEE_AMOUNT_PER_1000: u128 = 5;
 pub const SWAP_EXTCALL_OPCODE: u128 = 73776170;
-
-type U256 = Uint<256, 4>;
-struct Lock {}
-impl Lock {
-    fn lock_pointer() -> StoragePointer {
-        StoragePointer::from_keyword("/lock")
-    }
-    fn get_lock() -> u128 {
-        Lock::lock_pointer().get_value::<u128>()
-    }
-    fn set_lock(v: u128) {
-        Lock::lock_pointer().set_value::<u128>(v);
-    }
-    fn lock<F>(func: F) -> Result<CallResponse>
-    where
-        F: FnOnce() -> Result<CallResponse>,
-    {
-        if Lock::lock_pointer().get().len() != 0 && Lock::get_lock() == 1 {
-            return Err(anyhow!("LOCKED"));
-        }
-
-        // Locking the resource
-        Lock::set_lock(1);
-
-        // Run the function (this is the _ in Solidity)
-        let ret = func();
-
-        // Unlocking after function execution
-        Lock::set_lock(0);
-
-        ret
-    }
-}
-
-#[derive(Default)]
-pub struct PoolInfo {
-    pub token_a: AlkaneId,
-    pub token_b: AlkaneId,
-    pub reserve_a: u128,
-    pub reserve_b: u128,
-    pub total_supply: u128,
-    pub pool_name: String,
-}
-
-impl PoolInfo {
-    pub fn try_to_vec(&self) -> Vec<u8> {
-        let mut bytes = Vec::new();
-
-        let mut token_a_bytes: Vec<u8> = Vec::with_capacity(32);
-        token_a_bytes.extend(&self.token_a.block.to_le_bytes());
-        token_a_bytes.extend(&self.token_a.tx.to_le_bytes());
-
-        let mut token_b_bytes: Vec<u8> = Vec::with_capacity(32);
-        token_b_bytes.extend(&self.token_b.block.to_le_bytes());
-        token_b_bytes.extend(&self.token_b.tx.to_le_bytes());
-
-        bytes.extend_from_slice(&token_a_bytes);
-
-        bytes.extend_from_slice(&token_b_bytes);
-
-        bytes.extend_from_slice(&self.reserve_a.to_le_bytes());
-
-        bytes.extend_from_slice(&self.reserve_b.to_le_bytes());
-        bytes.extend_from_slice(&self.total_supply.to_le_bytes());
-
-        // Add the pool name
-        let name_bytes = self.pool_name.as_bytes();
-        // Add the length of the name as a u32
-        bytes.extend_from_slice(&(name_bytes.len() as u32).to_le_bytes());
-        // Add the name bytes
-        bytes.extend_from_slice(name_bytes);
-
-        bytes
-    }
-}
 
 pub trait AMMPoolBase: MintableToken + AlkaneResponder {
     fn factory(&self) -> Result<AlkaneId> {
@@ -531,19 +456,6 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         })
     }
 
-    fn _get_amount_out(
-        &self,
-        amount_in: u128,
-        reserve_in: u128,
-        reserve_out: u128,
-    ) -> Result<u128> {
-        let amount_in_with_fee =
-            U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(amount_in);
-
-        let numerator = amount_in_with_fee * U256::from(reserve_out);
-        let denominator = U256::from(1000) * U256::from(reserve_in) + amount_in_with_fee;
-        Ok((numerator / denominator).try_into()?)
-    }
     fn get_amount_out(&self, parcel: AlkaneTransferParcel) -> Result<(u128, u128)> {
         let transfer = parcel.0[0].clone();
         let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
@@ -552,11 +464,19 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         if &transfer.id == &reserve_a {
             Ok((
                 0,
-                self._get_amount_out(transfer.value, previous_a.value, previous_b.value)?,
+                oylswap_library::get_amount_out(
+                    transfer.value,
+                    previous_a.value,
+                    previous_b.value,
+                )?,
             ))
         } else {
             Ok((
-                self._get_amount_out(transfer.value, previous_b.value, previous_a.value)?,
+                oylswap_library::get_amount_out(
+                    transfer.value,
+                    previous_b.value,
+                    previous_a.value,
+                )?,
                 0,
             ))
         }
@@ -587,19 +507,6 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         self.swap(amount_0_out, amount_1_out, context.caller, vec![])
     }
 
-    fn get_amount_in(&self, amount_out: u128, reserve_in: u128, reserve_out: u128) -> Result<u128> {
-        if amount_out == 0 {
-            return Err(anyhow!("INSUFFICIENT_OUTPUT_AMOUNT"));
-        }
-        if reserve_in == 0 || reserve_out == 0 {
-            return Err(anyhow!("INSUFFICIENT_LIQUIDITY"));
-        }
-        let numerator = U256::from(1000) * U256::from(reserve_in) * U256::from(amount_out);
-        let denominator =
-            U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(reserve_out - amount_out);
-        Ok((numerator / denominator + U256::from(1)).try_into()?)
-    }
-
     fn swap_tokens_for_exact_tokens(
         &self,
         desired_amount_out: u128,
@@ -618,9 +525,9 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         let (reserve_a, reserve_b) = self.alkanes_for_self()?;
 
         let amount_in = if &transfer.id == &reserve_a {
-            self.get_amount_in(desired_amount_out, previous_a.value, previous_b.value)?
+            oylswap_library::get_amount_in(desired_amount_out, previous_a.value, previous_b.value)?
         } else {
-            self.get_amount_in(desired_amount_out, previous_b.value, previous_a.value)?
+            oylswap_library::get_amount_in(desired_amount_out, previous_b.value, previous_a.value)?
         };
         if amount_in > amount_in_max {
             return Err(anyhow!("EXCESSIVE_INPUT_AMOUNT"));
