@@ -86,7 +86,31 @@ pub fn insert_swap_exact_tokens_for_tokens_txs(
         input_outpoint,
         Cellpack {
             target: pool_address,
-            inputs: vec![3, min_out],
+            inputs: vec![3, min_out, test_block.header.time.into()],
+        },
+    )
+}
+
+pub fn insert_swap_exact_tokens_for_tokens_txs_deadline(
+    amount: u128,
+    swap_from_token: AlkaneId,
+    min_out: u128,
+    test_block: &mut Block,
+    input_outpoint: OutPoint,
+    pool_address: AlkaneId,
+    deadline: u32,
+) {
+    _insert_swap_txs(
+        vec![ProtostoneEdict {
+            id: swap_from_token.into(),
+            amount: amount,
+            output: 0,
+        }],
+        test_block,
+        input_outpoint,
+        Cellpack {
+            target: pool_address,
+            inputs: vec![3, min_out, deadline as u128],
         },
     )
 }
@@ -110,7 +134,7 @@ pub fn insert_swap_tokens_for_exact_tokens_txs(
         input_outpoint,
         Cellpack {
             target: pool_address,
-            inputs: vec![4, desired_out, max_in],
+            inputs: vec![4, desired_out, max_in, test_block.header.time.into()],
         },
     )
 }
@@ -134,6 +158,7 @@ pub fn insert_swap_txs_w_factory(
         .inputs
         .extend(swap_path.iter().flat_map(|s| vec![s.block, s.tx]));
     cellpack.inputs.push(min_out);
+    cellpack.inputs.push(test_block.header.time.into());
 
     _insert_swap_txs(
         vec![ProtostoneEdict {

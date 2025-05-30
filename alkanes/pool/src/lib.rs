@@ -26,12 +26,16 @@ pub enum AMMPoolMessage {
     Burn,
 
     #[opcode(3)]
-    SwapExactTokensForTokens { amount_out_predicate: u128 },
+    SwapExactTokensForTokens {
+        amount_out_predicate: u128,
+        deadline: u128,
+    },
 
     #[opcode(4)]
     SwapTokensForExactTokens {
         amount_out: u128,
         amount_in_max: u128,
+        deadline: u128,
     },
 
     #[opcode(10)]

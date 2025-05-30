@@ -44,7 +44,11 @@ pub enum AMMFactoryMessage {
     CollectFees { pool_id: AlkaneId },
 
     #[opcode(20)]
-    SwapAlongPath { path: Vec<AlkaneId>, amount: u128 },
+    SwapExactTokensForTokensAlongPath {
+        path: Vec<AlkaneId>,
+        amount: u128,
+        deadline: u128,
+    },
 }
 
 // Base implementation of AMMFactory that can be used directly or extended
