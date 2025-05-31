@@ -2,7 +2,6 @@ use alkanes::indexer::index_block;
 use alkanes::tests::helpers::{
     self as alkane_helpers, assert_revert_context, get_last_outpoint_sheet,
 };
-use alkanes_runtime_pool::DEFAULT_FEE_AMOUNT_PER_1000;
 use alkanes_support::id::AlkaneId;
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
@@ -10,6 +9,7 @@ use init_pools::{
     calc_lp_balance_from_pool_init, init_block_with_amm_pool, insert_init_pool_liquidity_txs,
     test_amm_pool_init_fixture,
 };
+use oylswap_library::DEFAULT_FEE_AMOUNT_PER_1000;
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::protostone::ProtostoneEdict;
 use swap::{
