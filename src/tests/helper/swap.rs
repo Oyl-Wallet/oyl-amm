@@ -2,7 +2,6 @@ use alkanes::tests::helpers::{
     self as alkane_helpers, get_last_outpoint_sheet, get_lazy_sheet_for_runtime,
     get_sheet_for_runtime,
 };
-use alkanes_runtime_pool::{AMMPoolBase, DEFAULT_FEE_AMOUNT_PER_1000};
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::id::AlkaneId;
 use anyhow::Result;
@@ -10,6 +9,7 @@ use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::{Block, Witness};
 #[allow(unused_imports)]
 use metashrew_core::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
+use oylswap_library::DEFAULT_FEE_AMOUNT_PER_1000;
 use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations};
 use protorune_support::protostone::ProtostoneEdict;
 use ruint::Uint;

@@ -27,6 +27,7 @@ metashrew-support = { git = "https://github.com/sandshrewmetaprotocols/metashrew
 protorune-support = { git = "https://github.com/kungfuflex/alkanes-rs" }
 ordinals = { git = "https://github.com/kungfuflex/alkanes-rs" }
 alkanes-runtime-pool = { path = "./alkanes/alkanes-runtime-pool" }
+oylswap-library = { path = "./alkanes/oylswap-library" }
 anyhow = "1.0.94"
 bitcoin = { version = "0.32.4", features = ["rand"] }
 hex = "0.4.3"
@@ -39,6 +40,7 @@ alkanes-runtime = { workspace = true }
 metashrew-support = { workspace = true }
 protorune-support = { workspace = true }
 ordinals = { workspace = true }
+oylswap-library = { workspace = true }
 alkanes-runtime-pool = { workspace = true }
 anyhow = { workspace = true }
 bitcoin = { workspace = true }

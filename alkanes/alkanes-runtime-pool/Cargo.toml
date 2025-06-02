@@ -10,6 +10,7 @@ crate-type = ["cdylib", "rlib"]
 alkanes-support = { workspace = true }
 alkanes-runtime = { workspace = true }
 alkanes-std-factory-support = { workspace = true }
+oylswap-library = { path = "../oylswap-library" }
 metashrew-support = { workspace = true }
 protorune-support = { workspace = true }
 anyhow = "1.0.91"
