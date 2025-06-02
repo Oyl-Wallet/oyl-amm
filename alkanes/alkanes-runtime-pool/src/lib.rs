@@ -65,6 +65,30 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
     fn set_k_last(&self, v: u128) {
         self.k_last_pointer().set_value::<u128>(v);
     }
+    fn block_timestamp_last_pointer(&self) -> StoragePointer {
+        StoragePointer::from_keyword("/blockTimestampLast")
+    }
+    fn block_timestamp_last(&self) -> u32 {
+        self.block_timestamp_last_pointer().get_value::<u32>()
+    }
+    fn set_block_timestamp_last(&self, v: u32) {
+        self.block_timestamp_last_pointer().set_value::<u32>(v);
+    }
+    fn price_cumulative_pointers(&self) -> (StoragePointer, StoragePointer) {
+        (
+            StoragePointer::from_keyword("/price0CumLast"),
+            StoragePointer::from_keyword("/price1CumLast"),
+        )
+    }
+    fn price_cumulative(&self) -> (u128, u128) {
+        let (p0, p1) = self.price_cumulative_pointers();
+        (p0.get_value::<u128>(), p1.get_value::<u128>())
+    }
+    fn set_price_cumulative(&self, v0: u128, v1: u128) {
+        let (mut p0, mut p1) = self.price_cumulative_pointers();
+        p0.set_value::<u128>(v0);
+        p1.set_value::<u128>(v1);
+    }
     fn _only_factory_caller(&self) -> Result<()> {
         if self.context()?.caller != self.factory()? {
             return Err(anyhow!("Caller is not factory"));
@@ -242,6 +266,20 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         let new_k = checked_expr!(previous_a.value.checked_mul(previous_b.value))?;
         self.set_k_last(new_k);
         Ok(response)
+    }
+
+    fn _update_cum_prices(&self, balance0: u128, balance1: u128, reserve0: u128, reserve1: u128) {
+        let block = consensus_decode::<Block>(&mut std::io::Cursor::new(self.block()))?;
+        let current_timestamp = block.header.time;
+        let last_timestamp = self.block_timestamp_last();
+        let time_elapsed = current_timestamp - last_timestamp;
+        if time_elapsed > 0 && reserve0 != 0 && reserve1 != 0 {
+            self.set_price_cumulative(
+                (U256::from(reserve1) * U256::from(time_elapsed) / U256::from(reserve0)).into(),
+                (U256::from(reserve0) * U256::from(time_elapsed) / U256::from(reserve1)).into(),
+            );
+        }
+        self.set_block_timestamp_last(current_timestamp);
     }
 
     fn add_liquidity(&self) -> Result<CallResponse> {
