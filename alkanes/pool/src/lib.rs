@@ -53,6 +53,10 @@ pub enum AMMPoolMessage {
     #[opcode(50)]
     ForwardIncoming,
 
+    #[opcode(98)]
+    #[returns(u128, u128)]
+    GetPriceCumulativeLast,
+
     #[opcode(99)]
     #[returns(String)]
     GetName,
