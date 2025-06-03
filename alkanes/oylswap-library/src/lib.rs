@@ -7,12 +7,50 @@ use alkanes_runtime::{
 };
 use alkanes_support::{id::AlkaneId, response::CallResponse};
 use anyhow::{anyhow, Result};
-use metashrew_support::index_pointer::KeyValuePointer;
+use metashrew_support::{byte_view::ByteView, index_pointer::KeyValuePointer};
 use ruint::Uint;
 
 pub const DEFAULT_FEE_AMOUNT_PER_1000: u128 = 5;
 
 pub type U256 = Uint<256, 4>;
+
+// Create a storage wrapper for U256 to implement ByteView
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct StorableU256(pub U256);
+
+impl ByteView for StorableU256 {
+    fn from_bytes(v: Vec<u8>) -> Self {
+        assert!(v.len() == 32, "Expected a byte vector of length 32.");
+        // Convert bytes to U256 using from_le_bytes
+        let mut bytes_array = [0u8; 32];
+        bytes_array.copy_from_slice(&v);
+        StorableU256(U256::from_le_bytes(bytes_array))
+    }
+
+    fn to_bytes(&self) -> Vec<u8> {
+        self.0.to_le_bytes::<32>().to_vec()
+    }
+
+    fn maximum() -> Self {
+        StorableU256(U256::MAX)
+    }
+
+    fn zero() -> Self {
+        StorableU256(U256::ZERO)
+    }
+}
+
+impl From<U256> for StorableU256 {
+    fn from(value: U256) -> Self {
+        StorableU256(value)
+    }
+}
+
+impl From<StorableU256> for U256 {
+    fn from(value: StorableU256) -> Self {
+        value.0
+    }
+}
 pub struct Lock {}
 impl Lock {
     pub fn lock_pointer() -> StoragePointer {

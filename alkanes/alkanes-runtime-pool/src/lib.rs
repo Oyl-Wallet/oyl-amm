@@ -19,17 +19,17 @@ use alkanes_support::{
 };
 use anyhow::{anyhow, Result};
 use bitcoin::Block;
-use metashrew_support::{index_pointer::KeyValuePointer, utils::consume_u128};
+use metashrew_support::{byte_view::ByteView, index_pointer::KeyValuePointer, utils::consume_u128};
 use num::integer::Roots;
-use oylswap_library::{Lock, PoolInfo, DEFAULT_FEE_AMOUNT_PER_1000, U256};
+use oylswap_library::{Lock, PoolInfo, StorableU256, DEFAULT_FEE_AMOUNT_PER_1000, U256};
 use protorune_support::balance_sheet::{BalanceSheetOperations, CachedBalanceSheet};
 use protorune_support::utils::consensus_decode;
-use ruint::Uint;
 use std::{cmp::min, sync::Arc};
 
 // per uniswap docs, the first 1e3 wei of lp token minted are burned to mitigate attacks where the value of a lp token is raised too high easily
 pub const MINIMUM_LIQUIDITY: u128 = 1000;
 pub const SWAP_EXTCALL_OPCODE: u128 = 73776170;
+pub const PRECISION: u32 = 128;
 
 pub trait AMMPoolBase: MintableToken + AlkaneResponder {
     fn factory(&self) -> Result<AlkaneId> {
@@ -80,14 +80,18 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             StoragePointer::from_keyword("/price1CumLast"),
         )
     }
-    fn price_cumulative(&self) -> (u128, u128) {
+    fn price_cumulative(&self) -> (U256, U256) {
         let (p0, p1) = self.price_cumulative_pointers();
-        (p0.get_value::<u128>(), p1.get_value::<u128>())
+        (
+            p0.get_value::<StorableU256>().into(),
+            p1.get_value::<StorableU256>().into(),
+        )
     }
-    fn set_price_cumulative(&self, v0: u128, v1: u128) {
+    fn increase_price_cumulative(&self, v0: U256, v1: U256) {
         let (mut p0, mut p1) = self.price_cumulative_pointers();
-        p0.set_value::<u128>(v0);
-        p1.set_value::<u128>(v1);
+        let (p0_val, p1_val) = self.price_cumulative();
+        p0.set_value::<StorableU256>((p0_val + v0).into());
+        p1.set_value::<StorableU256>((p1_val + v1).into());
     }
     fn _only_factory_caller(&self) -> Result<()> {
         if self.context()?.caller != self.factory()? {
@@ -268,18 +272,23 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         Ok(response)
     }
 
-    fn _update_cum_prices(&self, balance0: u128, balance1: u128, reserve0: u128, reserve1: u128) {
+    fn _update_cum_prices(&self, reserve0: u128, reserve1: u128) -> Result<()> {
         let block = consensus_decode::<Block>(&mut std::io::Cursor::new(self.block()))?;
         let current_timestamp = block.header.time;
         let last_timestamp = self.block_timestamp_last();
         let time_elapsed = current_timestamp - last_timestamp;
         if time_elapsed > 0 && reserve0 != 0 && reserve1 != 0 {
-            self.set_price_cumulative(
-                (U256::from(reserve1) * U256::from(time_elapsed) / U256::from(reserve0)).into(),
-                (U256::from(reserve0) * U256::from(time_elapsed) / U256::from(reserve1)).into(),
+            self.increase_price_cumulative(
+                ((U256::from(reserve1) << U256::from(PRECISION)) / U256::from(reserve0)
+                    * U256::from(time_elapsed))
+                .try_into()?,
+                ((U256::from(reserve0) << U256::from(PRECISION)) / U256::from(reserve1)
+                    * U256::from(time_elapsed))
+                .try_into()?,
             );
         }
         self.set_block_timestamp_last(current_timestamp);
+        Ok(())
     }
 
     fn add_liquidity(&self) -> Result<CallResponse> {
@@ -314,6 +323,7 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             }
             let mut response = CallResponse::default();
             response.alkanes.pay(self.mint(&context, liquidity)?);
+            self._update_cum_prices(previous_a.value, previous_b.value)?;
             let new_k = checked_expr!(reserve_a.value.checked_mul(reserve_b.value))?;
             self.set_k_last(new_k);
             Ok(response)
@@ -352,6 +362,7 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
                 },
             ]);
 
+            self._update_cum_prices(previous_a.value, previous_b.value)?;
             let new_k = checked_expr!(
                 (reserve_a.value - amount_a).checked_mul(reserve_b.value - amount_b)
             )?;
@@ -430,7 +441,6 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
                 balance_0.value -= amount_0_out;
                 balance_1.value -= amount_1_out;
             }
-            println!("balance_0 {:?} balance_1 {:?}", balance_0, balance_1);
 
             // Calculate input amounts.
             let mut amount_0_in = if balance_0.value > reserve_0.value - amount_0_out {
@@ -464,10 +474,6 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             if amount_0_in == 0 && amount_1_in == 0 {
                 return Err(anyhow!("INSUFFICIENT_INPUT_AMOUNT"));
             }
-            println!(
-                "amount_0_in {:?} amount_1_in {:?}",
-                amount_0_in, amount_1_in
-            );
 
             // Check K value (constant product formula)
             // In Uniswap: balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2)
@@ -475,11 +481,6 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
                 - U256::from(amount_0_in) * U256::from(DEFAULT_FEE_AMOUNT_PER_1000);
             let balance_1_adjusted = U256::from(balance_1.value) * U256::from(1000)
                 - U256::from(amount_1_in) * U256::from(DEFAULT_FEE_AMOUNT_PER_1000);
-            println!(
-                "adjusted balance_0 {:?} balance_1 {:?}",
-                balance_0_adjusted, balance_1_adjusted
-            );
-            println!("reserve_0 {:?} reserve_1 {:?}", reserve_0, reserve_1);
 
             if balance_0_adjusted * balance_1_adjusted
                 < U256::from(reserve_0.value)
@@ -488,6 +489,8 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             {
                 return Err(anyhow!("K is not increasing"));
             }
+
+            self._update_cum_prices(reserve_0.value, reserve_1.value)?;
 
             // Return response with transfers
             Ok(response)
@@ -590,6 +593,17 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
     fn forward_incoming(&self) -> Result<CallResponse> {
         let context = self.context()?;
         Ok(CallResponse::forward(&context.incoming_alkanes))
+    }
+
+    fn get_price_cumulative_last(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        let mut response = CallResponse::forward(&context.incoming_alkanes);
+        let mut bytes = Vec::new();
+        let (p0, p1) = self.price_cumulative();
+        bytes.extend_from_slice(&p0.to_le_bytes::<32>());
+        bytes.extend_from_slice(&p1.to_le_bytes::<32>());
+        response.data = bytes;
+        Ok(response)
     }
 
     fn get_name(&self) -> Result<CallResponse> {

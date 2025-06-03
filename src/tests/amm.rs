@@ -1,4 +1,5 @@
 use add_liquidity::{check_add_liquidity_lp_balance, insert_add_liquidity_txs};
+use alkanes_runtime_pool::PRECISION;
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::trace::{Trace, TraceEvent};
 use anyhow::Result;
@@ -8,7 +9,9 @@ use init_pools::{
     calc_lp_balance_from_pool_init, init_block_with_amm_pool, insert_init_pool_liquidity_txs,
     test_amm_pool_init_fixture,
 };
+use metashrew_support::byte_view::ByteView;
 use num::integer::Roots;
+use oylswap_library::{StorableU256, U256};
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
@@ -692,6 +695,256 @@ fn test_amm_pool_details() -> Result<()> {
         "Trace data should contain the name '{}', but it doesn't",
         expected_name
     );
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_price_0() -> Result<()> {
+    clear();
+    // Initialize a pool
+    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+
+    // Create a new block for testing the pool details
+    let block_height = 840_001;
+    let mut test_block = create_block_with_coinbase_tx(block_height);
+
+    // Call opcode 999 on the pool to get its pool details including the name
+    test_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_pool_1_deployment,
+                inputs: vec![98],
+            }],
+            OutPoint {
+                txid: block.txdata[block.txdata.len() - 1].compute_txid(),
+                vout: 0,
+            },
+            false,
+        ),
+    );
+
+    index_block(&test_block, block_height)?;
+
+    // Get the trace data from the transaction
+    let outpoint = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        vout: 3,
+    };
+
+    let trace_data: Trace = view::trace(&outpoint)?.try_into()?;
+
+    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
+
+    // Access the data field from the trace response
+    if let Some(return_context) = last_trace_event {
+        // Use pattern matching to extract the data field from the TraceEvent enum
+        match return_context {
+            TraceEvent::ReturnContext(trace_response) => {
+                // Now we have the TraceResponse, access the data field
+                let data = &trace_response.inner.data;
+                assert!(data.iter().all(|&x| x == 0), "Zero init price");
+            }
+            _ => panic!("Expected ReturnContext variant, but got a different variant"),
+        }
+    } else {
+        panic!("Failed to get last_trace_event from trace data");
+    }
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_price_swap() -> Result<()> {
+    clear();
+    // Initialize a pool
+    let (init_block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+
+    // Create a new block for testing the pool details
+    let block_height = 840_001;
+    let mut swap_block = create_block_with_coinbase_tx(block_height);
+    swap_block.header.time = init_block.header.time + 100;
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    let amount_to_swap = 10000;
+    insert_swap_exact_tokens_for_tokens_txs(
+        amount_to_swap,
+        deployment_ids.owned_token_1_deployment,
+        0,
+        &mut swap_block,
+        input_outpoint,
+        deployment_ids.amm_pool_1_deployment,
+    );
+    index_block(&swap_block, block_height)?;
+
+    let mut test_block = create_block_with_coinbase_tx(block_height + 1);
+
+    // Call opcode 999 on the pool to get its pool details including the name
+    test_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_pool_1_deployment,
+                inputs: vec![98],
+            }],
+            OutPoint {
+                txid: swap_block.txdata[swap_block.txdata.len() - 1].compute_txid(),
+                vout: 0,
+            },
+            false,
+        ),
+    );
+
+    index_block(&test_block, block_height + 1)?;
+
+    // Get the trace data from the transaction
+    let outpoint = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        vout: 3,
+    };
+
+    let trace_data: Trace = view::trace(&outpoint)?.try_into()?;
+
+    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
+
+    // Access the data field from the trace response
+    if let Some(return_context) = last_trace_event {
+        // Use pattern matching to extract the data field from the TraceEvent enum
+        match return_context {
+            TraceEvent::ReturnContext(trace_response) => {
+                // Now we have the TraceResponse, access the data field
+                let data = &trace_response.inner.data;
+                assert_eq!(
+                    data[16], 100,
+                    "first price event should be 1:1, * time(100)"
+                );
+                assert_eq!(
+                    data[48], 100,
+                    "first price event should be 1:1, * time(100)"
+                );
+            }
+            _ => panic!("Expected ReturnContext variant, but got a different variant"),
+        }
+    } else {
+        panic!("Failed to get last_trace_event from trace data");
+    }
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_price_swap_2() -> Result<()> {
+    clear();
+    // Initialize a pool
+    let (init_block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+
+    // Create a new block for testing the pool details
+    let block_height = 840_001;
+    let mut swap_block = create_block_with_coinbase_tx(block_height);
+    swap_block.header.time = init_block.header.time + 100;
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    let amount_to_swap = 10000;
+    insert_swap_exact_tokens_for_tokens_txs(
+        amount_to_swap,
+        deployment_ids.owned_token_1_deployment,
+        0,
+        &mut swap_block,
+        input_outpoint,
+        deployment_ids.amm_pool_1_deployment,
+    );
+    index_block(&swap_block, block_height)?;
+
+    let mut swap_block2 = create_block_with_coinbase_tx(block_height + 1);
+    swap_block2.header.time = swap_block.header.time + 100;
+    let input_outpoint = OutPoint {
+        txid: swap_block.txdata[swap_block.txdata.len() - 1].compute_txid(),
+        vout: 2,
+    };
+    let amount_to_swap = 10000;
+    insert_swap_exact_tokens_for_tokens_txs(
+        amount_to_swap,
+        deployment_ids.owned_token_1_deployment,
+        0,
+        &mut swap_block2,
+        input_outpoint,
+        deployment_ids.amm_pool_1_deployment,
+    );
+    index_block(&swap_block2, block_height + 1)?;
+
+    let mut test_block = create_block_with_coinbase_tx(block_height + 2);
+
+    // Call opcode 999 on the pool to get its pool details including the name
+    test_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_pool_1_deployment,
+                inputs: vec![98],
+            }],
+            OutPoint {
+                txid: swap_block.txdata[swap_block.txdata.len() - 1].compute_txid(),
+                vout: 0,
+            },
+            false,
+        ),
+    );
+
+    index_block(&test_block, block_height + 2)?;
+
+    // Get the trace data from the transaction
+    let outpoint = OutPoint {
+        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        vout: 3,
+    };
+
+    let trace_data: Trace = view::trace(&outpoint)?.try_into()?;
+
+    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
+
+    // Access the data field from the trace response
+    if let Some(return_context) = last_trace_event {
+        // Use pattern matching to extract the data field from the TraceEvent enum
+        match return_context {
+            TraceEvent::ReturnContext(trace_response) => {
+                // Now we have the TraceResponse, access the data field
+                let data = &trace_response.inner.data;
+                println!("{:?}", data);
+                let p0: U256 = StorableU256::from_bytes(data[0..32].to_vec()).into();
+                let p1: U256 = StorableU256::from_bytes(data[32..64].to_vec()).into();
+
+                println!(
+                    "{:?}.{:?}",
+                    p0 >> U256::from(PRECISION),
+                    p0 & U256::from(u128::MAX)
+                );
+                println!(
+                    "{:?}.{:?}",
+                    p1 >> U256::from(PRECISION),
+                    p1 & U256::from(u128::MAX)
+                );
+
+                assert_eq!(p0 >> U256::from(PRECISION), U256::from(198));
+                assert_eq!(
+                    p0 & U256::from(u128::MAX),
+                    U256::from(11758271886674012252348290890464069812u128)
+                );
+                assert_eq!(p1 >> U256::from(PRECISION), U256::from(202));
+                assert_eq!(
+                    p1 & U256::from(u128::MAX),
+                    U256::from(1650292961922242512542177858976124688u128)
+                );
+            }
+            _ => panic!("Expected ReturnContext variant, but got a different variant"),
+        }
+    } else {
+        panic!("Failed to get last_trace_event from trace data");
+    }
 
     Ok(())
 }
