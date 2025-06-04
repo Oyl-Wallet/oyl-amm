@@ -632,12 +632,15 @@ fn test_amm_pool_swap_tokens_for_exact_1() -> Result<()> {
     let amount_to_swap = 10000;
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
-        deployment_ids.owned_token_1_deployment,
+        vec![
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
+        ],
         5000,
         10000,
         &mut swap_block,
+        &deployment_ids,
         input_outpoint,
-        deployment_ids.amm_pool_1_deployment,
     );
     index_block(&swap_block, block_height)?;
 
@@ -668,12 +671,15 @@ fn test_amm_pool_swap_tokens_for_exact_2() -> Result<()> {
     let amount_to_swap = 10000;
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
-        deployment_ids.owned_token_1_deployment,
+        vec![
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
+        ],
         5000,
         5076,
         &mut swap_block,
+        &deployment_ids,
         input_outpoint,
-        deployment_ids.amm_pool_1_deployment,
     );
     index_block(&swap_block, block_height)?;
 
@@ -704,12 +710,15 @@ fn test_amm_pool_swap_tokens_for_exact_3() -> Result<()> {
     let amount_to_swap = 10000;
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
-        deployment_ids.owned_token_1_deployment,
+        vec![
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
+        ],
         5000,
         5075,
         &mut swap_block,
+        &deployment_ids,
         input_outpoint,
-        deployment_ids.amm_pool_1_deployment,
     );
     index_block(&swap_block, block_height)?;
 
@@ -739,12 +748,15 @@ fn test_amm_pool_swap_tokens_for_exact_4() -> Result<()> {
     let amount_to_swap = 10000;
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
-        deployment_ids.owned_token_1_deployment,
+        vec![
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
+        ],
         5000,
         10001,
         &mut swap_block,
+        &deployment_ids,
         input_outpoint,
-        deployment_ids.amm_pool_1_deployment,
     );
     index_block(&swap_block, block_height)?;
 

@@ -515,7 +515,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         let context = self.context()?;
         let parcel: AlkaneTransferParcel = context.clone().incoming_alkanes;
 
-        if path.len() == 2 {
+        if path.len() != 2 {
             return Err(anyhow!("Routing path must be at least two alkanes long"));
         }
         if parcel.0.len() != 1 {

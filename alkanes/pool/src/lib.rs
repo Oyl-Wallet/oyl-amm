@@ -37,6 +37,9 @@ pub enum AMMPoolMessage {
     #[opcode(10)]
     CollectFees {},
 
+    #[opcode(50)]
+    ForwardIncoming,
+
     #[opcode(97)]
     #[returns(u128, u128)]
     GetReserves,

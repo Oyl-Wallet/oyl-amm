@@ -271,6 +271,10 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         self.set_k_last(new_k);
         Ok(response)
     }
+    fn forward_incoming(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        Ok(CallResponse::forward(&context.incoming_alkanes))
+    }
 
     fn _update_cum_prices(&self, reserve0: u128, reserve1: u128) -> Result<()> {
         let block = consensus_decode::<Block>(&mut std::io::Cursor::new(self.block()))?;
