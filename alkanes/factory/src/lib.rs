@@ -66,7 +66,7 @@ pub enum AMMFactoryMessage {
     #[opcode(13)]
     SwapExactTokensForTokens {
         path: Vec<AlkaneId>,
-        amount_out_predicate: u128,
+        amount_out_min: u128,
         deadline: u128,
     },
 

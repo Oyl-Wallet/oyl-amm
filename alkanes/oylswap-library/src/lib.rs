@@ -201,3 +201,11 @@ pub fn get_amount_in(amount_out: u128, reserve_in: u128, reserve_out: u128) -> R
         U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(reserve_out - amount_out);
     Ok((numerator / denominator + U256::from(1)).try_into()?)
 }
+
+pub fn sort_alkanes((a, b): (AlkaneId, AlkaneId)) -> (AlkaneId, AlkaneId) {
+    if a < b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
