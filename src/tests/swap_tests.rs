@@ -12,9 +12,6 @@ use init_pools::{
 use oylswap_library::DEFAULT_FEE_AMOUNT_PER_1000;
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::protostone::ProtostoneEdict;
-use swap::{
-    check_swap_lp_balance, insert_swap_exact_tokens_for_tokens_txs, insert_swap_txs_w_factory,
-};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use super::helper::swap::{
@@ -592,7 +589,6 @@ fn test_amm_pool_swap_with_reentrancy_swap() -> Result<()> {
         + 1;
 
     println!("amount needed to cover fee: {}", amount_fee_cover);
-    let deadline = swap_block.header.time as u128;
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
             id: deployment_ids.owned_token_1_deployment.into(),
@@ -605,7 +601,7 @@ fn test_amm_pool_swap_with_reentrancy_swap() -> Result<()> {
         0,
         swap_out,
         deployment_ids.example_flashswap,
-        vec![2, deployment_ids.amm_pool_1_deployment.tx, 3, 0, deadline], // swap
+        vec![2, deployment_ids.amm_pool_1_deployment.tx, 3, 0, 0, 0, 0, 0], // swap
     );
 
     index_block(&swap_block, block_height)?;
@@ -635,12 +631,15 @@ fn test_amm_pool_swap_tokens_for_exact_1() -> Result<()> {
     let amount_to_swap = 10000;
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
-        deployment_ids.owned_token_1_deployment,
+        vec![
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
+        ],
         5000,
         10000,
         &mut swap_block,
+        &deployment_ids,
         input_outpoint,
-        deployment_ids.amm_pool_1_deployment,
     );
     index_block(&swap_block, block_height)?;
 
@@ -671,12 +670,15 @@ fn test_amm_pool_swap_tokens_for_exact_2() -> Result<()> {
     let amount_to_swap = 10000;
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
-        deployment_ids.owned_token_1_deployment,
+        vec![
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
+        ],
         5000,
         5076,
         &mut swap_block,
+        &deployment_ids,
         input_outpoint,
-        deployment_ids.amm_pool_1_deployment,
     );
     index_block(&swap_block, block_height)?;
 
@@ -707,12 +709,15 @@ fn test_amm_pool_swap_tokens_for_exact_3() -> Result<()> {
     let amount_to_swap = 10000;
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
-        deployment_ids.owned_token_1_deployment,
+        vec![
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
+        ],
         5000,
         5075,
         &mut swap_block,
+        &deployment_ids,
         input_outpoint,
-        deployment_ids.amm_pool_1_deployment,
     );
     index_block(&swap_block, block_height)?;
 
@@ -742,12 +747,15 @@ fn test_amm_pool_swap_tokens_for_exact_4() -> Result<()> {
     let amount_to_swap = 10000;
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
-        deployment_ids.owned_token_1_deployment,
+        vec![
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
+        ],
         5000,
         10001,
         &mut swap_block,
+        &deployment_ids,
         input_outpoint,
-        deployment_ids.amm_pool_1_deployment,
     );
     index_block(&swap_block, block_height)?;
 

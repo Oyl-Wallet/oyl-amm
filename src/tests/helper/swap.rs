@@ -50,7 +50,7 @@ pub fn insert_low_level_swap_txs(
     to: AlkaneId,
     data: Vec<u128>,
 ) {
-    let mut inputs: Vec<u128> = vec![20];
+    let mut inputs: Vec<u128> = vec![3];
 
     inputs.push(amount_0_out);
     inputs.push(amount_1_out);
@@ -68,81 +68,11 @@ pub fn insert_low_level_swap_txs(
     )
 }
 
-pub fn insert_swap_exact_tokens_for_tokens_txs(
-    amount: u128,
-    swap_from_token: AlkaneId,
-    min_out: u128,
-    test_block: &mut Block,
-    input_outpoint: OutPoint,
-    pool_address: AlkaneId,
-) {
-    _insert_swap_txs(
-        vec![ProtostoneEdict {
-            id: swap_from_token.into(),
-            amount: amount,
-            output: 0,
-        }],
-        test_block,
-        input_outpoint,
-        Cellpack {
-            target: pool_address,
-            inputs: vec![3, min_out, test_block.header.time.into()],
-        },
-    )
-}
-
-pub fn insert_swap_exact_tokens_for_tokens_txs_deadline(
-    amount: u128,
-    swap_from_token: AlkaneId,
-    min_out: u128,
-    test_block: &mut Block,
-    input_outpoint: OutPoint,
-    pool_address: AlkaneId,
-    deadline: u32,
-) {
-    _insert_swap_txs(
-        vec![ProtostoneEdict {
-            id: swap_from_token.into(),
-            amount: amount,
-            output: 0,
-        }],
-        test_block,
-        input_outpoint,
-        Cellpack {
-            target: pool_address,
-            inputs: vec![3, min_out, deadline as u128],
-        },
-    )
-}
-
 pub fn insert_swap_tokens_for_exact_tokens_txs(
     amount: u128,
-    swap_from_token: AlkaneId,
-    desired_out: u128,
-    max_in: u128,
-    test_block: &mut Block,
-    input_outpoint: OutPoint,
-    pool_address: AlkaneId,
-) {
-    _insert_swap_txs(
-        vec![ProtostoneEdict {
-            id: swap_from_token.into(),
-            amount: amount,
-            output: 0,
-        }],
-        test_block,
-        input_outpoint,
-        Cellpack {
-            target: pool_address,
-            inputs: vec![4, desired_out, max_in, test_block.header.time.into()],
-        },
-    )
-}
-
-pub fn insert_swap_txs_w_factory(
-    amount: u128,
     swap_path: Vec<AlkaneId>,
-    min_out: u128,
+    amount_out: u128,
+    amount_in_max: u128,
     test_block: &mut Block,
     deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
@@ -152,13 +82,14 @@ pub fn insert_swap_txs_w_factory(
     }
     let mut cellpack = Cellpack {
         target: deployment_ids.amm_factory_deployment,
-        inputs: vec![20, swap_path.len() as u128],
+        inputs: vec![14, swap_path.len() as u128],
     };
     cellpack
         .inputs
         .extend(swap_path.iter().flat_map(|s| vec![s.block, s.tx]));
-    cellpack.inputs.push(min_out);
-    cellpack.inputs.push(test_block.header.time.into());
+    cellpack.inputs.push(amount_out);
+    cellpack.inputs.push(amount_in_max);
+    cellpack.inputs.push(test_block.header.time as u128);
 
     _insert_swap_txs(
         vec![ProtostoneEdict {
@@ -169,6 +100,59 @@ pub fn insert_swap_txs_w_factory(
         test_block,
         input_outpoint,
         cellpack,
+    )
+}
+
+pub fn insert_swap_exact_tokens_for_tokens_deadline(
+    amount: u128,
+    swap_path: Vec<AlkaneId>,
+    min_out: u128,
+    test_block: &mut Block,
+    deployment_ids: &AmmTestDeploymentIds,
+    input_outpoint: OutPoint,
+    deadline: u128,
+) {
+    if swap_path.len() < 2 {
+        panic!("Swap path must be at least two alkanes long");
+    }
+    let mut cellpack = Cellpack {
+        target: deployment_ids.amm_factory_deployment,
+        inputs: vec![13, swap_path.len() as u128],
+    };
+    cellpack
+        .inputs
+        .extend(swap_path.iter().flat_map(|s| vec![s.block, s.tx]));
+    cellpack.inputs.push(min_out);
+    cellpack.inputs.push(deadline);
+
+    _insert_swap_txs(
+        vec![ProtostoneEdict {
+            id: swap_path[0].into(),
+            amount: amount,
+            output: 0,
+        }],
+        test_block,
+        input_outpoint,
+        cellpack,
+    )
+}
+
+pub fn insert_swap_exact_tokens_for_tokens(
+    amount: u128,
+    swap_path: Vec<AlkaneId>,
+    min_out: u128,
+    test_block: &mut Block,
+    deployment_ids: &AmmTestDeploymentIds,
+    input_outpoint: OutPoint,
+) {
+    insert_swap_exact_tokens_for_tokens_deadline(
+        amount,
+        swap_path,
+        min_out,
+        test_block,
+        deployment_ids,
+        input_outpoint,
+        test_block.header.time as u128,
     )
 }
 
