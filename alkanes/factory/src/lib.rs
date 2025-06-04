@@ -43,10 +43,38 @@ pub enum AMMFactoryMessage {
     #[opcode(10)]
     CollectFees { pool_id: AlkaneId },
 
-    #[opcode(20)]
-    SwapExactTokensForTokensAlongPath {
+    #[opcode(11)]
+    AddLiquidityChecked {
+        token_a: AlkaneId,
+        token_b: AlkaneId,
+        amount_a_desired: u128,
+        amount_b_desired: u128,
+        amount_a_min: u128,
+        amount_b_min: u128,
+        deadline: u128,
+    },
+
+    // #[opcode(12)]
+    // BurnChecked {
+    //     token_a: AlkaneId,
+    //     token_b: AlkaneId,
+    //     liquidity: u128,
+    //     amount_a_min: u128,
+    //     amount_b_min: u128,
+    //     deadline: u128,
+    // },
+    #[opcode(13)]
+    SwapExactTokensForTokens {
         path: Vec<AlkaneId>,
-        amount: u128,
+        amount_out_predicate: u128,
+        deadline: u128,
+    },
+
+    #[opcode(14)]
+    SwapTokensForExactTokens {
+        path: Vec<AlkaneId>,
+        amount_out: u128,
+        amount_in_max: u128,
         deadline: u128,
     },
 }

@@ -12,9 +12,6 @@ use init_pools::{
 use oylswap_library::DEFAULT_FEE_AMOUNT_PER_1000;
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::protostone::ProtostoneEdict;
-use swap::{
-    check_swap_lp_balance, insert_swap_exact_tokens_for_tokens_txs, insert_swap_txs_w_factory,
-};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use super::helper::swap::{

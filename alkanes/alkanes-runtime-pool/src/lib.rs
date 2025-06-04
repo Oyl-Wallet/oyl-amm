@@ -455,21 +455,6 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
                 0
             };
 
-            if !should_send_to_extcall {
-                // we don't want to charge fees on input amounts that go back out and not used for flashswaps (treated as a refund).
-                // Ex: input 5000 of token0, output 5000 token0. Should not take any fee on that input since it's treated as a refund
-                amount_0_in = if amount_0_in >= amount_0_out {
-                    amount_0_in - amount_0_out
-                } else {
-                    amount_0_in
-                };
-                amount_1_in = if amount_1_in >= amount_1_out {
-                    amount_1_in - amount_1_out
-                } else {
-                    amount_1_in
-                };
-            }
-
             // Check that at least one input amount is greater than 0
             if amount_0_in == 0 && amount_1_in == 0 {
                 return Err(anyhow!("INSUFFICIENT_INPUT_AMOUNT"));
@@ -497,104 +482,6 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         })
     }
 
-    fn get_amount_out(&self, parcel: AlkaneTransferParcel) -> Result<(u128, u128)> {
-        let transfer = parcel.0[0].clone();
-        let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
-        let (reserve_a, reserve_b) = self.alkanes_for_self()?;
-
-        if &transfer.id == &reserve_a {
-            Ok((
-                0,
-                oylswap_library::get_amount_out(
-                    transfer.value,
-                    previous_a.value,
-                    previous_b.value,
-                )?,
-            ))
-        } else {
-            Ok((
-                oylswap_library::get_amount_out(
-                    transfer.value,
-                    previous_b.value,
-                    previous_a.value,
-                )?,
-                0,
-            ))
-        }
-    }
-
-    fn _check_deadline(&self, deadline: u128) -> Result<()> {
-        let block = consensus_decode::<Block>(&mut std::io::Cursor::new(self.block()))?;
-        if block.header.time as u128 > deadline {
-            Err(anyhow!("EXPIRED deadline"))
-        } else {
-            Ok(())
-        }
-    }
-
-    fn swap_exact_tokens_for_tokens(
-        &self,
-        amount_out_predicate: u128,
-        deadline: u128,
-    ) -> Result<CallResponse> {
-        self._check_deadline(deadline)?;
-        let context = self.context()?;
-        let parcel: AlkaneTransferParcel = context.incoming_alkanes;
-        self.check_inputs(&context.myself, &parcel, 1)?;
-        let (amount_0_out, amount_1_out) = self.get_amount_out(parcel.clone())?;
-        if amount_0_out < amount_out_predicate && amount_1_out < amount_out_predicate {
-            return Err(anyhow!("predicate failed: insufficient output"));
-        }
-        self.swap(amount_0_out, amount_1_out, context.caller, vec![])
-    }
-
-    fn swap_tokens_for_exact_tokens(
-        &self,
-        desired_amount_out: u128,
-        amount_in_max: u128,
-        deadline: u128,
-    ) -> Result<CallResponse> {
-        self._check_deadline(deadline)?;
-        let context = self.context()?;
-        let parcel: AlkaneTransferParcel = context.incoming_alkanes;
-        self.check_inputs(&context.myself, &parcel, 1)?;
-        let transfer = parcel.0[0].clone();
-        if transfer.value < amount_in_max {
-            return Err(anyhow!("amount_in_max is higher than input amount"));
-        }
-        let (previous_a, previous_b) = self.previous_reserves(&parcel)?;
-        let (reserve_a, reserve_b) = self.alkanes_for_self()?;
-
-        let amount_in = if &transfer.id == &reserve_a {
-            oylswap_library::get_amount_in(desired_amount_out, previous_a.value, previous_b.value)?
-        } else {
-            oylswap_library::get_amount_in(desired_amount_out, previous_b.value, previous_a.value)?
-        };
-        if amount_in > amount_in_max {
-            return Err(anyhow!("EXCESSIVE_INPUT_AMOUNT"));
-        }
-        if &transfer.id == &reserve_a {
-            self.swap(
-                transfer.value - amount_in,
-                desired_amount_out,
-                context.caller,
-                vec![],
-            )
-        } else {
-            self.swap(
-                desired_amount_out,
-                transfer.value - amount_in,
-                context.caller,
-                vec![],
-            )
-        }
-    }
-
-    fn forward_incoming(&self) -> Result<CallResponse> {
-        let context = self.context()?;
-        Ok(CallResponse::forward(&context.incoming_alkanes))
-    }
-
     fn get_price_cumulative_last(&self) -> Result<CallResponse> {
         let context = self.context()?;
         let mut response = CallResponse::forward(&context.incoming_alkanes);
@@ -602,6 +489,18 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         let (p0, p1) = self.price_cumulative();
         bytes.extend_from_slice(&p0.to_le_bytes::<32>());
         bytes.extend_from_slice(&p1.to_le_bytes::<32>());
+        response.data = bytes;
+        Ok(response)
+    }
+
+    fn get_reserves(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        let parcel = context.incoming_alkanes.clone();
+        let (reserve_a, reserve_b) = self.previous_reserves(&parcel)?;
+        let mut response = CallResponse::forward(&context.incoming_alkanes);
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&reserve_a.value.to_le_bytes());
+        bytes.extend_from_slice(&reserve_b.value.to_le_bytes());
         response.data = bytes;
         Ok(response)
     }
