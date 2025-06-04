@@ -1,14 +1,9 @@
-use add_liquidity::{check_add_liquidity_lp_balance, insert_add_liquidity_txs};
+use add_liquidity::insert_add_liquidity_txs;
 use alkanes_support::cellpack::Cellpack;
-use alkanes_support::trace::{Trace, TraceEvent};
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::Witness;
-use init_pools::{
-    calc_lp_balance_from_pool_init, init_block_with_amm_pool, insert_init_pool_liquidity_txs,
-    test_amm_pool_init_fixture,
-};
-use num::integer::Roots;
+use init_pools::test_amm_pool_init_fixture;
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::protostone::ProtostoneEdict;
 
@@ -19,18 +14,11 @@ use crate::tests::helper::*;
 use alkane_helpers::clear;
 use alkanes::indexer::index_block;
 use alkanes::tests::helpers::{
-    self as alkane_helpers, assert_revert_context, assert_revert_context_at_index,
-    assert_token_id_has_no_deployment, get_last_outpoint_sheet, get_sheet_for_outpoint,
+    self as alkane_helpers, get_last_outpoint_sheet, get_sheet_for_outpoint,
 };
-use alkanes::view;
-use alkanes_support::id::AlkaneId;
 #[allow(unused_imports)]
 use metashrew_core::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
-use std::fmt::Write;
 use wasm_bindgen_test::wasm_bindgen_test;
-
-use super::helper::add_liquidity::check_add_liquidity_runtime_balance;
-use super::helper::swap::check_swap_runtime_balance;
 
 #[wasm_bindgen_test]
 fn test_amm_pool_swap_fee_claim() -> Result<()> {
@@ -86,8 +74,8 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
     insert_swap_exact_tokens_for_tokens(
         first_swap_sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()) * 1005 / 1000,
         vec![
-            deployment_ids.owned_token_1_deployment,
             deployment_ids.owned_token_2_deployment,
+            deployment_ids.owned_token_1_deployment,
         ],
         0,
         &mut swap_block2,

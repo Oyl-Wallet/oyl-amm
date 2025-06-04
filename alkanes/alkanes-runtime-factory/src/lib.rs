@@ -393,11 +393,13 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
 
     fn _swap_exact_tokens_for_tokens(
         &self,
-        pool: AlkaneId,
+        token_in: AlkaneId,
+        token_out: AlkaneId,
         amount_out_predicate: u128,
         parcel: AlkaneTransferParcel,
     ) -> Result<CallResponse> {
         let context = self.context()?;
+        let pool = self._find_existing_pool_id(token_in, token_out)?;
         let (amount_0_out, amount_1_out) = self._get_amount_out(pool, parcel.clone())?;
         if amount_0_out < amount_out_predicate && amount_1_out < amount_out_predicate {
             return Err(anyhow!("predicate failed: insufficient output"));
@@ -443,10 +445,13 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         };
 
         for i in 1..path.len() {
-            let pool = self._find_existing_pool_id(path[i - 1], path[i])?;
             let this_amount = if i == path.len() - 1 { amount } else { 0 };
-            this_response =
-                self._swap_exact_tokens_for_tokens(pool, this_amount, this_response.alkanes)?;
+            this_response = self._swap_exact_tokens_for_tokens(
+                path[i - 1],
+                path[i],
+                this_amount,
+                this_response.alkanes,
+            )?;
         }
 
         Ok(this_response)
