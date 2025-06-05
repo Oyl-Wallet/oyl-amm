@@ -15,10 +15,6 @@ use oylswap_library::{StorableU256, U256};
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
-use swap::{
-    check_swap_lp_balance, insert_swap_exact_tokens_for_tokens,
-    insert_swap_exact_tokens_for_tokens_deadline,
-};
 
 use crate::tests::helper::add_liquidity::insert_add_liquidity_checked_txs;
 use crate::tests::helper::common::DEPLOYMENT_IDS;
