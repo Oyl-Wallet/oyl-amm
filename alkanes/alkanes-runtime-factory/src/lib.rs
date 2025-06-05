@@ -472,7 +472,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         if n < 2 {
             return Err(anyhow!("Routing path must be at least two alkanes long"));
         }
-        let mut amounts: Vec<u128> = Vec::with_capacity(n);
+        let mut amounts: Vec<u128> = vec![0; n];
         amounts[n - 1] = amount_out;
         for i in 1..n {
             let (reserve_in, reserve_out) =
@@ -507,7 +507,6 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         }
 
         let amounts = self.get_amounts_in(desired_amount_out, &path)?;
-
         if amounts[0] > amount_in_max {
             return Err(anyhow!("EXCESSIVE_INPUT_AMOUNT"));
         }
