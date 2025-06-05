@@ -1,3 +1,4 @@
+pub mod add_liquidity;
 pub mod amm;
 pub mod fees;
 pub mod helper;
