@@ -772,3 +772,43 @@ fn test_amm_pool_swap_tokens_for_exact_4() -> Result<()> {
 
     Ok(())
 }
+
+#[wasm_bindgen_test]
+fn test_amm_pool_swap_tokens_for_exact_middle() -> Result<()> {
+    clear();
+    let (amount1, amount2) = (500000, 500000);
+    let (init_block, deployment_ids, mut runtime_balances) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
+    let block_height = 840_001;
+    let mut swap_block = create_block_with_coinbase_tx(block_height);
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    let amount_to_swap = 10000;
+    insert_swap_tokens_for_exact_tokens_txs(
+        amount_to_swap,
+        vec![
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
+            deployment_ids.owned_token_3_deployment,
+        ],
+        5000,
+        7000,
+        &mut swap_block,
+        &deployment_ids,
+        input_outpoint,
+    );
+    index_block(&swap_block, block_height)?;
+
+    let sheet = get_last_outpoint_sheet(&swap_block)?;
+    assert_eq!(
+        sheet.get_cached(&deployment_ids.owned_token_3_deployment.into()),
+        5000
+    );
+    assert_eq!(
+        sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
+        4846
+    );
+    Ok(())
+}

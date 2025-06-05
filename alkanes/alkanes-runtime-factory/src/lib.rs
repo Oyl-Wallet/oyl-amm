@@ -26,14 +26,6 @@ pub fn take_two<T: Clone>(v: &Vec<T>) -> (T, T) {
     (v[0].clone(), v[1].clone())
 }
 
-pub fn sort_alkanes((a, b): (AlkaneId, AlkaneId)) -> (AlkaneId, AlkaneId) {
-    if a < b {
-        (a, b)
-    } else {
-        (b, a)
-    }
-}
-
 pub fn join_ids(a: AlkaneId, b: AlkaneId) -> Vec<u8> {
     let mut result: Vec<u8> = a.into();
     let value: Vec<u8> = b.into();
@@ -114,7 +106,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
             )));
         }
         let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
-        let (a, b) = sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
+        let (a, b) = oylswap_library::sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
         let pool_id = AlkaneId::new(2, self.sequence());
         // check if this pool already exists
         if self.pool_pointer(&a, &b).get().len() == 0 {
@@ -160,7 +152,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
     }
 
     fn _find_existing_pool_id(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> Result<AlkaneId> {
-        let (a, b) = sort_alkanes((alkane_a, alkane_b));
+        let (a, b) = oylswap_library::sort_alkanes((alkane_a, alkane_b));
         if self.pool_pointer(&a, &b).get().len() == 0 {
             return Err(anyhow!(format!(
                 "the pool {:?} {:?} doesn't exist in the factory",
@@ -291,6 +283,17 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         Ok((reserve_a, reserve_b))
     }
 
+    fn _get_reserves_ordered(&self, token_a: AlkaneId, token_b: AlkaneId) -> Result<(u128, u128)> {
+        let (token_0, _) = oylswap_library::sort_alkanes((token_a, token_b));
+        let pool = self._find_existing_pool_id(token_a, token_b)?;
+        let (reserve_0, reserve_1) = self._get_reserves(pool)?;
+        if token_a == token_0 {
+            Ok((reserve_0, reserve_1))
+        } else {
+            Ok((reserve_1, reserve_0))
+        }
+    }
+
     fn _get_pool_info(&self, pool: AlkaneId) -> Result<PoolInfo> {
         let cellpack = Cellpack {
             target: pool,
@@ -391,46 +394,62 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         }
     }
 
-    fn _swap_exact_tokens_for_tokens(
-        &self,
-        token_in: AlkaneId,
-        token_out: AlkaneId,
-        amount_out_predicate: u128,
-        parcel: AlkaneTransferParcel,
-    ) -> Result<CallResponse> {
+    fn _swap(&self, amounts: &Vec<u128>, path: &Vec<AlkaneId>) -> Result<CallResponse> {
         let context = self.context()?;
-        let pool = self._find_existing_pool_id(token_in, token_out)?;
-        let (amount_0_out, amount_1_out) = self._get_amount_out(pool, parcel.clone())?;
-        if amount_0_out < amount_out_predicate && amount_1_out < amount_out_predicate {
-            return Err(anyhow!("predicate failed: insufficient output"));
+        let mut response: CallResponse = CallResponse::default();
+        for i in 1..path.len() {
+            let pool = self._find_existing_pool_id(path[i - 1], path[i])?;
+            let (token_a, _) = oylswap_library::sort_alkanes((path[i - 1], path[i]));
+            let amount_out = amounts[i];
+            let (amount_0_out, amount_1_out) = if path[i - 1] == token_a {
+                (0, amount_out)
+            } else {
+                (amount_out, 0)
+            };
+            let cellpack = Cellpack {
+                target: pool,
+                inputs: vec![
+                    3,
+                    amount_0_out,
+                    amount_1_out,
+                    context.caller.block,
+                    context.caller.tx,
+                    0,
+                ],
+            };
+            let parcel = AlkaneTransferParcel(vec![AlkaneTransfer {
+                id: path[i - 1],
+                value: amounts[i - 1],
+            }]);
+            response = self.call(&cellpack, &parcel, self.fuel())?;
         }
-        let cellpack = Cellpack {
-            target: pool,
-            inputs: vec![
-                3,
-                amount_0_out,
-                amount_1_out,
-                context.caller.block,
-                context.caller.tx,
-                0,
-            ],
-        };
-        self.call(&cellpack, &parcel, self.fuel())
+        Ok(response)
+    }
+
+    fn get_amounts_out(&self, amount_in: u128, path: &Vec<AlkaneId>) -> Result<Vec<u128>> {
+        let n = path.len();
+        if n < 2 {
+            return Err(anyhow!("Routing path must be at least two alkanes long"));
+        }
+        let mut amounts: Vec<u128> = vec![0; n];
+        amounts[0] = amount_in;
+        for i in 1..n {
+            let (reserve_in, reserve_out) = self._get_reserves_ordered(path[i - 1], path[i])?;
+            amounts[i] = oylswap_library::get_amount_out(amounts[i - 1], reserve_in, reserve_out)?;
+        }
+        Ok(amounts)
     }
 
     fn swap_exact_tokens_for_tokens(
         &self,
         path: Vec<AlkaneId>,
-        amount: u128,
+        amount_out_min: u128,
         deadline: u128,
     ) -> Result<CallResponse> {
         self._check_deadline(deadline)?;
         let context = self.context()?;
 
         // swap
-        if path.len() < 2 {
-            return Err(anyhow!("Routing path must be at least two alkanes long"));
-        }
         if context.incoming_alkanes.0.len() != 1 {
             return Err(anyhow!("Input must be 1 alkane"));
         }
@@ -439,74 +458,29 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
                 "Routing path first element must be the input token"
             ));
         }
-        let mut this_response = CallResponse {
-            alkanes: context.incoming_alkanes.clone(),
-            data: vec![],
-        };
 
-        for i in 1..path.len() {
-            let this_amount = if i == path.len() - 1 { amount } else { 0 };
-            this_response = self._swap_exact_tokens_for_tokens(
-                path[i - 1],
-                path[i],
-                this_amount,
-                this_response.alkanes,
-            )?;
+        let amounts = self.get_amounts_out(context.incoming_alkanes.0[0].value, &path)?;
+        if amounts[amounts.len() - 1] < amount_out_min {
+            return Err(anyhow!("predicate failed: insufficient output"));
         }
 
-        Ok(this_response)
+        self._swap(&amounts, &path)
     }
 
-    fn _swap_tokens_for_exact_tokens(
-        &self,
-        token_in: AlkaneId,
-        token_out: AlkaneId,
-        desired_amount_out: u128,
-        amount_in_max: u128,
-    ) -> Result<CallResponse> {
-        let context = self.context()?;
-
-        let pool = self._find_existing_pool_id(token_in, token_out)?;
-
-        let pool_info = self._get_pool_info(pool)?;
-
-        let amount_in = if &token_in == &pool_info.token_a {
-            oylswap_library::get_amount_in(
-                desired_amount_out,
-                pool_info.reserve_a,
-                pool_info.reserve_b,
-            )?
-        } else {
-            oylswap_library::get_amount_in(
-                desired_amount_out,
-                pool_info.reserve_b,
-                pool_info.reserve_a,
-            )?
-        };
-        if amount_in > amount_in_max {
-            return Err(anyhow!("EXCESSIVE_INPUT_AMOUNT"));
+    fn get_amounts_in(&self, amount_out: u128, path: &Vec<AlkaneId>) -> Result<Vec<u128>> {
+        let n = path.len();
+        if n < 2 {
+            return Err(anyhow!("Routing path must be at least two alkanes long"));
         }
-        let (amount_0_out, amount_1_out) = if &token_in == &pool_info.token_a {
-            (0, desired_amount_out)
-        } else {
-            (desired_amount_out, 0)
-        };
-        let cellpack = Cellpack {
-            target: pool,
-            inputs: vec![
-                3,
-                amount_0_out,
-                amount_1_out,
-                context.caller.block,
-                context.caller.tx,
-                0,
-            ],
-        };
-        let transfer_in = AlkaneTransferParcel(vec![AlkaneTransfer {
-            id: token_in,
-            value: amount_in,
-        }]);
-        self.call(&cellpack, &transfer_in, self.fuel())
+        let mut amounts: Vec<u128> = vec![0; n];
+        amounts[n - 1] = amount_out;
+        for i in 1..n {
+            let (reserve_in, reserve_out) =
+                self._get_reserves_ordered(path[n - i - 1], path[n - i])?;
+            amounts[n - i - 1] =
+                oylswap_library::get_amount_in(amounts[n - i], reserve_in, reserve_out)?;
+        }
+        Ok(amounts)
     }
 
     fn swap_tokens_for_exact_tokens(
@@ -520,9 +494,6 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         let context = self.context()?;
         let parcel: AlkaneTransferParcel = context.clone().incoming_alkanes;
 
-        if path.len() != 2 {
-            return Err(anyhow!("Routing path must be at least two alkanes long"));
-        }
         if parcel.0.len() != 1 {
             return Err(anyhow!("Input must be 1 alkane"));
         }
@@ -534,12 +505,13 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         if parcel.0[0].value < amount_in_max {
             return Err(anyhow!("amount_in_max is higher than input amount"));
         }
-        let mut response = self._swap_tokens_for_exact_tokens(
-            path[0],
-            path[1],
-            desired_amount_out,
-            amount_in_max,
-        )?;
+
+        let amounts = self.get_amounts_in(desired_amount_out, &path)?;
+        if amounts[0] > amount_in_max {
+            return Err(anyhow!("EXCESSIVE_INPUT_AMOUNT"));
+        }
+
+        let mut response = self._swap(&amounts, &path)?;
 
         // refund remaining to user
         response.alkanes.pay(AlkaneTransfer {
