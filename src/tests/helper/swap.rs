@@ -15,9 +15,10 @@ use protorune_support::protostone::ProtostoneEdict;
 use ruint::Uint;
 use std::fmt::Write;
 
+use crate::tests::helper::common::DEPLOYMENT_IDS;
+
 use super::common::{
-    create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers, AmmTestDeploymentIds,
-    CellpackOrEdict,
+    create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers, CellpackOrEdict,
 };
 
 fn _insert_swap_txs(
@@ -74,14 +75,13 @@ pub fn insert_swap_tokens_for_exact_tokens_txs(
     amount_out: u128,
     amount_in_max: u128,
     test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
 ) {
     if swap_path.len() < 2 {
         panic!("Swap path must be at least two alkanes long");
     }
     let mut cellpack = Cellpack {
-        target: deployment_ids.amm_factory_deployment,
+        target: DEPLOYMENT_IDS.amm_factory_deployment,
         inputs: vec![14, swap_path.len() as u128],
     };
     cellpack
@@ -108,7 +108,6 @@ pub fn insert_swap_exact_tokens_for_tokens_deadline(
     swap_path: Vec<AlkaneId>,
     min_out: u128,
     test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
     deadline: u128,
 ) {
@@ -116,7 +115,7 @@ pub fn insert_swap_exact_tokens_for_tokens_deadline(
         panic!("Swap path must be at least two alkanes long");
     }
     let mut cellpack = Cellpack {
-        target: deployment_ids.amm_factory_deployment,
+        target: DEPLOYMENT_IDS.amm_factory_deployment,
         inputs: vec![13, swap_path.len() as u128],
     };
     cellpack
@@ -142,7 +141,6 @@ pub fn insert_swap_exact_tokens_for_tokens(
     swap_path: Vec<AlkaneId>,
     min_out: u128,
     test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
     input_outpoint: OutPoint,
 ) {
     insert_swap_exact_tokens_for_tokens_deadline(
@@ -150,7 +148,6 @@ pub fn insert_swap_exact_tokens_for_tokens(
         swap_path,
         min_out,
         test_block,
-        deployment_ids,
         input_outpoint,
         test_block.header.time as u128,
     )

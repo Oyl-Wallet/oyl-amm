@@ -18,9 +18,9 @@ use metashrew_support::{
     index_pointer::KeyValuePointer,
     utils::{consume_sized_int, consume_u128},
 };
-use oylswap_library::PoolInfo;
+use oylswap_library::{PoolInfo, U256};
 use protorune_support::utils::consensus_decode;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 pub fn take_two<T: Clone>(v: &Vec<T>) -> (T, T) {
     (v[0].clone(), v[1].clone())
@@ -303,8 +303,31 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         Ok(PoolInfo::from_vec(&response.data)?)
     }
 
+    fn _return_leftovers(
+        &self,
+        myself: AlkaneId,
+        result: CallResponse,
+        input_alkanes: AlkaneTransferParcel,
+    ) -> Result<CallResponse> {
+        let mut response = CallResponse::default();
+        let mut unique_ids: HashSet<AlkaneId> = HashSet::new();
+        for transfer in input_alkanes.0 {
+            unique_ids.insert(transfer.id);
+        }
+        for transfer in result.alkanes.0 {
+            unique_ids.insert(transfer.id);
+        }
+        for id in unique_ids {
+            response.alkanes.pay(AlkaneTransfer {
+                id: id,
+                value: self.balance(&myself, &id),
+            });
+        }
+        Ok(response)
+    }
+
     // note: for now, token_a and token_b must be in alphabetical order
-    fn add_liquidity_checked(
+    fn add_liquidity(
         &self,
         token_a: AlkaneId,
         token_b: AlkaneId,
@@ -321,14 +344,18 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         let (amount_a, amount_b) = if previous_a == 0 && previous_b == 0 {
             (amount_a_desired, amount_b_desired)
         } else {
-            let amount_b_optimal = amount_a_desired * previous_b / previous_a;
+            let amount_b_optimal: u128 = (U256::from(amount_a_desired) * U256::from(previous_b)
+                / U256::from(previous_a))
+            .try_into()?;
             if amount_b_optimal <= amount_b_desired {
                 if amount_b_optimal < amount_b_min {
                     return Err(anyhow!("INSUFFICIENT_B_AMOUNT"));
                 }
                 (amount_a_desired, amount_b_optimal)
             } else {
-                let amount_a_optimal = amount_b_desired * previous_a / previous_b;
+                let amount_a_optimal = (U256::from(amount_b_desired) * U256::from(previous_a)
+                    / U256::from(previous_b))
+                .try_into()?;
                 if amount_a_optimal > amount_a_desired || amount_a_optimal < amount_a_min {
                     return Err(anyhow!("INSUFFICIENT_A_AMOUNT"));
                 }
@@ -350,19 +377,39 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
             target: pool,
             inputs: vec![1],
         };
-        let mut result = self.call(&cellpack, &input_transfer, self.fuel())?;
+        let result = self.call(&cellpack, &input_transfer, self.fuel())?;
+        self._return_leftovers(context.myself, result, context.incoming_alkanes)
+    }
 
-        // return leftovers
-        result.alkanes.pay(AlkaneTransfer {
-            id: token_a,
-            value: self.balance(&context.myself, &token_a),
-        });
-        result.alkanes.pay(AlkaneTransfer {
-            id: token_b,
-            value: self.balance(&context.myself, &token_b),
-        });
-
-        Ok(result)
+    fn burn(
+        &self,
+        token_a: AlkaneId,
+        token_b: AlkaneId,
+        liquidity: u128,
+        amount_a_min: u128,
+        amount_b_min: u128,
+        deadline: u128,
+    ) -> Result<CallResponse> {
+        self._check_deadline(deadline)?;
+        let context = self.context()?;
+        let parcel = context.incoming_alkanes;
+        let pool = self._find_existing_pool_id(token_a, token_b)?;
+        let input_transfer = AlkaneTransferParcel(vec![AlkaneTransfer {
+            id: pool,
+            value: liquidity,
+        }]);
+        let cellpack = Cellpack {
+            target: pool,
+            inputs: vec![1],
+        };
+        let result = self.call(&cellpack, &input_transfer, self.fuel())?;
+        if self.balance(&context.myself, &token_a) < amount_a_min {
+            return Err(anyhow!("INSUFFICIENT_A_AMOUNT"));
+        }
+        if self.balance(&context.myself, &token_b) < amount_b_min {
+            return Err(anyhow!("INSUFFICIENT_B_AMOUNT"));
+        }
+        self._return_leftovers(context.myself, result, parcel)
     }
 
     fn _get_amount_out(

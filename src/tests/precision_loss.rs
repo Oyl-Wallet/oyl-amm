@@ -9,6 +9,7 @@ use num::integer::Roots;
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations, ProtoruneRuneId};
 
+use crate::tests::helper::common::DEPLOYMENT_IDS;
 use crate::tests::helper::*;
 use alkane_helpers::clear;
 use alkanes::indexer::index_block;
@@ -34,8 +35,7 @@ fn test_precision_loss_attack() -> Result<()> {
     let (amount1, amount2) = (1_000_000_000_000_000_000u128, 100u128);
 
     // Initialize the pool
-    let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
 
     // Calculate the initial invariant (k = x * y)
     let initial_invariant = amount1 * amount2;
@@ -86,9 +86,9 @@ fn test_precision_loss_attack() -> Result<()> {
         insert_add_liquidity_txs(
             add_amount1,
             add_amount2,
-            deployment_ids.owned_token_1_deployment,
-            deployment_ids.owned_token_2_deployment,
-            deployment_ids.amm_pool_1_deployment,
+            DEPLOYMENT_IDS.owned_token_1_deployment,
+            DEPLOYMENT_IDS.owned_token_2_deployment,
+            DEPLOYMENT_IDS.amm_pool_1_deployment,
             &mut add_liquidity_block,
             input_outpoint,
         );
@@ -102,7 +102,7 @@ fn test_precision_loss_attack() -> Result<()> {
 
         // Get the LP tokens minted
         let sheet = get_last_outpoint_sheet(&add_liquidity_block)?;
-        let lp_tokens = sheet.get_cached(&deployment_ids.amm_pool_1_deployment.into());
+        let lp_tokens = sheet.get_cached(&DEPLOYMENT_IDS.amm_pool_1_deployment.into());
 
         println!("LP tokens received: {}", lp_tokens);
 
@@ -118,7 +118,7 @@ fn test_precision_loss_attack() -> Result<()> {
             lp_tokens,
             &mut remove_liquidity_block,
             input_outpoint,
-            deployment_ids.amm_pool_1_deployment,
+            DEPLOYMENT_IDS.amm_pool_1_deployment,
             false,
         );
 
@@ -127,8 +127,8 @@ fn test_precision_loss_attack() -> Result<()> {
 
         // Get the tokens returned
         let sheet = get_last_outpoint_sheet(&remove_liquidity_block)?;
-        let token1_return = sheet.get_cached(&deployment_ids.owned_token_1_deployment.into());
-        let token2_return = sheet.get_cached(&deployment_ids.owned_token_2_deployment.into());
+        let token1_return = sheet.get_cached(&DEPLOYMENT_IDS.owned_token_1_deployment.into());
+        let token2_return = sheet.get_cached(&DEPLOYMENT_IDS.owned_token_2_deployment.into());
 
         println!("Token1 returned: {}", token1_return);
         println!("Token2 returned: {}", token2_return);

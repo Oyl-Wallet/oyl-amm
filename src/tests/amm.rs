@@ -20,6 +20,8 @@ use swap::{
     insert_swap_exact_tokens_for_tokens_deadline,
 };
 
+use crate::tests::helper::add_liquidity::insert_add_liquidity_checked_txs;
+use crate::tests::helper::common::DEPLOYMENT_IDS;
 use crate::tests::helper::*;
 use alkane_helpers::clear;
 use alkanes::indexer::index_block;
@@ -48,12 +50,12 @@ fn test_amm_pool_normal_init() -> Result<()> {
 fn test_amm_factory_double_init_fail() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
+    let mut test_block = init_block_with_amm_pool()?;
     test_block.txdata.push(
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: deployment_ids.amm_factory_deployment,
+                target: DEPLOYMENT_IDS.amm_factory_deployment,
                 inputs: vec![0],
             }],
             OutPoint {
@@ -80,18 +82,18 @@ fn test_amm_factory_double_init_fail() -> Result<()> {
 fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
+    let mut test_block = init_block_with_amm_pool()?;
     test_block.txdata.push(
         common::create_multiple_cellpack_with_witness_and_in_with_edicts(
             Witness::new(),
             vec![
                 common::CellpackOrEdict::Edict(vec![ProtostoneEdict {
-                    id: deployment_ids.owned_token_1_deployment.into(),
+                    id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
                     amount: 1000000,
                     output: 0,
                 }]),
                 common::CellpackOrEdict::Cellpack(Cellpack {
-                    target: deployment_ids.amm_factory_deployment,
+                    target: DEPLOYMENT_IDS.amm_factory_deployment,
                     inputs: vec![1],
                 }),
             ],
@@ -119,7 +121,7 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
 fn test_amm_factory_duplicate_pool_fail() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, deployment_ids, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut init_block_2 = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -129,10 +131,9 @@ fn test_amm_factory_duplicate_pool_fail() -> Result<()> {
     insert_init_pool_liquidity_txs(
         10000,
         10000,
-        deployment_ids.owned_token_1_deployment,
-        deployment_ids.owned_token_2_deployment,
+        DEPLOYMENT_IDS.owned_token_1_deployment,
+        DEPLOYMENT_IDS.owned_token_2_deployment,
         &mut init_block_2,
-        &deployment_ids,
         input_outpoint,
     );
     index_block(&init_block_2, block_height)?;
@@ -165,7 +166,7 @@ fn test_amm_pool_skewed_init() -> Result<()> {
 fn test_amm_pool_zero_init() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
+    let (mut test_block) = init_block_with_amm_pool()?;
     let mut previous_outpoint = OutPoint {
         txid: test_block.txdata.last().unwrap().compute_txid(),
         vout: 0,
@@ -173,10 +174,9 @@ fn test_amm_pool_zero_init() -> Result<()> {
     insert_init_pool_liquidity_txs(
         1000000,
         1,
-        deployment_ids.owned_token_1_deployment,
-        deployment_ids.owned_token_2_deployment,
+        DEPLOYMENT_IDS.owned_token_1_deployment,
+        DEPLOYMENT_IDS.owned_token_2_deployment,
         &mut test_block,
-        &deployment_ids,
         previous_outpoint,
     );
     index_block(&test_block, block_height)?;
@@ -197,7 +197,7 @@ fn test_amm_pool_zero_init() -> Result<()> {
 fn test_amm_pool_bad_init() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
+    let (mut test_block) = init_block_with_amm_pool()?;
     let previous_outpoint = OutPoint {
         txid: test_block.txdata.last().unwrap().compute_txid(),
         vout: 0,
@@ -205,17 +205,16 @@ fn test_amm_pool_bad_init() -> Result<()> {
     insert_init_pool_liquidity_txs(
         10000,
         1,
-        deployment_ids.owned_token_1_deployment,
-        deployment_ids.owned_token_2_deployment,
+        DEPLOYMENT_IDS.owned_token_1_deployment,
+        DEPLOYMENT_IDS.owned_token_2_deployment,
         &mut test_block,
-        &deployment_ids,
         previous_outpoint,
     );
     index_block(&test_block, block_height)?;
-    assert_token_id_has_no_deployment(deployment_ids.amm_pool_1_deployment)?;
+    assert_token_id_has_no_deployment(DEPLOYMENT_IDS.amm_pool_1_deployment)?;
     let sheet = get_last_outpoint_sheet(&test_block)?;
     assert_eq!(
-        sheet.get_cached(&deployment_ids.amm_pool_1_deployment.into()),
+        sheet.get_cached(&DEPLOYMENT_IDS.amm_pool_1_deployment.into()),
         0
     );
 
@@ -266,308 +265,10 @@ fn test_amm_pool_burn_more_than_owned() -> Result<()> {
 }
 
 #[wasm_bindgen_test]
-fn test_amm_pool_add_more_liquidity() -> Result<()> {
-    clear();
-    let (amount1, amount2) = (500000, 500000);
-    let total_supply = (amount1 * amount2).sqrt();
-    let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2)?;
-    let block_height = 840_001;
-    let mut add_liquidity_block = create_block_with_coinbase_tx(block_height);
-    let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
-        vout: 0,
-    };
-    insert_add_liquidity_txs(
-        amount1,
-        amount2,
-        deployment_ids.owned_token_1_deployment,
-        deployment_ids.owned_token_2_deployment,
-        deployment_ids.amm_pool_1_deployment,
-        &mut add_liquidity_block,
-        input_outpoint,
-    );
-    index_block(&add_liquidity_block, block_height)?;
-
-    check_add_liquidity_lp_balance(
-        amount1,
-        amount2,
-        amount1,
-        amount2,
-        total_supply,
-        &add_liquidity_block,
-        deployment_ids.amm_pool_1_deployment,
-    )?;
-
-    check_add_liquidity_runtime_balance(
-        &mut runtime_balances,
-        amount1,
-        amount2,
-        0,
-        &deployment_ids,
-    )?;
-    Ok(())
-}
-
-#[wasm_bindgen_test]
-fn test_amm_pool_add_more_liquidity_one_sided() -> Result<()> {
-    clear();
-    let (amount1, amount2) = (500000, 500000);
-    let total_supply = (amount1 * amount2).sqrt();
-    let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2)?;
-    let block_height = 840_001;
-    let mut add_liquidity_block = create_block_with_coinbase_tx(block_height);
-    let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
-        vout: 0,
-    };
-    insert_add_liquidity_txs(
-        amount1,
-        1,
-        deployment_ids.owned_token_1_deployment,
-        deployment_ids.owned_token_2_deployment,
-        deployment_ids.amm_pool_1_deployment,
-        &mut add_liquidity_block,
-        input_outpoint,
-    );
-    index_block(&add_liquidity_block, block_height)?;
-
-    check_add_liquidity_lp_balance(
-        amount1,
-        amount2,
-        amount1,
-        1,
-        total_supply,
-        &add_liquidity_block,
-        deployment_ids.amm_pool_1_deployment,
-    )?;
-
-    check_add_liquidity_runtime_balance(&mut runtime_balances, amount1, 1, 0, &deployment_ids)?;
-    Ok(())
-}
-
-#[wasm_bindgen_test]
-fn test_amm_pool_add_more_liquidity_to_wrong_pool() -> Result<()> {
-    clear();
-    let (amount1, amount2) = (500000, 500000);
-    let total_supply = (amount1 * amount2).sqrt();
-    let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2)?;
-    let block_height = 840_001;
-    let mut add_liquidity_block = create_block_with_coinbase_tx(block_height);
-    let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
-        vout: 0,
-    };
-    insert_add_liquidity_txs(
-        amount1,
-        amount2,
-        deployment_ids.owned_token_1_deployment,
-        deployment_ids.owned_token_2_deployment,
-        deployment_ids.amm_pool_2_deployment,
-        &mut add_liquidity_block,
-        input_outpoint,
-    );
-    index_block(&add_liquidity_block, block_height)?;
-
-    check_add_liquidity_lp_balance(
-        amount1,
-        amount2,
-        0,
-        0,
-        total_supply,
-        &add_liquidity_block,
-        deployment_ids.amm_pool_2_deployment,
-    )?;
-
-    check_add_liquidity_runtime_balance(&mut runtime_balances, 0, 0, 0, &deployment_ids)?;
-
-    assert_revert_context(
-        &(OutPoint {
-            txid: add_liquidity_block.txdata[add_liquidity_block.txdata.len() - 1].compute_txid(),
-            vout: 5,
-        }),
-        "ALKANES: revert: Error: unsupported alkane sent to pool",
-    )?;
-    Ok(())
-}
-
-#[wasm_bindgen_test]
-fn test_amm_pool_swap() -> Result<()> {
-    clear();
-    let (amount1, amount2) = (500000, 500000);
-    let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2)?;
-    let block_height = 840_001;
-    let mut swap_block = create_block_with_coinbase_tx(block_height);
-    let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
-        vout: 0,
-    };
-    let amount_to_swap = 10000;
-    insert_swap_exact_tokens_for_tokens(
-        amount_to_swap,
-        vec![
-            deployment_ids.owned_token_1_deployment,
-            deployment_ids.owned_token_2_deployment,
-        ],
-        0,
-        &mut swap_block,
-        &deployment_ids,
-        input_outpoint,
-    );
-    index_block(&swap_block, block_height)?;
-
-    check_swap_lp_balance(
-        vec![amount1, amount2],
-        amount_to_swap,
-        deployment_ids.owned_token_2_deployment,
-        &swap_block,
-    )?;
-
-    check_swap_runtime_balance(
-        vec![amount1, amount2],
-        &mut runtime_balances,
-        amount_to_swap,
-        deployment_ids.owned_token_1_deployment,
-        deployment_ids.owned_token_2_deployment,
-    )?;
-    Ok(())
-}
-
-#[wasm_bindgen_test]
-fn test_amm_pool_swap_deadline_fail() -> Result<()> {
-    clear();
-    let (amount1, amount2) = (500000, 500000);
-    let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2)?;
-    let block_height = 840_001;
-    let mut swap_block = create_block_with_coinbase_tx(block_height);
-    let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
-        vout: 0,
-    };
-    let amount_to_swap = 10000;
-    let deadline = (swap_block.header.time - 1) as u128;
-
-    insert_swap_exact_tokens_for_tokens_deadline(
-        amount_to_swap,
-        vec![
-            deployment_ids.owned_token_1_deployment,
-            deployment_ids.owned_token_2_deployment,
-        ],
-        0,
-        &mut swap_block,
-        &deployment_ids,
-        input_outpoint,
-        deadline,
-    );
-    index_block(&swap_block, block_height)?;
-
-    let outpoint = OutPoint {
-        txid: swap_block.txdata[swap_block.txdata.len() - 1].compute_txid(),
-        vout: 5,
-    };
-
-    // Check the last trace event
-    assert_revert_context(&outpoint, "EXPIRED deadline")?;
-    Ok(())
-}
-
-#[wasm_bindgen_test]
-fn test_amm_pool_swap_large() -> Result<()> {
-    clear();
-    let (amount1, amount2) = (500000, 500000);
-    let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2)?;
-    let block_height = 840_001;
-    let mut swap_block = create_block_with_coinbase_tx(block_height);
-    let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
-        vout: 0,
-    };
-    let amount_to_swap = 500000;
-    insert_swap_exact_tokens_for_tokens(
-        amount_to_swap,
-        vec![
-            deployment_ids.owned_token_1_deployment,
-            deployment_ids.owned_token_2_deployment,
-        ],
-        0,
-        &mut swap_block,
-        &deployment_ids,
-        input_outpoint,
-    );
-
-    index_block(&swap_block, block_height)?;
-
-    check_swap_lp_balance(
-        vec![amount1, amount2],
-        amount_to_swap,
-        deployment_ids.owned_token_2_deployment,
-        &swap_block,
-    )?;
-
-    check_swap_runtime_balance(
-        vec![amount1, amount2],
-        &mut runtime_balances,
-        amount_to_swap,
-        deployment_ids.owned_token_1_deployment,
-        deployment_ids.owned_token_2_deployment,
-    )?;
-    Ok(())
-}
-
-#[wasm_bindgen_test]
-fn test_amm_pool_swap_w_factory_middle_path() -> Result<()> {
-    clear();
-    let (amount1, amount2) = (500000, 500000);
-    let (init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2)?;
-    let block_height = 840_001;
-    let mut swap_block = create_block_with_coinbase_tx(block_height);
-    let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
-        vout: 0,
-    };
-    let amount_to_swap = 10000;
-    insert_swap_exact_tokens_for_tokens(
-        amount_to_swap,
-        vec![
-            deployment_ids.owned_token_1_deployment,
-            deployment_ids.owned_token_2_deployment,
-            deployment_ids.owned_token_3_deployment,
-        ],
-        0,
-        &mut swap_block,
-        &deployment_ids,
-        input_outpoint,
-    );
-    index_block(&swap_block, block_height)?;
-
-    check_swap_lp_balance(
-        vec![amount1, amount2, amount2],
-        amount_to_swap,
-        deployment_ids.owned_token_3_deployment,
-        &swap_block,
-    )?;
-
-    check_swap_runtime_balance(
-        vec![amount1, amount2, amount2],
-        &mut runtime_balances,
-        amount_to_swap,
-        deployment_ids.owned_token_1_deployment,
-        deployment_ids.owned_token_3_deployment,
-    )?;
-    Ok(())
-}
-
-#[wasm_bindgen_test]
 fn test_amm_pool_name() -> Result<()> {
     clear();
     // Initialize a pool
-    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     // Create a new block for testing the name
     let block_height = 840_001;
@@ -578,7 +279,7 @@ fn test_amm_pool_name() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: deployment_ids.amm_pool_1_deployment,
+                target: DEPLOYMENT_IDS.amm_pool_1_deployment,
                 inputs: vec![99],
             }],
             OutPoint {
@@ -619,7 +320,7 @@ fn test_amm_pool_name() -> Result<()> {
 fn test_amm_pool_details() -> Result<()> {
     clear();
     // Initialize a pool
-    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     // Create a new block for testing the pool details
     let block_height = 840_001;
@@ -630,7 +331,7 @@ fn test_amm_pool_details() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: deployment_ids.amm_pool_1_deployment,
+                target: DEPLOYMENT_IDS.amm_pool_1_deployment,
                 inputs: vec![999],
             }],
             OutPoint {
@@ -671,7 +372,7 @@ fn test_amm_pool_details() -> Result<()> {
 fn test_amm_price_0() -> Result<()> {
     clear();
     // Initialize a pool
-    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     // Create a new block for testing the pool details
     let block_height = 840_001;
@@ -682,7 +383,7 @@ fn test_amm_price_0() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: deployment_ids.amm_pool_1_deployment,
+                target: DEPLOYMENT_IDS.amm_pool_1_deployment,
                 inputs: vec![98],
             }],
             OutPoint {
@@ -724,215 +425,9 @@ fn test_amm_price_0() -> Result<()> {
 }
 
 #[wasm_bindgen_test]
-fn test_amm_price_swap() -> Result<()> {
-    clear();
-    // Initialize a pool
-    let (init_block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
-
-    // Create a new block for testing the pool details
-    let block_height = 840_001;
-    let mut swap_block = create_block_with_coinbase_tx(block_height);
-    swap_block.header.time = init_block.header.time + 100;
-    let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
-        vout: 0,
-    };
-    let amount_to_swap = 10000;
-
-    insert_swap_exact_tokens_for_tokens(
-        amount_to_swap,
-        vec![
-            deployment_ids.owned_token_1_deployment,
-            deployment_ids.owned_token_2_deployment,
-        ],
-        0,
-        &mut swap_block,
-        &deployment_ids,
-        input_outpoint,
-    );
-    index_block(&swap_block, block_height)?;
-
-    let mut test_block = create_block_with_coinbase_tx(block_height + 1);
-
-    // Call opcode 999 on the pool to get its pool details including the name
-    test_block.txdata.push(
-        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
-            Witness::new(),
-            vec![Cellpack {
-                target: deployment_ids.amm_pool_1_deployment,
-                inputs: vec![98],
-            }],
-            OutPoint {
-                txid: swap_block.txdata[swap_block.txdata.len() - 1].compute_txid(),
-                vout: 0,
-            },
-            false,
-        ),
-    );
-
-    index_block(&test_block, block_height + 1)?;
-
-    // Get the trace data from the transaction
-    let outpoint = OutPoint {
-        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-        vout: 3,
-    };
-
-    let trace_data: Trace = view::trace(&outpoint)?.try_into()?;
-
-    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
-
-    // Access the data field from the trace response
-    if let Some(return_context) = last_trace_event {
-        // Use pattern matching to extract the data field from the TraceEvent enum
-        match return_context {
-            TraceEvent::ReturnContext(trace_response) => {
-                // Now we have the TraceResponse, access the data field
-                let data = &trace_response.inner.data;
-                assert_eq!(
-                    data[16], 100,
-                    "first price event should be 1:1, * time(100)"
-                );
-                assert_eq!(
-                    data[48], 100,
-                    "first price event should be 1:1, * time(100)"
-                );
-            }
-            _ => panic!("Expected ReturnContext variant, but got a different variant"),
-        }
-    } else {
-        panic!("Failed to get last_trace_event from trace data");
-    }
-
-    Ok(())
-}
-
-#[wasm_bindgen_test]
-fn test_amm_price_swap_2() -> Result<()> {
-    clear();
-    // Initialize a pool
-    let (init_block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
-
-    // Create a new block for testing the pool details
-    let block_height = 840_001;
-    let mut swap_block = create_block_with_coinbase_tx(block_height);
-    swap_block.header.time = init_block.header.time + 100;
-    let input_outpoint = OutPoint {
-        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
-        vout: 0,
-    };
-    let amount_to_swap = 10000;
-
-    insert_swap_exact_tokens_for_tokens(
-        amount_to_swap,
-        vec![
-            deployment_ids.owned_token_1_deployment,
-            deployment_ids.owned_token_2_deployment,
-        ],
-        0,
-        &mut swap_block,
-        &deployment_ids,
-        input_outpoint,
-    );
-    index_block(&swap_block, block_height)?;
-
-    let mut swap_block2 = create_block_with_coinbase_tx(block_height + 1);
-    swap_block2.header.time = swap_block.header.time + 100;
-    let input_outpoint = OutPoint {
-        txid: swap_block.txdata[swap_block.txdata.len() - 1].compute_txid(),
-        vout: 2,
-    };
-    let amount_to_swap = 10000;
-
-    insert_swap_exact_tokens_for_tokens(
-        amount_to_swap,
-        vec![
-            deployment_ids.owned_token_1_deployment,
-            deployment_ids.owned_token_2_deployment,
-        ],
-        0,
-        &mut swap_block2,
-        &deployment_ids,
-        input_outpoint,
-    );
-    index_block(&swap_block2, block_height + 1)?;
-
-    let mut test_block = create_block_with_coinbase_tx(block_height + 2);
-
-    // Call opcode 999 on the pool to get its pool details including the name
-    test_block.txdata.push(
-        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
-            Witness::new(),
-            vec![Cellpack {
-                target: deployment_ids.amm_pool_1_deployment,
-                inputs: vec![98],
-            }],
-            OutPoint {
-                txid: swap_block.txdata[swap_block.txdata.len() - 1].compute_txid(),
-                vout: 0,
-            },
-            false,
-        ),
-    );
-
-    index_block(&test_block, block_height + 2)?;
-
-    // Get the trace data from the transaction
-    let outpoint = OutPoint {
-        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-        vout: 3,
-    };
-
-    let trace_data: Trace = view::trace(&outpoint)?.try_into()?;
-
-    let last_trace_event = trace_data.0.lock().expect("Mutex poisoned").last().cloned();
-
-    // Access the data field from the trace response
-    if let Some(return_context) = last_trace_event {
-        // Use pattern matching to extract the data field from the TraceEvent enum
-        match return_context {
-            TraceEvent::ReturnContext(trace_response) => {
-                // Now we have the TraceResponse, access the data field
-                let data = &trace_response.inner.data;
-                println!("{:?}", data);
-                let p0: U256 = StorableU256::from_bytes(data[0..32].to_vec()).into();
-                let p1: U256 = StorableU256::from_bytes(data[32..64].to_vec()).into();
-
-                println!(
-                    "{:?}.{:?}",
-                    p0 >> U256::from(PRECISION),
-                    p0 & U256::from(u128::MAX)
-                );
-                println!(
-                    "{:?}.{:?}",
-                    p1 >> U256::from(PRECISION),
-                    p1 & U256::from(u128::MAX)
-                );
-
-                assert_eq!(p0 >> U256::from(PRECISION), U256::from(198));
-                assert_eq!(
-                    p0 & U256::from(u128::MAX),
-                    U256::from(11758271886674012252348290890464069812u128)
-                );
-                assert_eq!(p1 >> U256::from(PRECISION), U256::from(202));
-                assert_eq!(
-                    p1 & U256::from(u128::MAX),
-                    U256::from(1650292961922242512542177858976124688u128)
-                );
-            }
-            _ => panic!("Expected ReturnContext variant, but got a different variant"),
-        }
-    } else {
-        panic!("Failed to get last_trace_event from trace data");
-    }
-
-    Ok(())
-}
-
-#[wasm_bindgen_test]
 fn test_get_num_pools() -> Result<()> {
     clear();
-    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     let block_height = 840_000;
 
@@ -942,7 +437,7 @@ fn test_get_num_pools() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: deployment_ids.amm_factory_deployment,
+                target: DEPLOYMENT_IDS.amm_factory_deployment,
                 inputs: vec![4],
             }],
             OutPoint {
@@ -994,7 +489,7 @@ fn test_get_num_pools() -> Result<()> {
 #[wasm_bindgen_test]
 fn test_find_existing_pool_id() -> Result<()> {
     clear();
-    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     let block_height = 840_000;
 
@@ -1004,13 +499,13 @@ fn test_find_existing_pool_id() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: deployment_ids.amm_factory_deployment,
+                target: DEPLOYMENT_IDS.amm_factory_deployment,
                 inputs: vec![
                     2,
-                    deployment_ids.owned_token_1_deployment.block,
-                    deployment_ids.owned_token_1_deployment.tx,
-                    deployment_ids.owned_token_2_deployment.block,
-                    deployment_ids.owned_token_2_deployment.tx,
+                    DEPLOYMENT_IDS.owned_token_1_deployment.block,
+                    DEPLOYMENT_IDS.owned_token_1_deployment.tx,
+                    DEPLOYMENT_IDS.owned_token_2_deployment.block,
+                    DEPLOYMENT_IDS.owned_token_2_deployment.tx,
                 ],
             }],
             OutPoint {
@@ -1048,9 +543,9 @@ fn test_find_existing_pool_id() -> Result<()> {
                     data[0]
                 );
                 assert_eq!(
-                    data[16] as u128, deployment_ids.amm_pool_1_deployment.tx,
+                    data[16] as u128, DEPLOYMENT_IDS.amm_pool_1_deployment.tx,
                     "Expected second u128 of data to be {}, but got {}",
-                    deployment_ids.amm_pool_1_deployment.tx, data[16]
+                    DEPLOYMENT_IDS.amm_pool_1_deployment.tx, data[16]
                 );
             }
             _ => panic!("Expected ReturnContext variant, but got a different variant"),
@@ -1065,7 +560,7 @@ fn test_find_existing_pool_id() -> Result<()> {
 #[wasm_bindgen_test]
 fn test_find_nonexisting_pool_id() -> Result<()> {
     clear();
-    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     let block_height = 840_000;
 
@@ -1075,7 +570,7 @@ fn test_find_nonexisting_pool_id() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: deployment_ids.amm_factory_deployment,
+                target: DEPLOYMENT_IDS.amm_factory_deployment,
                 inputs: vec![2, 12, 100, 13, 101],
             }],
             OutPoint {
@@ -1112,7 +607,7 @@ fn test_find_nonexisting_pool_id() -> Result<()> {
 #[wasm_bindgen_test]
 fn test_get_all_pools() -> Result<()> {
     clear();
-    let (block, deployment_ids, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     let block_height = 840_000;
 
@@ -1122,7 +617,7 @@ fn test_get_all_pools() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: deployment_ids.amm_factory_deployment,
+                target: DEPLOYMENT_IDS.amm_factory_deployment,
                 inputs: vec![3],
             }],
             OutPoint {

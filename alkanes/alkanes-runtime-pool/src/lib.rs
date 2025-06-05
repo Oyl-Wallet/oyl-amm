@@ -21,7 +21,7 @@ use anyhow::{anyhow, Result};
 use bitcoin::Block;
 use metashrew_support::{byte_view::ByteView, index_pointer::KeyValuePointer, utils::consume_u128};
 use num::integer::Roots;
-use oylswap_library::{Lock, PoolInfo, StorableU256, DEFAULT_FEE_AMOUNT_PER_1000, U256};
+use oylswap_library::{Lock, PoolInfo, Sqrt, StorableU256, DEFAULT_FEE_AMOUNT_PER_1000, U256};
 use protorune_support::balance_sheet::{BalanceSheetOperations, CachedBalanceSheet};
 use protorune_support::utils::consensus_decode;
 use std::{cmp::min, sync::Arc};
@@ -59,11 +59,11 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
     fn k_last_pointer(&self) -> StoragePointer {
         StoragePointer::from_keyword("/klast")
     }
-    fn k_last(&self) -> u128 {
-        self.k_last_pointer().get_value::<u128>()
+    fn k_last(&self) -> U256 {
+        self.k_last_pointer().get_value::<StorableU256>().into()
     }
-    fn set_k_last(&self, v: u128) {
-        self.k_last_pointer().set_value::<u128>(v);
+    fn set_k_last(&self, v: U256) {
+        self.k_last_pointer().set_value::<StorableU256>(v.into());
     }
     fn block_timestamp_last_pointer(&self) -> StoragePointer {
         StoragePointer::from_keyword("/blockTimestampLast")
@@ -110,7 +110,7 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         StoragePointer::from_keyword("/alkane/1").set(Arc::new(alkane_b.into()));
         self.set_factory(factory.into());
         let _ = self.set_pool_name_and_symbol();
-        self.set_k_last(0);
+        self.set_k_last(U256::from(0));
         self.add_liquidity()
     }
     fn alkanes_for_self(&self) -> Result<(AlkaneId, AlkaneId)> {
@@ -238,14 +238,14 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
     fn _mint_fee(&self, previous_a: u128, previous_b: u128) -> Result<()> {
         let total_supply = self.total_supply();
         let k_last = self.k_last();
-        if k_last != 0 {
+        if !k_last.is_zero() {
             let root_k_last = k_last.sqrt();
-            let root_k = checked_expr!(previous_a.checked_mul(previous_b))?.sqrt();
+            let root_k = (U256::from(previous_a) * U256::from(previous_b)).sqrt();
             if (root_k > root_k_last) {
-                let numerator = checked_expr!(total_supply.checked_mul(root_k - root_k_last))?;
-                let root_k_fee_adj = checked_expr!(root_k.checked_mul(3))? / 2; // assuming 2/5 of 0.5% fee goes to protocol
-                let denominator = checked_expr!(root_k_fee_adj.checked_add(root_k_last))?;
-                let liquidity = numerator / denominator;
+                let numerator = U256::from(total_supply) * (root_k - root_k_last);
+                let root_k_fee_adj = root_k * U256::from(3) / U256::from(2); // assuming 2/5 of 0.5% fee goes to protocol
+                let denominator = root_k_fee_adj + root_k_last;
+                let liquidity: u128 = (numerator / denominator).try_into()?; // guaranteed to be storable in u128
                 self.increase_total_supply(liquidity)?;
                 self.set_claimable_fees(checked_expr!(self
                     .claimable_fees()
@@ -267,7 +267,7 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             value: self.claimable_fees(),
         });
         self.set_claimable_fees(0);
-        let new_k = checked_expr!(previous_a.value.checked_mul(previous_b.value))?;
+        let new_k = U256::from(previous_a.value) * U256::from(previous_b.value);
         self.set_k_last(new_k);
         Ok(response)
     }
@@ -328,7 +328,7 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             let mut response = CallResponse::default();
             response.alkanes.pay(self.mint(&context, liquidity)?);
             self._update_cum_prices(previous_a.value, previous_b.value)?;
-            let new_k = checked_expr!(reserve_a.value.checked_mul(reserve_b.value))?;
+            let new_k = U256::from(reserve_a.value) * U256::from(reserve_b.value);
             self.set_k_last(new_k);
             Ok(response)
         })
@@ -367,9 +367,8 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             ]);
 
             self._update_cum_prices(previous_a.value, previous_b.value)?;
-            let new_k = checked_expr!(
-                (reserve_a.value - amount_a).checked_mul(reserve_b.value - amount_b)
-            )?;
+            let new_k =
+                U256::from(reserve_a.value - amount_a) * U256::from(reserve_b.value - amount_b);
             self.set_k_last(new_k);
             Ok(response)
         })

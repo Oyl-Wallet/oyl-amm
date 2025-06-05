@@ -1,6 +1,7 @@
 use crate::tests::helper::common::create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers;
 use alkanes::tests::helpers::{
-    get_last_outpoint_sheet, get_lazy_sheet_for_runtime, get_sheet_for_runtime,
+    create_multiple_cellpack_with_witness_and_in, get_last_outpoint_sheet,
+    get_lazy_sheet_for_runtime, get_sheet_for_runtime,
 };
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::id::AlkaneId;
@@ -75,6 +76,41 @@ pub fn insert_add_liquidity_txs(
     )
 }
 
+pub fn insert_add_liquidity_checked_txs(
+    token1_address: AlkaneId,
+    token2_address: AlkaneId,
+    amount_a_desired: u128,
+    amount_b_desired: u128,
+    amount_a_min: u128,
+    amount_b_min: u128,
+    deadline: u128,
+    test_block: &mut Block,
+    input_outpoint: OutPoint,
+) {
+    test_block
+        .txdata
+        .push(create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: DEPLOYMENT_IDS.amm_factory_deployment,
+                inputs: vec![
+                    11,
+                    2,
+                    token1_address.tx,
+                    2,
+                    token2_address.tx,
+                    amount_a_desired,
+                    amount_b_desired,
+                    amount_a_min,
+                    amount_b_min,
+                    deadline,
+                ],
+            }],
+            input_outpoint,
+            false,
+        ));
+}
+
 pub fn calc_lp_balance_from_add_liquidity(
     prev_amount1: u128,
     prev_amount2: u128,
@@ -91,6 +127,7 @@ pub fn calc_lp_balance_from_add_liquidity(
 pub fn check_add_liquidity_lp_balance(
     prev_amount1: u128,
     prev_amount2: u128,
+    prev_lp_amount: u128,
     added_amount1: u128,
     added_amount2: u128,
     total_supply: u128,
@@ -106,7 +143,10 @@ pub fn check_add_liquidity_lp_balance(
         total_supply,
     );
     println!("expected amt from adding liquidity {:?}", expected_amount);
-    assert_eq!(sheet.get_cached(&pool_address.into()), expected_amount);
+    assert_eq!(
+        sheet.get_cached(&pool_address.into()) - prev_lp_amount,
+        expected_amount
+    );
     Ok(())
 }
 
@@ -115,20 +155,19 @@ pub fn check_add_liquidity_runtime_balance(
     added_amount1: u128,
     added_amount2: u128,
     added_amount3: u128,
-    deployment_ids: &AmmTestDeploymentIds,
 ) -> Result<()> {
     runtime_balances.increase(
-        &deployment_ids.owned_token_1_deployment.into(),
+        &DEPLOYMENT_IDS.owned_token_1_deployment.into(),
         added_amount1,
-    );
+    )?;
     runtime_balances.increase(
-        &deployment_ids.owned_token_2_deployment.into(),
+        &DEPLOYMENT_IDS.owned_token_2_deployment.into(),
         added_amount2,
-    );
+    )?;
     runtime_balances.increase(
-        &deployment_ids.owned_token_3_deployment.into(),
+        &DEPLOYMENT_IDS.owned_token_3_deployment.into(),
         added_amount3,
-    );
+    )?;
 
     let sheet = get_sheet_for_runtime();
     assert_eq!(sheet, runtime_balances.clone());
