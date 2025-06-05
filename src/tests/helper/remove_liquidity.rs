@@ -54,17 +54,16 @@ pub fn check_remove_liquidity_runtime_balance(
     removed_amount1: u128,
     removed_amount2: u128,
     lp_burned: u128,
-    deployment_ids: &AmmTestDeploymentIds,
 ) -> Result<()> {
     runtime_balances.decrease(
-        &deployment_ids.owned_token_1_deployment.into(),
+        &DEPLOYMENT_IDS.owned_token_1_deployment.into(),
         removed_amount1,
     );
     runtime_balances.decrease(
-        &deployment_ids.owned_token_2_deployment.into(),
+        &DEPLOYMENT_IDS.owned_token_2_deployment.into(),
         removed_amount2,
     );
-    runtime_balances.increase(&deployment_ids.amm_pool_1_deployment.into(), lp_burned);
+    runtime_balances.increase(&DEPLOYMENT_IDS.amm_pool_1_deployment.into(), lp_burned);
     let sheet = get_sheet_for_runtime();
 
     assert_eq!(sheet, runtime_balances.clone());
@@ -81,8 +80,7 @@ pub fn test_amm_burn_fixture(amount_burn: u128) -> Result<()> {
         (INIT_AMT_TOKEN1 - amount1, INIT_AMT_TOKEN2 - 2 * amount2);
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
     let total_supply = (amount1 * amount2).sqrt();
-    let (mut init_block, deployment_ids, mut runtime_balances) =
-        test_amm_pool_init_fixture(amount1, amount2)?;
+    let (mut init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
 
     let block_height = 840_001;
     let mut test_block = create_block_with_coinbase_tx(block_height);
@@ -94,7 +92,7 @@ pub fn test_amm_burn_fixture(amount_burn: u128) -> Result<()> {
         amount_burn,
         &mut test_block,
         input_outpoint,
-        deployment_ids.amm_pool_1_deployment,
+        DEPLOYMENT_IDS.amm_pool_1_deployment,
         false,
     );
 
@@ -103,18 +101,18 @@ pub fn test_amm_burn_fixture(amount_burn: u128) -> Result<()> {
     let sheet = get_last_outpoint_sheet(&test_block)?;
     let amount_burned_true = std::cmp::min(amount_burn, total_lp);
     assert_eq!(
-        sheet.get_cached(&deployment_ids.amm_pool_1_deployment.into()),
+        sheet.get_cached(&DEPLOYMENT_IDS.amm_pool_1_deployment.into()),
         total_lp - amount_burned_true
     );
 
     let amount_returned_1 = amount_burned_true * amount1 / total_supply;
     assert_eq!(
-        sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()) - amount1_leftover,
+        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_1_deployment.into()) - amount1_leftover,
         amount_returned_1
     );
     let amount_returned_2 = amount_burned_true * amount2 / total_supply;
     assert_eq!(
-        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()) - amount2_leftover,
+        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_2_deployment.into()) - amount2_leftover,
         amount_returned_2
     );
     check_remove_liquidity_runtime_balance(
@@ -122,7 +120,6 @@ pub fn test_amm_burn_fixture(amount_burn: u128) -> Result<()> {
         amount_returned_1,
         amount_returned_2,
         amount_burned_true,
-        &deployment_ids,
     )?;
     Ok(())
 }

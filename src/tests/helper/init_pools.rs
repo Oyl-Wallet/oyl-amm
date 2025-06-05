@@ -26,30 +26,7 @@ pub const INIT_AMT_TOKEN2: u128 = 2_000_000_000_000_000_000_000u128;
 pub const INIT_AMT_TOKEN3: u128 = 1_000_000_000_000_000_000_000u128;
 pub const INIT_AMT_OYL: u128 = 1_000_000_000_000_000_000_000u128;
 
-pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
-    // note: the order that these are defined matters, since the tx_terator will increment by one
-    let deployed_ids = AmmTestDeploymentIds {
-        amm_pool_factory: AlkaneId {
-            block: 4,
-            tx: AMM_FACTORY_ID,
-        },
-        auth_token_factory: AlkaneId {
-            block: 4,
-            tx: AUTH_TOKEN_FACTORY_ID,
-        },
-        amm_factory_deployment: AlkaneId { block: 2, tx: 1 },
-        amm_factory_auth_token: AlkaneId { block: 2, tx: 2 },
-        owned_token_1_deployment: AlkaneId { block: 2, tx: 3 },
-        auth_token_1_deployment: AlkaneId { block: 2, tx: 4 },
-        owned_token_2_deployment: AlkaneId { block: 2, tx: 5 },
-        auth_token_2_deployment: AlkaneId { block: 2, tx: 6 },
-        owned_token_3_deployment: AlkaneId { block: 2, tx: 7 },
-        auth_token_3_deployment: AlkaneId { block: 2, tx: 8 },
-        oyl_token_deployment: AlkaneId { block: 2, tx: 9 },
-        example_flashswap: AlkaneId { block: 2, tx: 10 },
-        amm_pool_1_deployment: AlkaneId { block: 2, tx: 11 },
-        amm_pool_2_deployment: AlkaneId { block: 2, tx: 12 },
-    };
+pub fn init_block_with_amm_pool() -> Result<Block> {
     let cellpacks: Vec<Cellpack> = [
         //amm pool init (in factory space so new pools can copy this code)
         Cellpack {
@@ -85,7 +62,7 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
         Cellpack {
             target: AlkaneId {
                 block: 5,
-                tx: deployed_ids.owned_token_1_deployment.tx,
+                tx: DEPLOYMENT_IDS.owned_token_1_deployment.tx,
             }, // factory creation of owned token using {2, 2} as the factory
             inputs: vec![0, 1, INIT_AMT_TOKEN2],
         },
@@ -93,7 +70,7 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
         Cellpack {
             target: AlkaneId {
                 block: 5,
-                tx: deployed_ids.owned_token_1_deployment.tx,
+                tx: DEPLOYMENT_IDS.owned_token_1_deployment.tx,
             }, // factory creation of owned token using {2, 2} as the factory
             inputs: vec![0, 1, INIT_AMT_TOKEN1],
         },
@@ -128,57 +105,57 @@ pub fn init_block_with_amm_pool() -> Result<(Block, AmmTestDeploymentIds)> {
         cellpacks,
     );
 
-    return Ok((test_block, deployed_ids));
+    return Ok(test_block);
 }
 
-pub fn assert_contracts_correct_ids(deployment_ids: &AmmTestDeploymentIds) -> Result<()> {
+pub fn assert_contracts_correct_ids() -> Result<()> {
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.amm_pool_factory.clone(),
+        DEPLOYMENT_IDS.amm_pool_factory.clone(),
         pool_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.auth_token_factory.clone(),
+        DEPLOYMENT_IDS.auth_token_factory.clone(),
         alkanes_std_auth_token_build::get_bytes(),
     );
 
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.amm_factory_deployment.clone(),
+        DEPLOYMENT_IDS.amm_factory_deployment.clone(),
         factory_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.owned_token_1_deployment.clone(),
+        DEPLOYMENT_IDS.owned_token_1_deployment.clone(),
         alkanes_std_owned_token_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.owned_token_2_deployment.clone(),
+        DEPLOYMENT_IDS.owned_token_2_deployment.clone(),
         alkanes_std_owned_token_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.owned_token_3_deployment.clone(),
+        DEPLOYMENT_IDS.owned_token_3_deployment.clone(),
         alkanes_std_owned_token_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.oyl_token_deployment.clone(),
+        DEPLOYMENT_IDS.oyl_token_deployment.clone(),
         oyl_token_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.auth_token_1_deployment.clone(),
+        DEPLOYMENT_IDS.auth_token_1_deployment.clone(),
         alkanes_std_auth_token_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.auth_token_2_deployment.clone(),
+        DEPLOYMENT_IDS.auth_token_2_deployment.clone(),
         alkanes_std_auth_token_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.auth_token_3_deployment.clone(),
+        DEPLOYMENT_IDS.auth_token_3_deployment.clone(),
         alkanes_std_auth_token_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.amm_pool_1_deployment.clone(),
+        DEPLOYMENT_IDS.amm_pool_1_deployment.clone(),
         pool_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.amm_pool_2_deployment.clone(),
+        DEPLOYMENT_IDS.amm_pool_2_deployment.clone(),
         pool_build::get_bytes(),
     );
     Ok(())
@@ -190,7 +167,6 @@ pub fn insert_init_pool_liquidity_txs(
     token1_address: AlkaneId,
     token2_address: AlkaneId,
     test_block: &mut Block,
-    deployment_ids: &AmmTestDeploymentIds,
     previous_output: OutPoint,
 ) {
     test_block
@@ -211,7 +187,7 @@ pub fn insert_init_pool_liquidity_txs(
                     },
                 ]),
                 CellpackOrEdict::Cellpack(Cellpack {
-                    target: deployment_ids.amm_factory_deployment,
+                    target: DEPLOYMENT_IDS.amm_factory_deployment,
                     inputs: vec![1],
                 }),
             ],
@@ -231,33 +207,32 @@ pub fn check_init_liquidity_balance(
     amount1: u128,
     amount2: u128,
     test_block: &Block,
-    deployment_ids: &AmmTestDeploymentIds,
 ) -> Result<()> {
     let sheet = get_last_outpoint_sheet(test_block)?;
     let expected_amount = calc_lp_balance_from_pool_init(amount1, amount2);
     println!(
         "expected amt from init {:?} {:?}",
-        sheet.get_cached(&deployment_ids.amm_pool_1_deployment.into()),
+        sheet.get_cached(&DEPLOYMENT_IDS.amm_pool_1_deployment.into()),
         expected_amount
     );
     assert_eq!(
-        sheet.get_cached(&deployment_ids.amm_pool_1_deployment.into()),
+        sheet.get_cached(&DEPLOYMENT_IDS.amm_pool_1_deployment.into()),
         expected_amount
     );
     assert_eq!(
-        sheet.get_cached(&deployment_ids.amm_pool_2_deployment.into()),
+        sheet.get_cached(&DEPLOYMENT_IDS.amm_pool_2_deployment.into()),
         expected_amount
     );
     assert_eq!(
-        sheet.get(&deployment_ids.owned_token_1_deployment.into()),
+        sheet.get(&DEPLOYMENT_IDS.owned_token_1_deployment.into()),
         INIT_AMT_TOKEN1 - amount1
     );
     assert_eq!(
-        sheet.get(&deployment_ids.owned_token_2_deployment.into()),
+        sheet.get(&DEPLOYMENT_IDS.owned_token_2_deployment.into()),
         INIT_AMT_TOKEN2 - amount1 - amount2
     );
     assert_eq!(
-        sheet.get(&deployment_ids.owned_token_3_deployment.into()),
+        sheet.get(&DEPLOYMENT_IDS.owned_token_3_deployment.into()),
         INIT_AMT_TOKEN3 - amount2
     );
 
@@ -267,16 +242,15 @@ pub fn check_init_liquidity_balance(
 pub fn check_and_get_init_liquidity_runtime_balance(
     amount1: u128,
     amount2: u128,
-    deployment_ids: &AmmTestDeploymentIds,
 ) -> Result<BalanceSheet<IndexPointer>> {
     let mut initial_runtime_balances: BalanceSheet<IndexPointer> =
         BalanceSheet::<IndexPointer>::new();
-    initial_runtime_balances.set(&deployment_ids.owned_token_1_deployment.into(), amount1);
+    initial_runtime_balances.set(&DEPLOYMENT_IDS.owned_token_1_deployment.into(), amount1);
     initial_runtime_balances.set(
-        &deployment_ids.owned_token_2_deployment.into(),
+        &DEPLOYMENT_IDS.owned_token_2_deployment.into(),
         amount1 + amount2,
     );
-    initial_runtime_balances.set(&deployment_ids.owned_token_3_deployment.into(), amount2);
+    initial_runtime_balances.set(&DEPLOYMENT_IDS.owned_token_3_deployment.into(), amount2);
     let sheet = get_sheet_for_runtime();
     assert_eq!(sheet, initial_runtime_balances);
     let lazy_sheet = get_lazy_sheet_for_runtime();
@@ -287,9 +261,9 @@ pub fn check_and_get_init_liquidity_runtime_balance(
 pub fn test_amm_pool_init_fixture(
     amount1: u128,
     amount2: u128,
-) -> Result<(Block, AmmTestDeploymentIds, BalanceSheet<IndexPointer>)> {
+) -> Result<(Block, BalanceSheet<IndexPointer>)> {
     let block_height = 840_000;
-    let (mut test_block, deployment_ids) = init_block_with_amm_pool()?;
+    let mut test_block = init_block_with_amm_pool()?;
     let mut previous_outpoint = OutPoint {
         txid: test_block.txdata.last().unwrap().compute_txid(),
         vout: 0,
@@ -297,10 +271,9 @@ pub fn test_amm_pool_init_fixture(
     insert_init_pool_liquidity_txs(
         amount1,
         amount2,
-        deployment_ids.owned_token_1_deployment,
-        deployment_ids.owned_token_2_deployment,
+        DEPLOYMENT_IDS.owned_token_1_deployment,
+        DEPLOYMENT_IDS.owned_token_2_deployment,
         &mut test_block,
-        &deployment_ids,
         previous_outpoint,
     );
 
@@ -311,17 +284,15 @@ pub fn test_amm_pool_init_fixture(
     insert_init_pool_liquidity_txs(
         amount1,
         amount2,
-        deployment_ids.owned_token_2_deployment,
-        deployment_ids.owned_token_3_deployment,
+        DEPLOYMENT_IDS.owned_token_2_deployment,
+        DEPLOYMENT_IDS.owned_token_3_deployment,
         &mut test_block,
-        &deployment_ids,
         previous_outpoint,
     );
 
     index_block(&test_block, block_height)?;
-    assert_contracts_correct_ids(&deployment_ids)?;
-    check_init_liquidity_balance(amount1, amount2, &test_block, &deployment_ids)?;
-    let init_runtime_balance =
-        check_and_get_init_liquidity_runtime_balance(amount1, amount2, &deployment_ids)?;
-    Ok((test_block, deployment_ids, init_runtime_balance))
+    assert_contracts_correct_ids()?;
+    check_init_liquidity_balance(amount1, amount2, &test_block)?;
+    let init_runtime_balance = check_and_get_init_liquidity_runtime_balance(amount1, amount2)?;
+    Ok((test_block, init_runtime_balance))
 }

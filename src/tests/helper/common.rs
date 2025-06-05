@@ -1,9 +1,5 @@
-use alkanes::message::AlkaneMessageContext;
 use alkanes::tests::helpers::{self as alkane_helpers};
-use alkanes::view;
-use alkanes_support::trace::{Trace, TraceEvent};
 use alkanes_support::{cellpack::Cellpack, id::AlkaneId};
-use anyhow::Result;
 use bitcoin::address::NetworkChecked;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::transaction::Version;
@@ -12,16 +8,13 @@ use hex;
 use metashrew_core::index_pointer::AtomicPointer;
 #[allow(unused_imports)]
 use metashrew_core::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
-use metashrew_support::index_pointer::KeyValuePointer;
+
+use alkanes_support::constants::{AMM_FACTORY_ID, AUTH_TOKEN_FACTORY_ID};
 use ordinals::{Etching, Rune, Runestone};
 use protorune::protostone::Protostones;
 use protorune::test_helpers::{get_address, ADDRESS1};
-use protorune::{balance_sheet::load_sheet, message::MessageContext, tables::RuneTable};
-use protorune_support::balance_sheet::BalanceSheet;
 use protorune_support::protostone::Protostone;
 use protorune_support::protostone::ProtostoneEdict;
-use protorune_support::utils::consensus_encode;
-use std::fmt::Write;
 use std::str::FromStr;
 
 pub struct AmmTestDeploymentIds {
@@ -40,6 +33,29 @@ pub struct AmmTestDeploymentIds {
     pub amm_pool_2_deployment: AlkaneId,
     pub example_flashswap: AlkaneId,
 }
+
+pub const DEPLOYMENT_IDS: AmmTestDeploymentIds = AmmTestDeploymentIds {
+    amm_pool_factory: AlkaneId {
+        block: 4,
+        tx: AMM_FACTORY_ID,
+    },
+    auth_token_factory: AlkaneId {
+        block: 4,
+        tx: AUTH_TOKEN_FACTORY_ID,
+    },
+    amm_factory_deployment: AlkaneId { block: 2, tx: 1 },
+    amm_factory_auth_token: AlkaneId { block: 2, tx: 2 },
+    owned_token_1_deployment: AlkaneId { block: 2, tx: 3 },
+    auth_token_1_deployment: AlkaneId { block: 2, tx: 4 },
+    owned_token_2_deployment: AlkaneId { block: 2, tx: 5 },
+    auth_token_2_deployment: AlkaneId { block: 2, tx: 6 },
+    owned_token_3_deployment: AlkaneId { block: 2, tx: 7 },
+    auth_token_3_deployment: AlkaneId { block: 2, tx: 8 },
+    oyl_token_deployment: AlkaneId { block: 2, tx: 9 },
+    example_flashswap: AlkaneId { block: 2, tx: 10 },
+    amm_pool_1_deployment: AlkaneId { block: 2, tx: 11 },
+    amm_pool_2_deployment: AlkaneId { block: 2, tx: 12 },
+};
 
 pub enum CellpackOrEdict {
     Cellpack(Cellpack),

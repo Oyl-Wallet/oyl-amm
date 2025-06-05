@@ -13,6 +13,27 @@ use ruint::Uint;
 pub const DEFAULT_FEE_AMOUNT_PER_1000: u128 = 5;
 
 pub type U256 = Uint<256, 4>;
+pub trait Sqrt {
+    fn sqrt(self) -> Self;
+}
+impl Sqrt for U256 {
+    fn sqrt(self) -> U256 {
+        if self.is_zero() {
+            return self; // Square root of 0 is 0
+        }
+
+        let mut x = self;
+        let mut y = (self + U256::ONE) / U256::from(2);
+
+        // Iterative process of Newton's method
+        while y < x {
+            x = y;
+            y = (self / x + x) / U256::from(2);
+        }
+
+        x
+    }
+}
 
 // Create a storage wrapper for U256 to implement ByteView
 #[derive(Clone, Copy, PartialEq, Eq)]
