@@ -11,6 +11,7 @@ use alkanes_support::parcel::{AlkaneTransfer, AlkaneTransferParcel};
 use alkanes_support::response::CallResponse;
 use anyhow::Result;
 use metashrew_support::compat::{to_arraybuffer_layout, to_passback_ptr};
+use oylswap_library::PoolInfo;
 
 #[derive(Default)]
 pub struct FlashSwap(());
@@ -24,6 +25,9 @@ enum FlashSwapMessage {
 
     #[opcode(1)]
     NoRefund {},
+
+    #[opcode(10)]
+    StaticAttack { pool: AlkaneId, liquidity: u128 },
 
     #[opcode(73776170)]
     Callback {
@@ -68,6 +72,56 @@ impl FlashSwap {
             &context.incoming_alkanes,
             self.fuel(),
         )
+    }
+
+    fn _get_pool_info(&self, pool: AlkaneId) -> Result<PoolInfo> {
+        let cellpack = Cellpack {
+            target: pool,
+            inputs: vec![999],
+        };
+        let response = self.call(&cellpack, &AlkaneTransferParcel(vec![]), self.fuel())?;
+        Ok(PoolInfo::from_vec(&response.data)?)
+    }
+
+    fn static_attack(&self, pool: AlkaneId, liquidity: u128) -> Result<CallResponse> {
+        let context = self.context()?;
+        let pool_info = self._get_pool_info(pool)?;
+        println!(
+            "pool token balance start: {:?}",
+            self.balance(&context.myself, &pool)
+        );
+        println!(
+            "token a balance start: {:?}",
+            self.balance(&context.myself, &pool_info.token_a)
+        );
+        println!(
+            "token b balance start: {:?}",
+            self.balance(&context.myself, &pool_info.token_b)
+        );
+        let input_transfer = AlkaneTransferParcel(vec![AlkaneTransfer {
+            id: pool,
+            value: liquidity,
+        }]);
+        let cellpack = Cellpack {
+            target: pool,
+            inputs: vec![2],
+        };
+        let response = self.staticcall(&cellpack, &input_transfer, self.fuel());
+        println!("call response: {:?}", response);
+        println!(
+            "pool token balance end: {:?}",
+            self.balance(&context.myself, &pool)
+        );
+        println!(
+            "token a balance end: {:?}",
+            self.balance(&context.myself, &pool_info.token_a)
+        );
+        println!(
+            "token b balance end: {:?}",
+            self.balance(&context.myself, &pool_info.token_b)
+        );
+
+        response
     }
 
     fn callback(
