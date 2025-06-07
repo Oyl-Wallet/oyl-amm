@@ -277,8 +277,8 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
     }
 
     fn _update_cum_prices(&self, reserve0: u128, reserve1: u128) -> Result<()> {
-        let block = consensus_decode::<Block>(&mut std::io::Cursor::new(self.block()))?;
-        let current_timestamp = block.header.time;
+        let block_header = self.block_header()?;
+        let current_timestamp = block_header.time;
         let last_timestamp = self.block_timestamp_last();
         let time_elapsed = current_timestamp - last_timestamp;
         if time_elapsed > 0 && reserve0 != 0 && reserve1 != 0 {

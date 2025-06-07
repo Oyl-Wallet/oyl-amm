@@ -260,11 +260,11 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
     }
 
     fn _check_deadline(&self, deadline: u128) -> Result<()> {
-        let block = consensus_decode::<Block>(&mut std::io::Cursor::new(self.block()))?;
-        if block.header.time as u128 > deadline {
+        let block_header = self.block_header()?;
+        if block_header.time as u128 > deadline {
             Err(anyhow!(format!(
                 "EXPIRED deadline: block time ({}) > deadline({})",
-                block.header.time, deadline
+                block_header.time, deadline
             )))
         } else {
             Ok(())
