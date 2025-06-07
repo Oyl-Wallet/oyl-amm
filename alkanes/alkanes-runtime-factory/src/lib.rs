@@ -403,14 +403,23 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         }]);
         let cellpack = Cellpack {
             target: pool,
-            inputs: vec![1],
+            inputs: vec![2],
         };
         let result = self.call(&cellpack, &input_transfer, self.fuel())?;
-        if self.balance(&context.myself, &token_a) < amount_a_min {
-            return Err(anyhow!("INSUFFICIENT_A_AMOUNT"));
-        }
-        if self.balance(&context.myself, &token_b) < amount_b_min {
-            return Err(anyhow!("INSUFFICIENT_B_AMOUNT"));
+        if result.alkanes.0[0].id == token_a {
+            if result.alkanes.0[0].value < amount_a_min {
+                return Err(anyhow!("INSUFFICIENT_A_AMOUNT"));
+            }
+            if result.alkanes.0[1].value < amount_b_min {
+                return Err(anyhow!("INSUFFICIENT_B_AMOUNT"));
+            }
+        } else {
+            if result.alkanes.0[0].value < amount_b_min {
+                return Err(anyhow!("INSUFFICIENT_B_AMOUNT"));
+            }
+            if result.alkanes.0[1].value < amount_a_min {
+                return Err(anyhow!("INSUFFICIENT_A_AMOUNT"));
+            }
         }
         self._return_leftovers(context.myself, result, parcel)
     }
