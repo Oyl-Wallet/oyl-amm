@@ -17,21 +17,24 @@ use init_pools::{
 use metashrew_support::byte_view::ByteView;
 use oylswap_library::{StorableU256, DEFAULT_FEE_AMOUNT_PER_1000, U256};
 use protorune::test_helpers::create_block_with_coinbase_tx;
+use protorune_support::balance_sheet::BalanceSheetOperations;
 use protorune_support::protostone::ProtostoneEdict;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use super::helper::swap::{
     check_swap_runtime_balance, insert_low_level_swap_txs, insert_swap_tokens_for_exact_tokens_txs,
 };
-use crate::tests::helper::common::DEPLOYMENT_IDS;
+use crate::tests::helper::common::{check_input_tokens_refunded, DEPLOYMENT_IDS};
 use crate::tests::helper::swap::{
     check_swap_lp_balance, insert_swap_exact_tokens_for_tokens,
-    insert_swap_exact_tokens_for_tokens_deadline,
+    insert_swap_exact_tokens_for_tokens_deadline, insert_swap_exact_tokens_for_tokens_no_split,
+    insert_swap_tokens_for_exact_tokens_txs_no_split,
 };
 use crate::tests::helper::*;
 use alkane_helpers::clear;
 #[allow(unused_imports)]
 use metashrew_core::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
+use std::collections::BTreeSet;
 use std::fmt::Write;
 
 #[wasm_bindgen_test]
@@ -61,6 +64,7 @@ fn test_amm_pool_swap() -> Result<()> {
     check_swap_lp_balance(
         vec![amount1, amount2],
         amount_to_swap,
+        0,
         DEPLOYMENT_IDS.owned_token_2_deployment,
         &swap_block,
     )?;
@@ -71,6 +75,60 @@ fn test_amm_pool_swap() -> Result<()> {
         amount_to_swap,
         DEPLOYMENT_IDS.owned_token_1_deployment,
         DEPLOYMENT_IDS.owned_token_2_deployment,
+    )?;
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_pool_swap_no_split() -> Result<()> {
+    clear();
+    let (amount1, amount2) = (500000, 500000);
+    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let block_height = 840_001;
+    let mut swap_block = create_block_with_coinbase_tx(block_height);
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    let init_balances = get_last_outpoint_sheet(&init_block)?;
+    let amount_to_swap = 10000;
+    insert_swap_exact_tokens_for_tokens_no_split(
+        amount_to_swap,
+        vec![
+            DEPLOYMENT_IDS.owned_token_1_deployment,
+            DEPLOYMENT_IDS.owned_token_2_deployment,
+        ],
+        0,
+        &mut swap_block,
+        input_outpoint,
+    );
+    index_block(&swap_block, block_height)?;
+
+    let output_sheet = get_last_outpoint_sheet(&swap_block)?;
+
+    check_swap_lp_balance(
+        vec![amount1, amount2],
+        amount_to_swap,
+        init_balances.get(&DEPLOYMENT_IDS.owned_token_2_deployment.into()),
+        DEPLOYMENT_IDS.owned_token_2_deployment,
+        &swap_block,
+    )?;
+
+    check_swap_runtime_balance(
+        vec![amount1, amount2],
+        &mut runtime_balances,
+        amount_to_swap,
+        DEPLOYMENT_IDS.owned_token_1_deployment,
+        DEPLOYMENT_IDS.owned_token_2_deployment,
+    )?;
+
+    check_input_tokens_refunded(
+        init_balances,
+        output_sheet,
+        BTreeSet::from_iter([
+            DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            DEPLOYMENT_IDS.owned_token_2_deployment.into(),
+        ]),
     )?;
     Ok(())
 }
@@ -140,6 +198,7 @@ fn test_amm_pool_swap_large() -> Result<()> {
     check_swap_lp_balance(
         vec![amount1, amount2],
         amount_to_swap,
+        0,
         DEPLOYMENT_IDS.owned_token_2_deployment,
         &swap_block,
     )?;
@@ -182,6 +241,7 @@ fn test_amm_pool_swap_w_factory_middle_path() -> Result<()> {
     check_swap_lp_balance(
         vec![amount1, amount2, amount2],
         amount_to_swap,
+        0,
         DEPLOYMENT_IDS.owned_token_3_deployment,
         &swap_block,
     )?;
@@ -790,6 +850,52 @@ fn test_amm_pool_swap_with_reentrancy_swap() -> Result<()> {
 }
 
 #[wasm_bindgen_test]
+fn test_amm_pool_swap_tokens_for_exact_no_split() -> Result<()> {
+    clear();
+    let (amount1, amount2) = (500000, 500000);
+    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let init_balances = get_last_outpoint_sheet(&init_block)?;
+    let block_height = 840_001;
+    let mut swap_block = create_block_with_coinbase_tx(block_height);
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    insert_swap_tokens_for_exact_tokens_txs_no_split(
+        vec![
+            DEPLOYMENT_IDS.owned_token_1_deployment,
+            DEPLOYMENT_IDS.owned_token_2_deployment,
+        ],
+        5000,
+        10000,
+        &mut swap_block,
+        input_outpoint,
+    );
+    index_block(&swap_block, block_height)?;
+
+    let sheet = get_last_outpoint_sheet(&swap_block)?;
+    assert_eq!(
+        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_2_deployment.into())
+            - init_balances.get_cached(&DEPLOYMENT_IDS.owned_token_2_deployment.into()),
+        5000
+    );
+    assert_eq!(
+        init_balances.get_cached(&DEPLOYMENT_IDS.owned_token_1_deployment.into())
+            - sheet.get_cached(&DEPLOYMENT_IDS.owned_token_1_deployment.into()),
+        5076
+    );
+    check_input_tokens_refunded(
+        init_balances,
+        sheet,
+        BTreeSet::from_iter([
+            DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            DEPLOYMENT_IDS.owned_token_2_deployment.into(),
+        ]),
+    )?;
+    Ok(())
+}
+
+#[wasm_bindgen_test]
 fn test_amm_pool_swap_tokens_for_exact_1() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
@@ -924,6 +1030,44 @@ fn test_amm_pool_swap_tokens_for_exact_4() -> Result<()> {
     );
     index_block(&swap_block, block_height)?;
 
+    let sheet = get_last_outpoint_sheet(&swap_block)?;
+    assert_eq!(
+        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_2_deployment.into()),
+        5000
+    );
+    assert_eq!(
+        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_1_deployment.into()),
+        4924
+    );
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_pool_swap_tokens_for_exact_5() -> Result<()> {
+    clear();
+    let (amount1, amount2) = (500000, 500000);
+    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let block_height = 840_001;
+    let mut swap_block = create_block_with_coinbase_tx(block_height);
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    let amount_to_swap = 10000;
+    insert_swap_tokens_for_exact_tokens_txs(
+        amount_to_swap,
+        vec![
+            DEPLOYMENT_IDS.owned_token_1_deployment,
+            DEPLOYMENT_IDS.owned_token_2_deployment,
+        ],
+        10000,
+        10256,
+        &mut swap_block,
+        input_outpoint,
+    );
+    index_block(&swap_block, block_height)?;
+
     // Check that the transaction reverted with the expected error
     let outpoint = OutPoint {
         txid: swap_block.txdata[swap_block.txdata.len() - 1].compute_txid(),
@@ -932,7 +1076,7 @@ fn test_amm_pool_swap_tokens_for_exact_4() -> Result<()> {
 
     assert_revert_context(
         &outpoint,
-        "ALKANES: revert: Error: amount_in_max is higher than input amount",
+        "Extcall failed: balance underflow, transferring(AlkaneTransfer { id: AlkaneId { block: 2, tx: 3 }, value: 10256 }), from(AlkaneId { block: 2, tx: 1 }), balance(10000)",
     )?;
 
     Ok(())
