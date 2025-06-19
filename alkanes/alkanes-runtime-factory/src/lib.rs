@@ -20,7 +20,7 @@ use metashrew_support::{
 };
 use oylswap_library::{PoolInfo, U256};
 use protorune_support::utils::consensus_decode;
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::BTreeSet, sync::Arc};
 
 pub fn take_two<T: Clone>(v: &Vec<T>) -> (T, T) {
     (v[0].clone(), v[1].clone())
@@ -313,7 +313,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         input_alkanes: AlkaneTransferParcel,
     ) -> Result<CallResponse> {
         let mut response = CallResponse::default();
-        let mut unique_ids: HashSet<AlkaneId> = HashSet::new();
+        let mut unique_ids: BTreeSet<AlkaneId> = BTreeSet::new();
         for transfer in input_alkanes.0 {
             unique_ids.insert(transfer.id);
         }

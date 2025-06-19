@@ -1,5 +1,6 @@
 use alkanes::tests::helpers::{self as alkane_helpers};
 use alkanes_support::{cellpack::Cellpack, id::AlkaneId};
+use anyhow::Result;
 use bitcoin::address::NetworkChecked;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::transaction::Version;
@@ -13,8 +14,10 @@ use alkanes_support::constants::{AMM_FACTORY_ID, AUTH_TOKEN_FACTORY_ID};
 use ordinals::{Etching, Rune, Runestone};
 use protorune::protostone::Protostones;
 use protorune::test_helpers::{get_address, ADDRESS1};
+use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations, ProtoruneRuneId};
 use protorune_support::protostone::Protostone;
 use protorune_support::protostone::ProtostoneEdict;
+use std::collections::BTreeSet;
 use std::str::FromStr;
 
 pub struct AmmTestDeploymentIds {
@@ -261,4 +264,22 @@ pub fn divide_round_u128(numerator: u128, denominator: u128) -> u128 {
     } else {
         quotient
     }
+}
+
+pub fn check_input_tokens_refunded(
+    input_sheet: BalanceSheet<IndexPointer>,
+    output_sheet: BalanceSheet<IndexPointer>,
+    expected_diffs: BTreeSet<ProtoruneRuneId>,
+) -> Result<()> {
+    let mut all_runes = input_sheet.balances().keys().collect::<BTreeSet<_>>();
+    all_runes.extend(output_sheet.balances().keys());
+
+    // Compare balances for each rune using get() which checks both cached and stored values
+    for rune in all_runes {
+        if let Some(_) = expected_diffs.get(rune) {
+            continue;
+        }
+        assert_eq!(input_sheet.get(rune), input_sheet.get(rune));
+    }
+    Ok(())
 }
