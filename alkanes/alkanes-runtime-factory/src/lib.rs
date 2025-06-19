@@ -101,6 +101,12 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         amount_b: u128,
     ) -> Result<CallResponse> {
         let context = self.context()?;
+        if token_a == token_b {
+            return Err(anyhow!("tokens to create the pool cannot be the same"));
+        }
+        if amount_a == 0 || amount_b == 0 {
+            return Err(anyhow!("input amount cannot be zero"));
+        }
         let (a, b) = oylswap_library::sort_alkanes((token_a.clone(), token_b.clone()));
         let pool_id = AlkaneId::new(2, self.sequence());
         // check if this pool already exists
