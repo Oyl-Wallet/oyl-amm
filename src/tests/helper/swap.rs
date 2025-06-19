@@ -116,7 +116,7 @@ pub fn insert_swap_exact_tokens_for_tokens_deadline(
     }
     let mut cellpack = Cellpack {
         target: DEPLOYMENT_IDS.amm_factory_deployment,
-        inputs: vec![13, swap_path.len() as u128],
+        inputs: vec![13, amount, swap_path.len() as u128],
     };
     cellpack
         .inputs

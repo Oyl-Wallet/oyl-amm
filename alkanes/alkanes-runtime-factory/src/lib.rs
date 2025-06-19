@@ -424,35 +424,6 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         self._return_leftovers(context.myself, result, parcel)
     }
 
-    fn _get_amount_out(
-        &self,
-        pool: AlkaneId,
-        parcel: AlkaneTransferParcel,
-    ) -> Result<(u128, u128)> {
-        let transfer = parcel.0[0].clone();
-        let pool_info = self._get_pool_info(pool)?;
-
-        if &transfer.id == &pool_info.token_a {
-            Ok((
-                0,
-                oylswap_library::get_amount_out(
-                    transfer.value,
-                    pool_info.reserve_a,
-                    pool_info.reserve_b,
-                )?,
-            ))
-        } else {
-            Ok((
-                oylswap_library::get_amount_out(
-                    transfer.value,
-                    pool_info.reserve_b,
-                    pool_info.reserve_a,
-                )?,
-                0,
-            ))
-        }
-    }
-
     fn _swap(&self, amounts: &Vec<u128>, path: &Vec<AlkaneId>) -> Result<CallResponse> {
         let context = self.context()?;
         let mut response: CallResponse = CallResponse::default();
@@ -501,29 +472,22 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
 
     fn swap_exact_tokens_for_tokens(
         &self,
+        amount_in: u128,
         path: Vec<AlkaneId>,
         amount_out_min: u128,
         deadline: u128,
     ) -> Result<CallResponse> {
         self._check_deadline(deadline)?;
         let context = self.context()?;
+        let parcel = context.incoming_alkanes;
 
-        // swap
-        if context.incoming_alkanes.0.len() != 1 {
-            return Err(anyhow!("Input must be 1 alkane"));
-        }
-        if path[0] != context.incoming_alkanes.0[0].id {
-            return Err(anyhow!(
-                "Routing path first element must be the input token"
-            ));
-        }
-
-        let amounts = self.get_amounts_out(context.incoming_alkanes.0[0].value, &path)?;
+        let amounts = self.get_amounts_out(amount_in, &path)?;
         if amounts[amounts.len() - 1] < amount_out_min {
             return Err(anyhow!("predicate failed: insufficient output"));
         }
 
-        self._swap(&amounts, &path)
+        let result = self._swap(&amounts, &path)?;
+        self._return_leftovers(context.myself, result, parcel)
     }
 
     fn get_amounts_in(&self, amount_out: u128, path: &Vec<AlkaneId>) -> Result<Vec<u128>> {
@@ -553,14 +517,6 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         let context = self.context()?;
         let parcel: AlkaneTransferParcel = context.clone().incoming_alkanes;
 
-        if parcel.0.len() != 1 {
-            return Err(anyhow!("Input must be 1 alkane"));
-        }
-        if path[0] != parcel.0[0].id {
-            return Err(anyhow!(
-                "Routing path first element must be the input token"
-            ));
-        }
         if parcel.0[0].value < amount_in_max {
             return Err(anyhow!("amount_in_max is higher than input amount"));
         }
@@ -570,14 +526,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
             return Err(anyhow!("EXCESSIVE_INPUT_AMOUNT"));
         }
 
-        let mut response = self._swap(&amounts, &path)?;
-
-        // refund remaining to user
-        response.alkanes.pay(AlkaneTransfer {
-            id: path[0],
-            value: self.balance(&context.myself, &path[0]),
-        });
-
-        Ok(response)
+        let result = self._swap(&amounts, &path)?;
+        self._return_leftovers(context.myself, result, parcel)
     }
 }
