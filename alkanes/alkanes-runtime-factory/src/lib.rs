@@ -22,10 +22,6 @@ use oylswap_library::{PoolInfo, U256};
 use protorune_support::utils::consensus_decode;
 use std::{collections::BTreeSet, sync::Arc};
 
-pub fn take_two<T: Clone>(v: &Vec<T>) -> (T, T) {
-    (v[0].clone(), v[1].clone())
-}
-
 pub fn join_ids(a: AlkaneId, b: AlkaneId) -> Vec<u8> {
     let mut result: Vec<u8> = a.into();
     let value: Vec<u8> = b.into();
@@ -97,16 +93,15 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         self.set_pool_id(pool_factory_id);
         Ok(CallResponse::forward(&context.incoming_alkanes.clone()))
     }
-    fn create_new_pool(&self) -> Result<CallResponse> {
+    fn create_new_pool(
+        &self,
+        token_a: AlkaneId,
+        token_b: AlkaneId,
+        amount_a: u128,
+        amount_b: u128,
+    ) -> Result<CallResponse> {
         let context = self.context()?;
-        if context.incoming_alkanes.0.len() != 2 {
-            return Err(anyhow!(format!(
-                "must send two runes to initialize a pool {:?}",
-                context.incoming_alkanes.0
-            )));
-        }
-        let (alkane_a, alkane_b) = take_two(&context.incoming_alkanes.0);
-        let (a, b) = oylswap_library::sort_alkanes((alkane_a.id.clone(), alkane_b.id.clone()));
+        let (a, b) = oylswap_library::sort_alkanes((token_a.clone(), token_b.clone()));
         let pool_id = AlkaneId::new(2, self.sequence());
         // check if this pool already exists
         if self.pool_pointer(&a, &b).get().len() == 0 {
@@ -127,7 +122,18 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         StoragePointer::from_keyword("/all_pools_length")
             .set(Arc::new((length + 1).to_le_bytes().to_vec()));
 
-        self.call(
+        let input_transfer = AlkaneTransferParcel(vec![
+            AlkaneTransfer {
+                id: token_a,
+                value: amount_a,
+            },
+            AlkaneTransfer {
+                id: token_b,
+                value: amount_b,
+            },
+        ]);
+
+        let result = self.call(
             &Cellpack {
                 target: AlkaneId {
                     block: 6,
@@ -143,12 +149,10 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
                     context.myself.tx,
                 ],
             },
-            &AlkaneTransferParcel(vec![
-                context.incoming_alkanes.0[0].clone(),
-                context.incoming_alkanes.0[1].clone(),
-            ]),
+            &input_transfer,
             self.fuel(),
-        )
+        )?;
+        self._return_leftovers(context.myself, result, context.incoming_alkanes)
     }
 
     fn _find_existing_pool_id(&self, alkane_a: AlkaneId, alkane_b: AlkaneId) -> Result<AlkaneId> {
