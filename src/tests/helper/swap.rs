@@ -80,14 +80,12 @@ pub fn insert_low_level_swap_txs(
     )
 }
 
-pub fn insert_swap_tokens_for_exact_tokens_txs(
-    amount: u128,
+pub fn _prepare_swap_tokens_for_exact_tokens_cellpack(
     swap_path: Vec<AlkaneId>,
     amount_out: u128,
     amount_in_max: u128,
     test_block: &mut Block,
-    input_outpoint: OutPoint,
-) {
+) -> Cellpack {
     if swap_path.len() < 2 {
         panic!("Swap path must be at least two alkanes long");
     }
@@ -101,6 +99,23 @@ pub fn insert_swap_tokens_for_exact_tokens_txs(
     cellpack.inputs.push(amount_out);
     cellpack.inputs.push(amount_in_max);
     cellpack.inputs.push(test_block.header.time as u128);
+    cellpack
+}
+
+pub fn insert_swap_tokens_for_exact_tokens_txs(
+    amount: u128,
+    swap_path: Vec<AlkaneId>,
+    amount_out: u128,
+    amount_in_max: u128,
+    test_block: &mut Block,
+    input_outpoint: OutPoint,
+) {
+    let cellpack = _prepare_swap_tokens_for_exact_tokens_cellpack(
+        swap_path.clone(),
+        amount_out,
+        amount_in_max,
+        test_block,
+    );
 
     _insert_swap_txs(
         vec![ProtostoneEdict {
@@ -112,6 +127,23 @@ pub fn insert_swap_tokens_for_exact_tokens_txs(
         input_outpoint,
         cellpack,
     )
+}
+
+pub fn insert_swap_tokens_for_exact_tokens_txs_no_split(
+    swap_path: Vec<AlkaneId>,
+    amount_out: u128,
+    amount_in_max: u128,
+    test_block: &mut Block,
+    input_outpoint: OutPoint,
+) {
+    let cellpack = _prepare_swap_tokens_for_exact_tokens_cellpack(
+        swap_path,
+        amount_out,
+        amount_in_max,
+        test_block,
+    );
+
+    _insert_swap_txs_no_split(test_block, input_outpoint, cellpack)
 }
 
 fn _prepare_swap_exact_tokens_for_tokens_cellpack(

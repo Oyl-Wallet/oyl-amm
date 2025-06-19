@@ -517,13 +517,12 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         let context = self.context()?;
         let parcel: AlkaneTransferParcel = context.clone().incoming_alkanes;
 
-        if parcel.0[0].value < amount_in_max {
-            return Err(anyhow!("amount_in_max is higher than input amount"));
-        }
-
         let amounts = self.get_amounts_in(desired_amount_out, &path)?;
         if amounts[0] > amount_in_max {
-            return Err(anyhow!("EXCESSIVE_INPUT_AMOUNT"));
+            return Err(anyhow!(format!(
+                "EXCESSIVE_INPUT_AMOUNT: required({}) > amount_in_max({})",
+                amounts[0], amount_in_max
+            )));
         }
 
         let result = self._swap(&amounts, &path)?;
