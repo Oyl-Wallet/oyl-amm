@@ -2,7 +2,8 @@ use crate::tests::std::{example_flashswap_build, factory_build, oyl_token_build,
 use alkanes::indexer::index_block;
 use alkanes::precompiled::{alkanes_std_auth_token_build, alkanes_std_owned_token_build};
 use alkanes::tests::helpers::{
-    self as alkane_helpers, assert_binary_deployed_to_id, get_last_outpoint_sheet,
+    self as alkane_helpers, assert_binary_deployed_to_id,
+    create_multiple_cellpack_with_witness_and_in, get_last_outpoint_sheet,
     get_lazy_sheet_for_runtime, get_sheet_for_runtime,
 };
 use alkanes_runtime_pool::MINIMUM_LIQUIDITY;
@@ -171,26 +172,20 @@ pub fn insert_init_pool_liquidity_txs(
 ) {
     test_block
         .txdata
-        .push(create_multiple_cellpack_with_witness_and_in_with_edicts(
+        .push(create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
-            vec![
-                CellpackOrEdict::Edict(vec![
-                    ProtostoneEdict {
-                        id: token1_address.into(),
-                        amount: amount1,
-                        output: 0,
-                    },
-                    ProtostoneEdict {
-                        id: token2_address.into(),
-                        amount: amount2,
-                        output: 0,
-                    },
-                ]),
-                CellpackOrEdict::Cellpack(Cellpack {
-                    target: DEPLOYMENT_IDS.amm_factory_deployment,
-                    inputs: vec![1],
-                }),
-            ],
+            vec![Cellpack {
+                target: DEPLOYMENT_IDS.amm_factory_deployment,
+                inputs: vec![
+                    1,
+                    token1_address.block,
+                    token1_address.tx,
+                    token2_address.block,
+                    token2_address.tx,
+                    amount1,
+                    amount2,
+                ],
+            }],
             previous_output,
             false,
         ));

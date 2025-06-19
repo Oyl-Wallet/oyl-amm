@@ -21,7 +21,12 @@ pub enum AMMFactoryMessage {
     },
 
     #[opcode(1)]
-    CreateNewPool,
+    CreateNewPool {
+        token_a: AlkaneId,
+        token_b: AlkaneId,
+        amount_a: u128,
+        amount_b: u128,
+    },
 
     #[opcode(2)]
     FindExistingPoolId {

@@ -90,7 +90,15 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
                 }]),
                 common::CellpackOrEdict::Cellpack(Cellpack {
                     target: DEPLOYMENT_IDS.amm_factory_deployment,
-                    inputs: vec![1],
+                    inputs: vec![
+                        1,
+                        2,
+                        DEPLOYMENT_IDS.owned_token_1_deployment.tx,
+                        2,
+                        DEPLOYMENT_IDS.owned_token_2_deployment.tx,
+                        1000000,
+                        1000000,
+                    ],
                 }),
             ],
             OutPoint {
@@ -107,7 +115,67 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
             txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
             vout: 4,
         }),
-        "ALKANES: revert: Error: must send two runes to initialize a pool",
+        "Extcall failed: balance underflow, transferring(AlkaneTransfer { id: AlkaneId { block: 2, tx: 5 }, value: 1000000 }), from(AlkaneId { block: 2, tx: 1 }), balance(0)",
+    )?;
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_factory_same_token_fail() -> Result<()> {
+    clear();
+    let block_height = 840_000;
+    let mut test_block = init_block_with_amm_pool()?;
+    let input_outpoint = OutPoint {
+        txid: test_block.txdata.last().unwrap().compute_txid(),
+        vout: 0,
+    };
+    insert_init_pool_liquidity_txs(
+        10,
+        10,
+        DEPLOYMENT_IDS.owned_token_1_deployment,
+        DEPLOYMENT_IDS.owned_token_1_deployment,
+        &mut test_block,
+        input_outpoint,
+    );
+    index_block(&test_block, block_height)?;
+
+    assert_revert_context(
+        &(OutPoint {
+            txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+            vout: 3,
+        }),
+        "tokens to create the pool cannot be the same",
+    )?;
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_factory_zero_amount_fail() -> Result<()> {
+    clear();
+    let block_height = 840_000;
+    let mut test_block = init_block_with_amm_pool()?;
+    let input_outpoint = OutPoint {
+        txid: test_block.txdata.last().unwrap().compute_txid(),
+        vout: 0,
+    };
+    insert_init_pool_liquidity_txs(
+        0,
+        10,
+        DEPLOYMENT_IDS.owned_token_1_deployment,
+        DEPLOYMENT_IDS.owned_token_2_deployment,
+        &mut test_block,
+        input_outpoint,
+    );
+    index_block(&test_block, block_height)?;
+
+    assert_revert_context(
+        &(OutPoint {
+            txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+            vout: 3,
+        }),
+        "input amount cannot be zero",
     )?;
 
     Ok(())
@@ -136,7 +204,7 @@ fn test_amm_factory_duplicate_pool_fail() -> Result<()> {
 
     let outpoint = OutPoint {
         txid: init_block_2.txdata[init_block_2.txdata.len() - 1].compute_txid(),
-        vout: 4,
+        vout: 3,
     };
 
     // For debugging purposes
@@ -179,7 +247,7 @@ fn test_amm_pool_zero_init() -> Result<()> {
 
     let outpoint = OutPoint {
         txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-        vout: 4,
+        vout: 3,
     };
     assert_revert_context(
         &outpoint,
@@ -216,7 +284,7 @@ fn test_amm_pool_bad_init() -> Result<()> {
 
     let outpoint = OutPoint {
         txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
-        vout: 4,
+        vout: 3,
     };
 
     // Check the second-to-last trace event
