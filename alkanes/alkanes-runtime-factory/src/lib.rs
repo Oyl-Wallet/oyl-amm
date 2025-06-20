@@ -269,12 +269,11 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         )
     }
 
-    fn _check_deadline(&self, deadline: u128) -> Result<()> {
-        let block_header = self.block_header()?;
-        if block_header.time as u128 > deadline {
+    fn _check_deadline(&self, height: u64, deadline: u128) -> Result<()> {
+        if deadline != 0 && height as u128 > deadline {
             Err(anyhow!(format!(
-                "EXPIRED deadline: block time ({}) > deadline({})",
-                block_header.time, deadline
+                "EXPIRED deadline: block height ({}) > deadline({})",
+                height, deadline
             )))
         } else {
             Ok(())
@@ -350,8 +349,8 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         amount_b_min: u128,
         deadline: u128,
     ) -> Result<CallResponse> {
-        self._check_deadline(deadline)?;
         let context = self.context()?;
+        self._check_deadline(context.height, deadline)?;
         let pool = self._find_existing_pool_id(token_a, token_b)?;
         let (previous_a, previous_b) = self._get_reserves(pool)?;
         let (amount_a, amount_b) = if previous_a == 0 && previous_b == 0 {
@@ -403,8 +402,8 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         amount_b_min: u128,
         deadline: u128,
     ) -> Result<CallResponse> {
-        self._check_deadline(deadline)?;
         let context = self.context()?;
+        self._check_deadline(context.height, deadline)?;
         let parcel = context.incoming_alkanes;
         let pool = self._find_existing_pool_id(token_a, token_b)?;
         let input_transfer = AlkaneTransferParcel(vec![AlkaneTransfer {
@@ -487,8 +486,8 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         amount_out_min: u128,
         deadline: u128,
     ) -> Result<CallResponse> {
-        self._check_deadline(deadline)?;
         let context = self.context()?;
+        self._check_deadline(context.height, deadline)?;
         let parcel = context.incoming_alkanes;
 
         let amounts = self.get_amounts_out(amount_in, &path)?;
@@ -523,8 +522,8 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         amount_in_max: u128,
         deadline: u128,
     ) -> Result<CallResponse> {
-        self._check_deadline(deadline)?;
         let context = self.context()?;
+        self._check_deadline(context.height, deadline)?;
         let parcel: AlkaneTransferParcel = context.clone().incoming_alkanes;
 
         let amounts = self.get_amounts_in(desired_amount_out, &path)?;
