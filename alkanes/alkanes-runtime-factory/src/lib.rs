@@ -350,7 +350,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         deadline: u128,
     ) -> Result<CallResponse> {
         let context = self.context()?;
-        self._check_deadline(context.height, deadline)?;
+        self._check_deadline(self.height(), deadline)?;
         let pool = self._find_existing_pool_id(token_a, token_b)?;
         let (previous_a, previous_b) = self._get_reserves(pool)?;
         let (amount_a, amount_b) = if previous_a == 0 && previous_b == 0 {
@@ -403,7 +403,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         deadline: u128,
     ) -> Result<CallResponse> {
         let context = self.context()?;
-        self._check_deadline(context.height, deadline)?;
+        self._check_deadline(self.height(), deadline)?;
         let parcel = context.incoming_alkanes;
         let pool = self._find_existing_pool_id(token_a, token_b)?;
         let input_transfer = AlkaneTransferParcel(vec![AlkaneTransfer {
@@ -487,7 +487,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         deadline: u128,
     ) -> Result<CallResponse> {
         let context = self.context()?;
-        self._check_deadline(context.height, deadline)?;
+        self._check_deadline(self.height(), deadline)?;
         let parcel = context.incoming_alkanes;
 
         let amounts = self.get_amounts_out(amount_in, &path)?;
@@ -523,7 +523,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         deadline: u128,
     ) -> Result<CallResponse> {
         let context = self.context()?;
-        self._check_deadline(context.height, deadline)?;
+        self._check_deadline(self.height(), deadline)?;
         let parcel: AlkaneTransferParcel = context.clone().incoming_alkanes;
 
         let amounts = self.get_amounts_in(desired_amount_out, &path)?;
