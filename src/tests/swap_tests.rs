@@ -145,7 +145,7 @@ fn test_amm_pool_swap_deadline_fail() -> Result<()> {
         vout: 0,
     };
     let amount_to_swap = 10000;
-    let deadline = (swap_block.header.time - 1) as u128;
+    let deadline = (block_height - 1) as u128;
 
     insert_swap_exact_tokens_for_tokens_deadline(
         amount_to_swap,
