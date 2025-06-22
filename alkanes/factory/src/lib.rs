@@ -88,7 +88,7 @@ pub enum AMMFactoryMessage {
         path: Vec<AlkaneId>,
         amount_out_min: u128,
         deadline: u128,
-    }
+    },
 
     #[opcode(50)]
     Forward {},
