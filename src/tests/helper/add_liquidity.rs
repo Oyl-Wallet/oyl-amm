@@ -86,13 +86,14 @@ pub fn insert_add_liquidity_checked_txs(
     deadline: u128,
     test_block: &mut Block,
     input_outpoint: OutPoint,
+    deployment_ids: &AmmTestDeploymentIds,
 ) {
     test_block
         .txdata
         .push(create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_factory_proxy,
+                target: deployment_ids.amm_factory_proxy,
                 inputs: vec![
                     11,
                     2,
@@ -155,17 +156,18 @@ pub fn check_add_liquidity_runtime_balance(
     added_amount1: u128,
     added_amount2: u128,
     added_amount3: u128,
+    deployment_ids: &AmmTestDeploymentIds,
 ) -> Result<()> {
     runtime_balances.increase(
-        &DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+        &deployment_ids.owned_token_1_deployment.into(),
         added_amount1,
     )?;
     runtime_balances.increase(
-        &DEPLOYMENT_IDS.owned_token_2_deployment.into(),
+        &deployment_ids.owned_token_2_deployment.into(),
         added_amount2,
     )?;
     runtime_balances.increase(
-        &DEPLOYMENT_IDS.owned_token_3_deployment.into(),
+        &deployment_ids.owned_token_3_deployment.into(),
         added_amount3,
     )?;
 

@@ -6,8 +6,7 @@ use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::Witness;
 use init_pools::{
-    calc_lp_balance_from_pool_init, init_block_with_amm_pool, insert_init_pool_liquidity_txs,
-    test_amm_pool_init_fixture,
+    calc_lp_balance_from_pool_init, init_pool_liquidity_txs, test_amm_pool_init_fixture,
 };
 use metashrew_support::byte_view::ByteView;
 use num::integer::Roots;
@@ -17,7 +16,6 @@ use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
 
 use crate::tests::helper::add_liquidity::insert_add_liquidity_checked_txs;
-use crate::tests::helper::common::DEPLOYMENT_IDS;
 use crate::tests::helper::*;
 use alkane_helpers::clear;
 use alkanes::indexer::index_block;
@@ -46,12 +44,12 @@ fn test_amm_pool_normal_init() -> Result<()> {
 fn test_amm_factory_double_init_fail() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let mut test_block = init_block_with_amm_pool()?;
+    let (mut test_block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
     test_block.txdata.push(
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_factory_proxy,
+                target: deployment_ids.amm_factory_proxy,
                 inputs: vec![0],
             }],
             OutPoint {
@@ -78,24 +76,24 @@ fn test_amm_factory_double_init_fail() -> Result<()> {
 fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let mut test_block = init_block_with_amm_pool()?;
+    let (mut test_block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
     test_block.txdata.push(
         common::create_multiple_cellpack_with_witness_and_in_with_edicts(
             Witness::new(),
             vec![
                 common::CellpackOrEdict::Edict(vec![ProtostoneEdict {
-                    id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+                    id: deployment_ids.owned_token_1_deployment.into(),
                     amount: 1000000,
                     output: 0,
                 }]),
                 common::CellpackOrEdict::Cellpack(Cellpack {
-                    target: DEPLOYMENT_IDS.amm_factory_proxy,
+                    target: deployment_ids.amm_factory_proxy,
                     inputs: vec![
                         1,
                         2,
-                        DEPLOYMENT_IDS.owned_token_1_deployment.tx,
+                        deployment_ids.owned_token_1_deployment.tx,
                         2,
-                        DEPLOYMENT_IDS.owned_token_2_deployment.tx,
+                        deployment_ids.owned_token_2_deployment.tx,
                         1000000,
                         1000000,
                     ],
@@ -125,19 +123,20 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
 fn test_amm_factory_same_token_fail() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let mut test_block = init_block_with_amm_pool()?;
+    let (mut test_block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
     let input_outpoint = OutPoint {
         txid: test_block.txdata.last().unwrap().compute_txid(),
         vout: 0,
     };
-    insert_init_pool_liquidity_txs(
+    let (pool_block, _) = init_pool_liquidity_txs(
         10,
         10,
-        DEPLOYMENT_IDS.owned_token_1_deployment,
-        DEPLOYMENT_IDS.owned_token_1_deployment,
-        &mut test_block,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_1_deployment,
         input_outpoint,
-    );
+        &deployment_ids,
+    )?;
+    test_block = pool_block;
     index_block(&test_block, block_height)?;
 
     assert_revert_context(
@@ -155,19 +154,20 @@ fn test_amm_factory_same_token_fail() -> Result<()> {
 fn test_amm_factory_zero_amount_fail() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let mut test_block = init_block_with_amm_pool()?;
+    let (mut test_block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
     let input_outpoint = OutPoint {
         txid: test_block.txdata.last().unwrap().compute_txid(),
         vout: 0,
     };
-    insert_init_pool_liquidity_txs(
+    let (pool_block, _) = init_pool_liquidity_txs(
         0,
         10,
-        DEPLOYMENT_IDS.owned_token_1_deployment,
-        DEPLOYMENT_IDS.owned_token_2_deployment,
-        &mut test_block,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
         input_outpoint,
-    );
+        &deployment_ids,
+    )?;
+    test_block = pool_block;
     index_block(&test_block, block_height)?;
 
     assert_revert_context(
@@ -185,21 +185,22 @@ fn test_amm_factory_zero_amount_fail() -> Result<()> {
 fn test_amm_factory_duplicate_pool_fail() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut init_block_2 = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
         txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
         vout: 0,
     };
-    insert_init_pool_liquidity_txs(
+    let (pool_block, _) = init_pool_liquidity_txs(
         10000,
         10000,
-        DEPLOYMENT_IDS.owned_token_1_deployment,
-        DEPLOYMENT_IDS.owned_token_2_deployment,
-        &mut init_block_2,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
         input_outpoint,
-    );
+        &deployment_ids,
+    )?;
+    init_block_2 = pool_block;
     index_block(&init_block_2, block_height)?;
 
     let outpoint = OutPoint {
@@ -230,19 +231,20 @@ fn test_amm_pool_skewed_init() -> Result<()> {
 fn test_amm_pool_zero_init() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let (mut test_block) = init_block_with_amm_pool()?;
+    let (mut test_block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
     let mut previous_outpoint = OutPoint {
         txid: test_block.txdata.last().unwrap().compute_txid(),
         vout: 0,
     };
-    insert_init_pool_liquidity_txs(
+    let (pool_block, _) = init_pool_liquidity_txs(
         1000000,
         1,
-        DEPLOYMENT_IDS.owned_token_1_deployment,
-        DEPLOYMENT_IDS.owned_token_2_deployment,
-        &mut test_block,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
         previous_outpoint,
-    );
+        &deployment_ids,
+    )?;
+    test_block = pool_block;
     index_block(&test_block, block_height)?;
 
     let outpoint = OutPoint {
@@ -261,24 +263,25 @@ fn test_amm_pool_zero_init() -> Result<()> {
 fn test_amm_pool_bad_init() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let (mut test_block) = init_block_with_amm_pool()?;
+    let (mut test_block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
     let previous_outpoint = OutPoint {
         txid: test_block.txdata.last().unwrap().compute_txid(),
         vout: 0,
     };
-    insert_init_pool_liquidity_txs(
+    let (pool_block, _) = init_pool_liquidity_txs(
         10000,
         1,
-        DEPLOYMENT_IDS.owned_token_1_deployment,
-        DEPLOYMENT_IDS.owned_token_2_deployment,
-        &mut test_block,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
         previous_outpoint,
-    );
+        &deployment_ids,
+    )?;
+    test_block = pool_block;
     index_block(&test_block, block_height)?;
-    assert_token_id_has_no_deployment(DEPLOYMENT_IDS.amm_pool_1_deployment)?;
+    assert_token_id_has_no_deployment(deployment_ids.amm_pool_1_deployment)?;
     let sheet = get_last_outpoint_sheet(&test_block)?;
     assert_eq!(
-        sheet.get_cached(&DEPLOYMENT_IDS.amm_pool_1_deployment.into()),
+        sheet.get_cached(&deployment_ids.amm_pool_1_deployment.into()),
         0
     );
 
@@ -332,7 +335,7 @@ fn test_amm_pool_burn_more_than_owned() -> Result<()> {
 fn test_amm_pool_name() -> Result<()> {
     clear();
     // Initialize a pool
-    let (block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     // Create a new block for testing the name
     let block_height = 840_001;
@@ -343,7 +346,7 @@ fn test_amm_pool_name() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_pool_1_deployment,
+                target: deployment_ids.amm_pool_1_deployment,
                 inputs: vec![99],
             }],
             OutPoint {
@@ -384,7 +387,7 @@ fn test_amm_pool_name() -> Result<()> {
 fn test_amm_pool_details() -> Result<()> {
     clear();
     // Initialize a pool
-    let (block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     // Create a new block for testing the pool details
     let block_height = 840_001;
@@ -395,7 +398,7 @@ fn test_amm_pool_details() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_pool_1_deployment,
+                target: deployment_ids.amm_pool_1_deployment,
                 inputs: vec![999],
             }],
             OutPoint {
@@ -436,7 +439,7 @@ fn test_amm_pool_details() -> Result<()> {
 fn test_amm_price_0() -> Result<()> {
     clear();
     // Initialize a pool
-    let (block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     // Create a new block for testing the pool details
     let block_height = 840_001;
@@ -447,7 +450,7 @@ fn test_amm_price_0() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_pool_1_deployment,
+                target: deployment_ids.amm_pool_1_deployment,
                 inputs: vec![98],
             }],
             OutPoint {
@@ -491,7 +494,7 @@ fn test_amm_price_0() -> Result<()> {
 #[wasm_bindgen_test]
 fn test_get_num_pools() -> Result<()> {
     clear();
-    let (block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     let block_height = 840_000;
 
@@ -501,7 +504,7 @@ fn test_get_num_pools() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_factory_proxy,
+                target: deployment_ids.amm_factory_proxy,
                 inputs: vec![4],
             }],
             OutPoint {
@@ -553,7 +556,7 @@ fn test_get_num_pools() -> Result<()> {
 #[wasm_bindgen_test]
 fn test_find_existing_pool_id() -> Result<()> {
     clear();
-    let (block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     let block_height = 840_000;
 
@@ -563,13 +566,13 @@ fn test_find_existing_pool_id() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_factory_proxy,
+                target: deployment_ids.amm_factory_proxy,
                 inputs: vec![
                     2,
-                    DEPLOYMENT_IDS.owned_token_1_deployment.block,
-                    DEPLOYMENT_IDS.owned_token_1_deployment.tx,
-                    DEPLOYMENT_IDS.owned_token_2_deployment.block,
-                    DEPLOYMENT_IDS.owned_token_2_deployment.tx,
+                    deployment_ids.owned_token_1_deployment.block,
+                    deployment_ids.owned_token_1_deployment.tx,
+                    deployment_ids.owned_token_2_deployment.block,
+                    deployment_ids.owned_token_2_deployment.tx,
                 ],
             }],
             OutPoint {
@@ -607,9 +610,9 @@ fn test_find_existing_pool_id() -> Result<()> {
                     data[0]
                 );
                 assert_eq!(
-                    data[16] as u128, DEPLOYMENT_IDS.amm_pool_1_deployment.tx,
+                    data[16] as u128, deployment_ids.amm_pool_1_deployment.tx,
                     "Expected second u128 of data to be {}, but got {}",
-                    DEPLOYMENT_IDS.amm_pool_1_deployment.tx, data[16]
+                    deployment_ids.amm_pool_1_deployment.tx, data[16]
                 );
             }
             _ => panic!("Expected ReturnContext variant, but got a different variant"),
@@ -624,7 +627,7 @@ fn test_find_existing_pool_id() -> Result<()> {
 #[wasm_bindgen_test]
 fn test_find_nonexisting_pool_id() -> Result<()> {
     clear();
-    let (block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     let block_height = 840_000;
 
@@ -634,7 +637,7 @@ fn test_find_nonexisting_pool_id() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_factory_proxy,
+                target: deployment_ids.amm_factory_proxy,
                 inputs: vec![2, 12, 100, 13, 101],
             }],
             OutPoint {
@@ -671,7 +674,7 @@ fn test_find_nonexisting_pool_id() -> Result<()> {
 #[wasm_bindgen_test]
 fn test_get_all_pools() -> Result<()> {
     clear();
-    let (block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     let block_height = 840_000;
 
@@ -681,7 +684,7 @@ fn test_get_all_pools() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_factory_proxy,
+                target: deployment_ids.amm_factory_proxy,
                 inputs: vec![3],
             }],
             OutPoint {

@@ -5,10 +5,7 @@ use alkanes_support::trace::{Trace, TraceEvent};
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::Witness;
-use init_pools::{
-    calc_lp_balance_from_pool_init, init_block_with_amm_pool, insert_init_pool_liquidity_txs,
-    test_amm_pool_init_fixture,
-};
+use init_pools::{calc_lp_balance_from_pool_init, test_amm_pool_init_fixture};
 use metashrew_support::byte_view::ByteView;
 use num::integer::Roots;
 use oylswap_library::{StorableU256, U256};
@@ -17,7 +14,6 @@ use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
 
 use crate::tests::helper::add_liquidity::insert_add_liquidity_checked_txs;
-use crate::tests::helper::common::DEPLOYMENT_IDS;
 use crate::tests::helper::remove_liquidity::{
     check_burn_balances, check_remove_liquidity_runtime_balance,
     insert_remove_liquidity_checked_txs,
@@ -70,7 +66,8 @@ fn test_amm_pool_checked() -> Result<()> {
     let (amount1, amount2) = (1000000, 1000000);
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
     let amount_burn = total_lp / 2;
-    let (mut init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (mut init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
 
     let block_height = 840_001;
     let mut test_block = create_block_with_coinbase_tx(block_height);
@@ -80,28 +77,36 @@ fn test_amm_pool_checked() -> Result<()> {
     };
     let deadline = test_block.header.time as u128;
     insert_remove_liquidity_checked_txs(
-        DEPLOYMENT_IDS.owned_token_1_deployment,
-        DEPLOYMENT_IDS.owned_token_2_deployment,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
         amount_burn,
         (amount1 - MINIMUM_LIQUIDITY) / 2,
         (amount2 - MINIMUM_LIQUIDITY) / 2,
         deadline,
         &mut test_block,
         input_outpoint,
+        &deployment_ids,
     );
 
     index_block(&test_block, block_height)?;
 
     let amount_burned_true = std::cmp::min(amount_burn, total_lp);
 
-    let (amount_returned_1, amount_returned_2) =
-        check_burn_balances(&test_block, amount_burned_true, total_lp, amount1, amount2)?;
+    let (amount_returned_1, amount_returned_2) = check_burn_balances(
+        &test_block,
+        amount_burned_true,
+        total_lp,
+        amount1,
+        amount2,
+        &deployment_ids,
+    )?;
 
     check_remove_liquidity_runtime_balance(
         &mut runtime_balances,
         amount_returned_1,
         amount_returned_2,
         amount_burned_true,
+        &deployment_ids,
     )?;
     Ok(())
 }
@@ -112,7 +117,8 @@ fn test_amm_pool_checked_fail_1() -> Result<()> {
     let (amount1, amount2) = (1000000, 1000000);
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
     let amount_burn = total_lp / 2;
-    let (mut init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (mut init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
 
     let block_height = 840_001;
     let mut test_block = create_block_with_coinbase_tx(block_height);
@@ -122,14 +128,15 @@ fn test_amm_pool_checked_fail_1() -> Result<()> {
     };
     let deadline = test_block.header.time as u128;
     insert_remove_liquidity_checked_txs(
-        DEPLOYMENT_IDS.owned_token_1_deployment,
-        DEPLOYMENT_IDS.owned_token_2_deployment,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
         amount_burn,
         (amount1 - MINIMUM_LIQUIDITY) / 2 + 1,
         (amount2 - MINIMUM_LIQUIDITY) / 2,
         deadline,
         &mut test_block,
         input_outpoint,
+        &deployment_ids,
     );
 
     index_block(&test_block, block_height)?;
@@ -150,7 +157,8 @@ fn test_amm_pool_checked_fail_2() -> Result<()> {
     let (amount1, amount2) = (1000000, 1000000);
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
     let amount_burn = total_lp / 2;
-    let (mut init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (mut init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
 
     let block_height = 840_001;
     let mut test_block = create_block_with_coinbase_tx(block_height);
@@ -160,14 +168,15 @@ fn test_amm_pool_checked_fail_2() -> Result<()> {
     };
     let deadline = test_block.header.time as u128;
     insert_remove_liquidity_checked_txs(
-        DEPLOYMENT_IDS.owned_token_2_deployment,
-        DEPLOYMENT_IDS.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
+        deployment_ids.owned_token_1_deployment,
         amount_burn,
         (amount2 - MINIMUM_LIQUIDITY) / 2,
         (amount1 - MINIMUM_LIQUIDITY) / 2 + 1,
         deadline,
         &mut test_block,
         input_outpoint,
+        &deployment_ids,
     );
 
     index_block(&test_block, block_height)?;
@@ -188,7 +197,8 @@ fn test_amm_pool_checked_fail_3() -> Result<()> {
     let (amount1, amount2) = (1000000, 1000000);
     let total_lp = calc_lp_balance_from_pool_init(1000000, 1000000);
     let amount_burn = total_lp / 2;
-    let (mut init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (mut init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
 
     let block_height = 840_001;
     let mut test_block = create_block_with_coinbase_tx(block_height);
@@ -198,14 +208,15 @@ fn test_amm_pool_checked_fail_3() -> Result<()> {
     };
     let deadline = test_block.header.time as u128;
     insert_remove_liquidity_checked_txs(
-        DEPLOYMENT_IDS.owned_token_1_deployment,
-        DEPLOYMENT_IDS.owned_token_2_deployment,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
         amount_burn,
         (amount1 - MINIMUM_LIQUIDITY) / 2,
         (amount2 - MINIMUM_LIQUIDITY) / 2 + 1,
         deadline,
         &mut test_block,
         input_outpoint,
+        &deployment_ids,
     );
 
     index_block(&test_block, block_height)?;
