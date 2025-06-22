@@ -83,6 +83,12 @@ pub enum AMMFactoryMessage {
         amount_in_max: u128,
         deadline: u128,
     },
+    #[opcode(29)]
+    SwapExactTokensForTokensImplicit {
+        path: Vec<AlkaneId>,
+        amount_out_min: u128,
+        deadline: u128,
+    }
 }
 
 // Base implementation of AMMFactory that can be used directly or extended

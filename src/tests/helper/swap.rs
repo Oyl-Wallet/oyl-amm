@@ -205,7 +205,7 @@ pub fn insert_swap_exact_tokens_for_tokens_no_split(
         amount,
         swap_path.clone(),
         min_out,
-        test_block.header.time as u128,
+        u128::MAX,
     );
 
     _insert_swap_txs_no_split(test_block, input_outpoint, cellpack)
