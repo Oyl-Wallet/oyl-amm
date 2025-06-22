@@ -90,7 +90,7 @@ pub fn _prepare_swap_tokens_for_exact_tokens_cellpack(
         panic!("Swap path must be at least two alkanes long");
     }
     let mut cellpack = Cellpack {
-        target: DEPLOYMENT_IDS.amm_factory_deployment,
+        target: DEPLOYMENT_IDS.amm_factory_proxy,
         inputs: vec![14, swap_path.len() as u128],
     };
     cellpack
@@ -156,7 +156,7 @@ fn _prepare_swap_exact_tokens_for_tokens_cellpack(
         panic!("Swap path must be at least two alkanes long");
     }
     let mut cellpack = Cellpack {
-        target: DEPLOYMENT_IDS.amm_factory_deployment,
+        target: DEPLOYMENT_IDS.amm_factory_proxy,
         inputs: vec![13, amount, swap_path.len() as u128],
     };
     cellpack

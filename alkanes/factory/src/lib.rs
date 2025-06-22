@@ -89,6 +89,9 @@ pub enum AMMFactoryMessage {
         amount_out_min: u128,
         deadline: u128,
     }
+
+    #[opcode(50)]
+    Forward {},
 }
 
 // Base implementation of AMMFactory that can be used directly or extended

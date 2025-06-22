@@ -1,10 +1,13 @@
 use crate::tests::std::{example_flashswap_build, factory_build, oyl_token_build, pool_build};
 use alkanes::indexer::index_block;
-use alkanes::precompiled::{alkanes_std_auth_token_build, alkanes_std_owned_token_build};
+use alkanes::precompiled::{
+    alkanes_std_auth_token_build, alkanes_std_beacon_proxy_build, alkanes_std_owned_token_build,
+    alkanes_std_upgradeable_beacon_build, alkanes_std_upgradeable_build,
+};
 use alkanes::tests::helpers::{
     self as alkane_helpers, assert_binary_deployed_to_id,
     create_multiple_cellpack_with_witness_and_in, get_last_outpoint_sheet,
-    get_lazy_sheet_for_runtime, get_sheet_for_runtime,
+    get_lazy_sheet_for_runtime, get_sheet_for_runtime, BinaryAndCellpack,
 };
 use alkanes_runtime_pool::MINIMUM_LIQUIDITY;
 use alkanes_support::cellpack::Cellpack;
@@ -28,83 +31,109 @@ pub const INIT_AMT_TOKEN3: u128 = 1_000_000_000_000_000_000_000u128;
 pub const INIT_AMT_OYL: u128 = 1_000_000_000_000_000_000_000u128;
 
 pub fn init_block_with_amm_pool() -> Result<Block> {
-    let cellpacks: Vec<Cellpack> = [
+    let cellpack_pairs: Vec<BinaryAndCellpack> = [
         //amm pool init (in factory space so new pools can copy this code)
-        Cellpack {
-            target: AlkaneId {
-                block: 3,
-                tx: AMM_FACTORY_ID,
+        BinaryAndCellpack {
+            binary: pool_build::get_bytes(),
+            cellpack: Cellpack {
+                target: AlkaneId {
+                    block: 3,
+                    tx: AMM_FACTORY_ID,
+                },
+                inputs: vec![50],
             },
-            inputs: vec![50],
         },
         //auth token factory init
-        Cellpack {
-            target: AlkaneId {
-                block: 3,
-                tx: AUTH_TOKEN_FACTORY_ID,
+        BinaryAndCellpack {
+            binary: alkanes_std_auth_token_build::get_bytes(),
+            cellpack: Cellpack {
+                target: AlkaneId {
+                    block: 3,
+                    tx: AUTH_TOKEN_FACTORY_ID,
+                },
+                inputs: vec![100],
             },
-            inputs: vec![100],
         },
-        //amm factory
-        Cellpack {
-            target: AlkaneId { block: 1, tx: 0 },
+        //amm factory initial deploy, no initialize call since behind proxy
+        BinaryAndCellpack {
+            binary: factory_build::get_bytes(),
+            cellpack: Cellpack {
+                target: AlkaneId { block: 3, tx: 2 },
+                inputs: vec![50],
+            },
+        },
+        // deploy the proxy and point to factory logic impl
+        BinaryAndCellpack {
+            binary: alkanes_std_upgradeable_build::get_bytes(),
+            cellpack: Cellpack {
+                target: AlkaneId {
+                    block: 3,
+                    tx: DEPLOYMENT_IDS.amm_factory_proxy.tx,
+                },
+                inputs: vec![
+                    0x7fff,
+                    DEPLOYMENT_IDS.amm_factory_logic_impl.block,
+                    DEPLOYMENT_IDS.amm_factory_logic_impl.tx,
+                    1,
+                ],
+            },
+        },
+        // now do init with the proxy
+        BinaryAndCellpack::cellpack_only(Cellpack {
+            target: DEPLOYMENT_IDS.amm_factory_proxy,
             inputs: vec![
                 0,
                 AMM_FACTORY_ID,
                 10, // 10 auth tokens
             ],
-        },
+        }),
         // token 1 init 1 auth token and mint 1000000 owned tokens. Also deploys owned token contract at {2,2}
-        Cellpack {
-            target: AlkaneId { block: 1, tx: 0 },
-            inputs: vec![0, 1, INIT_AMT_TOKEN1],
+        BinaryAndCellpack {
+            binary: alkanes_std_owned_token_build::get_bytes(),
+            cellpack: Cellpack {
+                target: AlkaneId { block: 1, tx: 0 },
+                inputs: vec![0, 1, INIT_AMT_TOKEN1],
+            },
         },
         // token 2 init 1 auth token and mint 2000000 owned tokens
-        Cellpack {
+        BinaryAndCellpack::cellpack_only(Cellpack {
             target: AlkaneId {
                 block: 5,
                 tx: DEPLOYMENT_IDS.owned_token_1_deployment.tx,
             }, // factory creation of owned token using {2, 2} as the factory
             inputs: vec![0, 1, INIT_AMT_TOKEN2],
-        },
+        }),
         // token 3 init 1 auth token and mint 1000000 owned tokens
-        Cellpack {
+        BinaryAndCellpack::cellpack_only(Cellpack {
             target: AlkaneId {
                 block: 5,
                 tx: DEPLOYMENT_IDS.owned_token_1_deployment.tx,
             }, // factory creation of owned token using {2, 2} as the factory
             inputs: vec![0, 1, INIT_AMT_TOKEN1],
-        },
+        }),
         // oyl token init 1 auth token and mint 1000000 owned tokens.
-        Cellpack {
-            target: AlkaneId { block: 1, tx: 0 }, // factory creation of owned token using {2, 2} as the factory
-            inputs: vec![
-                0,
-                INIT_AMT_OYL,
-                u128::from_le_bytes(*b"OYL Token\0\0\0\0\0\0\0"),
-                u128::from_le_bytes(*b"OYL\0\0\0\0\0\0\0\0\0\0\0\0\0"),
-            ],
+        BinaryAndCellpack {
+            binary: oyl_token_build::get_bytes(),
+            cellpack: Cellpack {
+                target: AlkaneId { block: 1, tx: 0 }, // factory creation of owned token using {2, 2} as the factory
+                inputs: vec![
+                    0,
+                    INIT_AMT_OYL,
+                    u128::from_le_bytes(*b"OYL Token\0\0\0\0\0\0\0"),
+                    u128::from_le_bytes(*b"OYL\0\0\0\0\0\0\0\0\0\0\0\0\0"),
+                ],
+            },
         },
-        Cellpack {
-            target: AlkaneId { block: 1, tx: 0 },
-            inputs: vec![0],
+        BinaryAndCellpack {
+            binary: example_flashswap_build::get_bytes(),
+            cellpack: Cellpack {
+                target: AlkaneId { block: 1, tx: 0 },
+                inputs: vec![0],
+            },
         },
     ]
     .into();
-    let test_block = alkane_helpers::init_with_multiple_cellpacks_with_tx(
-        [
-            pool_build::get_bytes(),
-            alkanes_std_auth_token_build::get_bytes(),
-            factory_build::get_bytes(),
-            alkanes_std_owned_token_build::get_bytes(),
-            [].into(),
-            [].into(),
-            oyl_token_build::get_bytes(),
-            example_flashswap_build::get_bytes(),
-        ]
-        .into(),
-        cellpacks,
-    );
+    let test_block = alkane_helpers::init_with_cellpack_pairs(cellpack_pairs);
 
     return Ok(test_block);
 }
@@ -120,7 +149,11 @@ pub fn assert_contracts_correct_ids() -> Result<()> {
     );
 
     let _ = assert_binary_deployed_to_id(
-        DEPLOYMENT_IDS.amm_factory_deployment.clone(),
+        DEPLOYMENT_IDS.amm_factory_proxy.clone(),
+        alkanes_std_upgradeable_build::get_bytes(),
+    );
+    let _ = assert_binary_deployed_to_id(
+        DEPLOYMENT_IDS.amm_factory_logic_impl.clone(),
         factory_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
@@ -175,7 +208,7 @@ pub fn insert_init_pool_liquidity_txs(
         .push(create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_factory_deployment,
+                target: DEPLOYMENT_IDS.amm_factory_proxy,
                 inputs: vec![
                     1,
                     token1_address.block,

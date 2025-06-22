@@ -560,4 +560,10 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         let result = self._swap(&amounts, &path)?;
         self._return_leftovers(context.myself, result, parcel)
     }
+
+    fn forward(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        let response = CallResponse::forward(&context.incoming_alkanes);
+        Ok(response)
+    }
 }

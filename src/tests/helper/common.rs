@@ -23,7 +23,8 @@ use std::str::FromStr;
 pub struct AmmTestDeploymentIds {
     pub amm_pool_factory: AlkaneId,
     pub auth_token_factory: AlkaneId,
-    pub amm_factory_deployment: AlkaneId,
+    pub amm_factory_logic_impl: AlkaneId,
+    pub amm_factory_proxy: AlkaneId,
     pub amm_factory_auth_token: AlkaneId,
     pub owned_token_1_deployment: AlkaneId,
     pub auth_token_1_deployment: AlkaneId,
@@ -46,7 +47,8 @@ pub const DEPLOYMENT_IDS: AmmTestDeploymentIds = AmmTestDeploymentIds {
         block: 4,
         tx: AUTH_TOKEN_FACTORY_ID,
     },
-    amm_factory_deployment: AlkaneId { block: 2, tx: 1 },
+    amm_factory_proxy: AlkaneId { block: 4, tx: 1 }, // proxy auth token gets deployed to 2,1
+    amm_factory_logic_impl: AlkaneId { block: 4, tx: 2 },
     amm_factory_auth_token: AlkaneId { block: 2, tx: 2 },
     owned_token_1_deployment: AlkaneId { block: 2, tx: 3 },
     auth_token_1_deployment: AlkaneId { block: 2, tx: 4 },

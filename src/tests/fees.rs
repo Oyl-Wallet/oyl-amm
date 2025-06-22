@@ -93,7 +93,7 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
                     output: 0,
                 }]),
                 common::CellpackOrEdict::Cellpack(Cellpack {
-                    target: DEPLOYMENT_IDS.amm_factory_deployment,
+                    target: DEPLOYMENT_IDS.amm_factory_proxy,
                     inputs: vec![10, 2, DEPLOYMENT_IDS.amm_pool_1_deployment.tx],
                 }),
             ],

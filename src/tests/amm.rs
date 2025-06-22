@@ -51,7 +51,7 @@ fn test_amm_factory_double_init_fail() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_factory_deployment,
+                target: DEPLOYMENT_IDS.amm_factory_proxy,
                 inputs: vec![0],
             }],
             OutPoint {
@@ -89,7 +89,7 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
                     output: 0,
                 }]),
                 common::CellpackOrEdict::Cellpack(Cellpack {
-                    target: DEPLOYMENT_IDS.amm_factory_deployment,
+                    target: DEPLOYMENT_IDS.amm_factory_proxy,
                     inputs: vec![
                         1,
                         2,
@@ -501,7 +501,7 @@ fn test_get_num_pools() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_factory_deployment,
+                target: DEPLOYMENT_IDS.amm_factory_proxy,
                 inputs: vec![4],
             }],
             OutPoint {
@@ -563,7 +563,7 @@ fn test_find_existing_pool_id() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_factory_deployment,
+                target: DEPLOYMENT_IDS.amm_factory_proxy,
                 inputs: vec![
                     2,
                     DEPLOYMENT_IDS.owned_token_1_deployment.block,
@@ -634,7 +634,7 @@ fn test_find_nonexisting_pool_id() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_factory_deployment,
+                target: DEPLOYMENT_IDS.amm_factory_proxy,
                 inputs: vec![2, 12, 100, 13, 101],
             }],
             OutPoint {
@@ -681,7 +681,7 @@ fn test_get_all_pools() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_factory_deployment,
+                target: DEPLOYMENT_IDS.amm_factory_proxy,
                 inputs: vec![3],
             }],
             OutPoint {

@@ -64,7 +64,7 @@ pub fn insert_remove_liquidity_checked_txs(
         .push(create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_factory_deployment,
+                target: DEPLOYMENT_IDS.amm_factory_proxy,
                 inputs: vec![
                     12,
                     2,
