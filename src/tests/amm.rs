@@ -115,7 +115,7 @@ fn test_amm_factory_init_one_incoming_fail() -> Result<()> {
             txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
             vout: 4,
         }),
-        "Extcall failed: balance underflow, transferring(AlkaneTransfer { id: AlkaneId { block: 2, tx: 5 }, value: 1000000 }), from(AlkaneId { block: 2, tx: 1 }), balance(0)",
+        "Extcall failed: balance underflow, transferring(AlkaneTransfer { id: AlkaneId { block: 2, tx: 5 }, value: 1000000 }), from(AlkaneId { block: 4, tx: 1 }), balance(0)",
     )?;
 
     Ok(())
