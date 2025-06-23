@@ -21,7 +21,7 @@ use std::collections::BTreeSet;
 use std::str::FromStr;
 
 pub struct AmmTestDeploymentIds {
-    pub amm_pool_factory: AlkaneId,
+    pub amm_pool_logic_impl: AlkaneId,
     pub auth_token_factory: AlkaneId,
     pub amm_factory_logic_impl: AlkaneId,
     pub amm_factory_proxy: AlkaneId,
@@ -51,7 +51,7 @@ pub const EXAMPLE_FLASHSWAP_TX: u128 = 10;
 
 pub fn create_deployment_ids() -> AmmTestDeploymentIds {
     AmmTestDeploymentIds {
-        amm_pool_factory: AlkaneId {
+        amm_pool_logic_impl: AlkaneId {
             block: 4,
             tx: AMM_FACTORY_ID,
         },

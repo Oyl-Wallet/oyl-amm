@@ -63,7 +63,10 @@ pub fn init_factories(deployment_ids: &AmmTestDeploymentIds) -> Result<Block> {
         BinaryAndCellpack {
             binary: factory_build::get_bytes(),
             cellpack: Cellpack {
-                target: AlkaneId { block: 3, tx: 2 },
+                target: AlkaneId {
+                    block: 3,
+                    tx: AMM_FACTORY_LOGIC_IMPL_TX,
+                },
                 inputs: vec![50],
             },
         },
@@ -142,6 +145,31 @@ pub fn init_factories(deployment_ids: &AmmTestDeploymentIds) -> Result<Block> {
                 inputs: vec![0],
             },
         },
+        BinaryAndCellpack {
+            binary: alkanes_std_beacon_proxy_build::get_bytes(),
+            cellpack: Cellpack {
+                target: AlkaneId {
+                    block: 3,
+                    tx: deployment_ids.pool_beacon_proxy.tx,
+                },
+                inputs: vec![0x8fff],
+            },
+        },
+        BinaryAndCellpack {
+            binary: alkanes_std_upgradeable_beacon_build::get_bytes(),
+            cellpack: Cellpack {
+                target: AlkaneId {
+                    block: 3,
+                    tx: deployment_ids.pool_upgradeable_beacon.tx,
+                },
+                inputs: vec![
+                    0x7fff,
+                    deployment_ids.amm_pool_logic_impl.block,
+                    deployment_ids.amm_pool_logic_impl.tx,
+                    1,
+                ],
+            },
+        },
     ]
     .into();
     let test_block = alkane_helpers::init_with_cellpack_pairs(cellpack_pairs);
@@ -165,7 +193,9 @@ pub fn init_factory_proxy(
                 target: deployment_ids.amm_factory_proxy,
                 inputs: vec![
                     0,
-                    AMM_FACTORY_ID,
+                    POOL_BEACON_PROXY_TX,
+                    deployment_ids.pool_upgradeable_beacon.block,
+                    deployment_ids.pool_upgradeable_beacon.tx,
                     10, // 10 auth tokens
                 ],
             }],
@@ -186,7 +216,7 @@ pub fn init_factory_proxy(
 
 pub fn assert_contracts_correct_ids(deployment_ids: &AmmTestDeploymentIds) -> Result<()> {
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.amm_pool_factory.clone(),
+        deployment_ids.amm_pool_logic_impl.clone(),
         pool_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
@@ -220,11 +250,11 @@ pub fn assert_contracts_correct_ids(deployment_ids: &AmmTestDeploymentIds) -> Re
     );
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_pool_1_deployment.clone(),
-        pool_build::get_bytes(),
+        alkanes_std_beacon_proxy_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
         deployment_ids.amm_pool_2_deployment.clone(),
-        pool_build::get_bytes(),
+        alkanes_std_beacon_proxy_build::get_bytes(),
     );
     Ok(())
 }
@@ -337,11 +367,14 @@ pub fn test_amm_pool_init_fixture(
     let mut deployment_ids = create_deployment_ids();
 
     let test_block = init_factories(&deployment_ids)?;
+    println!("Init factories complete");
     let previous_outpoint = OutPoint {
         txid: test_block.txdata.last().unwrap().compute_txid(),
         vout: 0,
     };
     let init_factory_proxy = init_factory_proxy(previous_outpoint, &mut deployment_ids)?;
+
+    println!("Init amm factory proxy complete");
 
     let previous_outpoint = OutPoint {
         txid: init_factory_proxy.txdata.last().unwrap().compute_txid(),
@@ -355,6 +388,7 @@ pub fn test_amm_pool_init_fixture(
         previous_outpoint,
         &deployment_ids,
     )?;
+    println!("Init pool 1 complete");
 
     deployment_ids.amm_pool_1_deployment = AlkaneId {
         block: 2,
@@ -373,6 +407,7 @@ pub fn test_amm_pool_init_fixture(
         previous_outpoint,
         &deployment_ids,
     )?;
+    println!("Init pool 2 complete");
 
     deployment_ids.amm_pool_2_deployment = AlkaneId {
         block: 2,

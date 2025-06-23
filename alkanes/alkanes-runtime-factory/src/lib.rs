@@ -13,6 +13,7 @@ use alkanes_support::{
 };
 use anyhow::{anyhow, Result};
 use bitcoin::Block;
+use core::prelude::v1;
 use metashrew_support::{
     byte_view::ByteView,
     index_pointer::KeyValuePointer,
@@ -47,6 +48,21 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         // set the address for the implementation for AMM pool
         pool_factory_id_pointer.set(Arc::new(pool_factory_id.to_bytes()));
     }
+    fn beacon_id(&self) -> Result<AlkaneId> {
+        let ptr = StoragePointer::from_keyword("/beacon_id")
+            .get()
+            .as_ref()
+            .clone();
+        let mut cursor = std::io::Cursor::<Vec<u8>>::new(ptr);
+        Ok(AlkaneId::new(
+            consume_u128(&mut cursor)?,
+            consume_u128(&mut cursor)?,
+        ))
+    }
+    fn set_beacon_id(&self, v: AlkaneId) {
+        let mut ptr = StoragePointer::from_keyword("/beacon_id");
+        ptr.set(Arc::new(v.into()));
+    }
     fn pool_pointer(&self, a: &AlkaneId, b: &AlkaneId) -> StoragePointer {
         StoragePointer::from_keyword("/pools/")
             .select(&a.clone().into())
@@ -76,12 +92,16 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
             ))
         }
     }
-    fn init_factory(&self, pool_factory_id: u128, auth_token_units: u128) -> Result<CallResponse> {
+    fn init_factory(
+        &self,
+        pool_factory_id: u128,
+        beacon_id: AlkaneId,
+        auth_token_units: u128,
+    ) -> Result<CallResponse> {
         self.observe_initialization()?;
         let context = self.context()?;
-        let mut pool_factory_id_pointer = StoragePointer::from_keyword("/pool_factory_id");
-        // set the address for the implementation for AMM pool
-        pool_factory_id_pointer.set(Arc::new(pool_factory_id.to_bytes()));
+        self.set_pool_id(pool_factory_id);
+        self.set_beacon_id(beacon_id);
         let auth_token = self.deploy_auth_token(auth_token_units)?;
         let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
         response.alkanes.pay(auth_token);
@@ -139,11 +159,27 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
             },
         ]);
 
-        let result = self.call(
+        let beacon_id = self.beacon_id()?;
+
+        // deploys proxy
+        self.call(
             &Cellpack {
                 target: AlkaneId {
                     block: 6,
                     tx: self.pool_id()?,
+                },
+                inputs: vec![0x7fff, beacon_id.block, beacon_id.tx],
+            },
+            &AlkaneTransferParcel::default(),
+            self.fuel(),
+        )?;
+
+        // inits proxy
+        let result = self.call(
+            &Cellpack {
+                target: AlkaneId {
+                    block: 2,
+                    tx: pool_id.tx,
                 },
                 inputs: vec![
                     0,
@@ -489,7 +525,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         self._check_deadline(self.height(), deadline)?;
         let parcel = context.incoming_alkanes;
         if parcel.0.len() != 1 {
-          return Err(anyhow!("must send an alkane as input"));
+            return Err(anyhow!("must send an alkane as input"));
         }
         let mut full_path = vec![parcel.0[0].id.clone()];
         full_path.extend(&path);
