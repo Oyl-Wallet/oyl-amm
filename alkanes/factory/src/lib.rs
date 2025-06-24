@@ -17,6 +17,7 @@ pub enum AMMFactoryMessage {
     #[opcode(0)]
     InitFactory {
         pool_factory_id: u128,
+        beacon_id: AlkaneId,
         auth_token_units: u128,
     },
 
@@ -88,7 +89,10 @@ pub enum AMMFactoryMessage {
         path: Vec<AlkaneId>,
         amount_out_min: u128,
         deadline: u128,
-    }
+    },
+
+    #[opcode(50)]
+    Forward {},
 }
 
 // Base implementation of AMMFactory that can be used directly or extended

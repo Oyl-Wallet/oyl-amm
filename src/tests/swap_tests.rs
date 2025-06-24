@@ -6,14 +6,12 @@ use alkanes::view;
 use alkanes_runtime_pool::PRECISION;
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::id::AlkaneId;
+use alkanes_support::parcel::AlkaneTransfer;
 use alkanes_support::trace::{Trace, TraceEvent};
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::Witness;
-use init_pools::{
-    calc_lp_balance_from_pool_init, init_block_with_amm_pool, insert_init_pool_liquidity_txs,
-    test_amm_pool_init_fixture,
-};
+use init_pools::{calc_lp_balance_from_pool_init, test_amm_pool_init_fixture};
 use metashrew_support::byte_view::ByteView;
 use oylswap_library::{StorableU256, DEFAULT_FEE_AMOUNT_PER_1000, U256};
 use protorune::test_helpers::create_block_with_coinbase_tx;
@@ -24,7 +22,7 @@ use wasm_bindgen_test::wasm_bindgen_test;
 use super::helper::swap::{
     check_swap_runtime_balance, insert_low_level_swap_txs, insert_swap_tokens_for_exact_tokens_txs,
 };
-use crate::tests::helper::common::{check_input_tokens_refunded, DEPLOYMENT_IDS};
+use crate::tests::helper::common::{check_input_tokens_refunded, AmmTestDeploymentIds};
 use crate::tests::helper::swap::{
     check_swap_lp_balance, insert_swap_exact_tokens_for_tokens,
     insert_swap_exact_tokens_for_tokens_deadline, insert_swap_exact_tokens_for_tokens_no_split,
@@ -41,7 +39,8 @@ use std::fmt::Write;
 fn test_amm_pool_swap() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -52,12 +51,13 @@ fn test_amm_pool_swap() -> Result<()> {
     insert_swap_exact_tokens_for_tokens(
         amount_to_swap,
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
         ],
         0,
         &mut swap_block,
         input_outpoint,
+        &deployment_ids,
     );
     index_block(&swap_block, block_height)?;
 
@@ -65,7 +65,7 @@ fn test_amm_pool_swap() -> Result<()> {
         vec![amount1, amount2],
         amount_to_swap,
         0,
-        DEPLOYMENT_IDS.owned_token_2_deployment,
+        deployment_ids.owned_token_2_deployment,
         &swap_block,
     )?;
 
@@ -73,8 +73,8 @@ fn test_amm_pool_swap() -> Result<()> {
         vec![amount1, amount2],
         &mut runtime_balances,
         amount_to_swap,
-        DEPLOYMENT_IDS.owned_token_1_deployment,
-        DEPLOYMENT_IDS.owned_token_2_deployment,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
     )?;
     Ok(())
 }
@@ -83,7 +83,8 @@ fn test_amm_pool_swap() -> Result<()> {
 fn test_amm_pool_swap_no_split() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -95,12 +96,13 @@ fn test_amm_pool_swap_no_split() -> Result<()> {
     insert_swap_exact_tokens_for_tokens_no_split(
         amount_to_swap,
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
         ],
         0,
         &mut swap_block,
         input_outpoint,
+        &deployment_ids,
     );
     index_block(&swap_block, block_height)?;
 
@@ -109,8 +111,8 @@ fn test_amm_pool_swap_no_split() -> Result<()> {
     check_swap_lp_balance(
         vec![amount1, amount2],
         amount_to_swap,
-        init_balances.get(&DEPLOYMENT_IDS.owned_token_2_deployment.into()),
-        DEPLOYMENT_IDS.owned_token_2_deployment,
+        init_balances.get(&deployment_ids.owned_token_2_deployment.into()),
+        deployment_ids.owned_token_2_deployment,
         &swap_block,
     )?;
 
@@ -118,16 +120,16 @@ fn test_amm_pool_swap_no_split() -> Result<()> {
         vec![amount1, amount2],
         &mut runtime_balances,
         amount_to_swap,
-        DEPLOYMENT_IDS.owned_token_1_deployment,
-        DEPLOYMENT_IDS.owned_token_2_deployment,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
     )?;
 
     check_input_tokens_refunded(
         init_balances,
         output_sheet,
         BTreeSet::from_iter([
-            DEPLOYMENT_IDS.owned_token_1_deployment.into(),
-            DEPLOYMENT_IDS.owned_token_2_deployment.into(),
+            deployment_ids.owned_token_1_deployment.into(),
+            deployment_ids.owned_token_2_deployment.into(),
         ]),
     )?;
     Ok(())
@@ -137,7 +139,8 @@ fn test_amm_pool_swap_no_split() -> Result<()> {
 fn test_amm_pool_swap_deadline_fail() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -150,13 +153,14 @@ fn test_amm_pool_swap_deadline_fail() -> Result<()> {
     insert_swap_exact_tokens_for_tokens_deadline(
         amount_to_swap,
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
         ],
         0,
         &mut swap_block,
         input_outpoint,
         deadline,
+        &deployment_ids,
     );
     index_block(&swap_block, block_height)?;
 
@@ -174,7 +178,8 @@ fn test_amm_pool_swap_deadline_fail() -> Result<()> {
 fn test_amm_pool_swap_large() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -185,12 +190,13 @@ fn test_amm_pool_swap_large() -> Result<()> {
     insert_swap_exact_tokens_for_tokens(
         amount_to_swap,
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
         ],
         0,
         &mut swap_block,
         input_outpoint,
+        &deployment_ids,
     );
 
     index_block(&swap_block, block_height)?;
@@ -199,7 +205,7 @@ fn test_amm_pool_swap_large() -> Result<()> {
         vec![amount1, amount2],
         amount_to_swap,
         0,
-        DEPLOYMENT_IDS.owned_token_2_deployment,
+        deployment_ids.owned_token_2_deployment,
         &swap_block,
     )?;
 
@@ -207,8 +213,8 @@ fn test_amm_pool_swap_large() -> Result<()> {
         vec![amount1, amount2],
         &mut runtime_balances,
         amount_to_swap,
-        DEPLOYMENT_IDS.owned_token_1_deployment,
-        DEPLOYMENT_IDS.owned_token_2_deployment,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_2_deployment,
     )?;
     Ok(())
 }
@@ -217,7 +223,8 @@ fn test_amm_pool_swap_large() -> Result<()> {
 fn test_amm_pool_swap_w_factory_middle_path() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -228,13 +235,14 @@ fn test_amm_pool_swap_w_factory_middle_path() -> Result<()> {
     insert_swap_exact_tokens_for_tokens(
         amount_to_swap,
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
-            DEPLOYMENT_IDS.owned_token_3_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
+            deployment_ids.owned_token_3_deployment,
         ],
         0,
         &mut swap_block,
         input_outpoint,
+        &deployment_ids,
     );
     index_block(&swap_block, block_height)?;
 
@@ -242,7 +250,7 @@ fn test_amm_pool_swap_w_factory_middle_path() -> Result<()> {
         vec![amount1, amount2, amount2],
         amount_to_swap,
         0,
-        DEPLOYMENT_IDS.owned_token_3_deployment,
+        deployment_ids.owned_token_3_deployment,
         &swap_block,
     )?;
 
@@ -250,8 +258,8 @@ fn test_amm_pool_swap_w_factory_middle_path() -> Result<()> {
         vec![amount1, amount2, amount2],
         &mut runtime_balances,
         amount_to_swap,
-        DEPLOYMENT_IDS.owned_token_1_deployment,
-        DEPLOYMENT_IDS.owned_token_3_deployment,
+        deployment_ids.owned_token_1_deployment,
+        deployment_ids.owned_token_3_deployment,
     )?;
     Ok(())
 }
@@ -261,7 +269,7 @@ fn test_amm_pool_swap_w_factory_middle_path() -> Result<()> {
 fn test_amm_pool_swap_zero_output() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -271,13 +279,13 @@ fn test_amm_pool_swap_zero_output() -> Result<()> {
 
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
-            id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            id: deployment_ids.owned_token_1_deployment.into(),
             amount: 10000,
             output: 0,
         }],
         &mut swap_block,
         input_outpoint,
-        DEPLOYMENT_IDS.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment,
         0,
         0,
         AlkaneId::new(0, 0),
@@ -305,7 +313,7 @@ fn test_amm_pool_swap_zero_output() -> Result<()> {
 fn test_amm_pool_swap_insufficient_liquidity() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -315,13 +323,13 @@ fn test_amm_pool_swap_insufficient_liquidity() -> Result<()> {
 
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
-            id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            id: deployment_ids.owned_token_1_deployment.into(),
             amount: 10000,
             output: 0,
         }],
         &mut swap_block,
         input_outpoint,
-        DEPLOYMENT_IDS.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment,
         0,
         amount2 + 1,
         AlkaneId::new(0, 0),
@@ -346,7 +354,7 @@ fn test_amm_pool_swap_insufficient_liquidity() -> Result<()> {
 fn test_amm_pool_swap_insufficient_input() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -356,13 +364,13 @@ fn test_amm_pool_swap_insufficient_input() -> Result<()> {
 
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
-            id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            id: deployment_ids.owned_token_1_deployment.into(),
             amount: 1, // Very small amount that won't satisfy the K equation
             output: 0,
         }],
         &mut swap_block,
         input_outpoint,
-        DEPLOYMENT_IDS.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment,
         0,
         10000,
         AlkaneId::new(0, 0),
@@ -387,7 +395,7 @@ fn test_amm_pool_swap_insufficient_input() -> Result<()> {
 fn test_amm_pool_swap_insufficient_input_2() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -397,13 +405,13 @@ fn test_amm_pool_swap_insufficient_input_2() -> Result<()> {
 
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
-            id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            id: deployment_ids.owned_token_1_deployment.into(),
             amount: 500000 * 10000 / (500000 - 10000), // satisfies the K equation without fees
             output: 0,
         }],
         &mut swap_block,
         input_outpoint,
-        DEPLOYMENT_IDS.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment,
         0,
         10000,
         AlkaneId::new(0, 0),
@@ -427,7 +435,7 @@ fn test_amm_pool_swap_insufficient_input_2() -> Result<()> {
 fn test_amm_pool_swap_insufficient_input_3() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -437,13 +445,13 @@ fn test_amm_pool_swap_insufficient_input_3() -> Result<()> {
 
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
-            id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            id: deployment_ids.owned_token_1_deployment.into(),
             amount: (1000 + DEFAULT_FEE_AMOUNT_PER_1000) * 500000 * 10000 / (500000 - 10000) / 1000, // barely doesn't satisfy the K equation with fees
             output: 0,
         }],
         &mut swap_block,
         input_outpoint,
-        DEPLOYMENT_IDS.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment,
         0,
         10000,
         AlkaneId::new(0, 0),
@@ -466,7 +474,7 @@ fn test_amm_pool_swap_insufficient_input_3() -> Result<()> {
 fn test_amm_pool_swap_sufficient_input() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -476,14 +484,14 @@ fn test_amm_pool_swap_sufficient_input() -> Result<()> {
 
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
-            id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            id: deployment_ids.owned_token_1_deployment.into(),
             amount: (1000 + DEFAULT_FEE_AMOUNT_PER_1000) * 500000 * 10000 / (500000 - 10000) / 1000
                 + 1,
             output: 0,
         }],
         &mut swap_block,
         input_outpoint,
-        DEPLOYMENT_IDS.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment,
         0,
         10000,
         AlkaneId::new(0, 0),
@@ -494,7 +502,7 @@ fn test_amm_pool_swap_sufficient_input() -> Result<()> {
 
     let sheet = get_last_outpoint_sheet(&swap_block)?;
     assert_eq!(
-        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_2_deployment.into()),
+        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
         10000
     );
     Ok(())
@@ -504,7 +512,7 @@ fn test_amm_pool_swap_sufficient_input() -> Result<()> {
 fn test_amm_pool_swap_zero_to() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -514,14 +522,14 @@ fn test_amm_pool_swap_zero_to() -> Result<()> {
 
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
-            id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            id: deployment_ids.owned_token_1_deployment.into(),
             amount: (1000 + DEFAULT_FEE_AMOUNT_PER_1000) * 500000 * 10000 / (500000 - 10000) / 1000
                 + 1,
             output: 0,
         }],
         &mut swap_block,
         input_outpoint,
-        DEPLOYMENT_IDS.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment,
         0,
         10000,
         AlkaneId::new(0, 0),
@@ -532,7 +540,7 @@ fn test_amm_pool_swap_zero_to() -> Result<()> {
 
     let sheet = get_last_outpoint_sheet(&swap_block)?;
     assert_eq!(
-        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_2_deployment.into()),
+        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
         10000
     );
     Ok(())
@@ -542,7 +550,7 @@ fn test_amm_pool_swap_zero_to() -> Result<()> {
 fn test_amm_pool_swap_with_data() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -552,16 +560,16 @@ fn test_amm_pool_swap_with_data() -> Result<()> {
 
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
-            id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            id: deployment_ids.owned_token_1_deployment.into(),
             amount: 1,
             output: 0,
         }],
         &mut swap_block,
         input_outpoint,
-        DEPLOYMENT_IDS.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment,
         0,
         10000,
-        DEPLOYMENT_IDS.example_flashswap,
+        deployment_ids.example_flashswap,
         vec![0],
     );
 
@@ -583,7 +591,7 @@ fn test_amm_pool_swap_with_data() -> Result<()> {
 fn test_amm_pool_swap_with_data_2() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -593,16 +601,16 @@ fn test_amm_pool_swap_with_data_2() -> Result<()> {
 
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
-            id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            id: deployment_ids.owned_token_1_deployment.into(),
             amount: 1,
             output: 0,
         }],
         &mut swap_block,
         input_outpoint,
-        DEPLOYMENT_IDS.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment,
         0,
         10000,
-        DEPLOYMENT_IDS.example_flashswap,
+        deployment_ids.example_flashswap,
         vec![1],
     );
 
@@ -624,7 +632,7 @@ fn test_amm_pool_swap_with_data_2() -> Result<()> {
 fn test_amm_pool_swap_with_data_3() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -641,16 +649,16 @@ fn test_amm_pool_swap_with_data_3() -> Result<()> {
 
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
-            id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            id: deployment_ids.owned_token_1_deployment.into(),
             amount: amount_fee_cover,
             output: 0,
         }],
         &mut swap_block,
         input_outpoint,
-        DEPLOYMENT_IDS.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment,
         0,
         swap_out,
-        DEPLOYMENT_IDS.example_flashswap,
+        deployment_ids.example_flashswap,
         vec![1],
     );
 
@@ -671,7 +679,7 @@ fn test_amm_pool_swap_with_data_3() -> Result<()> {
 fn test_amm_pool_swap_with_data_4() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -689,16 +697,16 @@ fn test_amm_pool_swap_with_data_4() -> Result<()> {
 
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
-            id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            id: deployment_ids.owned_token_1_deployment.into(),
             amount: amount_fee_cover,
             output: 0,
         }],
         &mut swap_block,
         input_outpoint,
-        DEPLOYMENT_IDS.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment,
         0,
         swap_out,
-        DEPLOYMENT_IDS.example_flashswap,
+        deployment_ids.example_flashswap,
         vec![1],
     );
 
@@ -713,7 +721,7 @@ fn test_amm_pool_swap_with_data_4() -> Result<()> {
 fn test_amm_pool_swap_with_reentrancy_add_liquidity() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -731,17 +739,17 @@ fn test_amm_pool_swap_with_reentrancy_add_liquidity() -> Result<()> {
 
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
-            id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            id: deployment_ids.owned_token_1_deployment.into(),
             amount: amount_fee_cover,
             output: 0,
         }],
         &mut swap_block,
         input_outpoint,
-        DEPLOYMENT_IDS.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment,
         0,
         swap_out,
-        DEPLOYMENT_IDS.example_flashswap,
-        vec![2, DEPLOYMENT_IDS.amm_pool_1_deployment.tx, 1], // add liquidity
+        deployment_ids.example_flashswap,
+        vec![2, deployment_ids.amm_pool_1_deployment.tx, 1], // add liquidity
     );
 
     index_block(&swap_block, block_height)?;
@@ -760,7 +768,7 @@ fn test_amm_pool_swap_with_reentrancy_add_liquidity() -> Result<()> {
 fn test_amm_pool_swap_with_reentrancy_burn() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -778,17 +786,17 @@ fn test_amm_pool_swap_with_reentrancy_burn() -> Result<()> {
 
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
-            id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            id: deployment_ids.owned_token_1_deployment.into(),
             amount: amount_fee_cover,
             output: 0,
         }],
         &mut swap_block,
         input_outpoint,
-        DEPLOYMENT_IDS.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment,
         0,
         swap_out,
-        DEPLOYMENT_IDS.example_flashswap,
-        vec![2, DEPLOYMENT_IDS.amm_pool_1_deployment.tx, 2], // burn
+        deployment_ids.example_flashswap,
+        vec![2, deployment_ids.amm_pool_1_deployment.tx, 2], // burn
     );
 
     index_block(&swap_block, block_height)?;
@@ -807,7 +815,7 @@ fn test_amm_pool_swap_with_reentrancy_burn() -> Result<()> {
 fn test_amm_pool_swap_with_reentrancy_swap() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, _) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -824,17 +832,17 @@ fn test_amm_pool_swap_with_reentrancy_swap() -> Result<()> {
     println!("amount needed to cover fee: {}", amount_fee_cover);
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
-            id: DEPLOYMENT_IDS.owned_token_1_deployment.into(),
+            id: deployment_ids.owned_token_1_deployment.into(),
             amount: amount_fee_cover,
             output: 0,
         }],
         &mut swap_block,
         input_outpoint,
-        DEPLOYMENT_IDS.amm_pool_1_deployment,
+        deployment_ids.amm_pool_1_deployment,
         0,
         swap_out,
-        DEPLOYMENT_IDS.example_flashswap,
-        vec![2, DEPLOYMENT_IDS.amm_pool_1_deployment.tx, 3, 0, 0, 0, 0, 0], // swap
+        deployment_ids.example_flashswap,
+        vec![2, deployment_ids.amm_pool_1_deployment.tx, 3, 0, 0, 0, 0, 0], // swap
     );
 
     index_block(&swap_block, block_height)?;
@@ -853,7 +861,8 @@ fn test_amm_pool_swap_with_reentrancy_swap() -> Result<()> {
 fn test_amm_pool_swap_tokens_for_exact_no_split() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let init_balances = get_last_outpoint_sheet(&init_block)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
@@ -863,33 +872,34 @@ fn test_amm_pool_swap_tokens_for_exact_no_split() -> Result<()> {
     };
     insert_swap_tokens_for_exact_tokens_txs_no_split(
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
         ],
         5000,
         10000,
         &mut swap_block,
         input_outpoint,
+        &deployment_ids,
     );
     index_block(&swap_block, block_height)?;
 
     let sheet = get_last_outpoint_sheet(&swap_block)?;
     assert_eq!(
-        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_2_deployment.into())
-            - init_balances.get_cached(&DEPLOYMENT_IDS.owned_token_2_deployment.into()),
+        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into())
+            - init_balances.get_cached(&deployment_ids.owned_token_2_deployment.into()),
         5000
     );
     assert_eq!(
-        init_balances.get_cached(&DEPLOYMENT_IDS.owned_token_1_deployment.into())
-            - sheet.get_cached(&DEPLOYMENT_IDS.owned_token_1_deployment.into()),
+        init_balances.get_cached(&deployment_ids.owned_token_1_deployment.into())
+            - sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
         5076
     );
     check_input_tokens_refunded(
         init_balances,
         sheet,
         BTreeSet::from_iter([
-            DEPLOYMENT_IDS.owned_token_1_deployment.into(),
-            DEPLOYMENT_IDS.owned_token_2_deployment.into(),
+            deployment_ids.owned_token_1_deployment.into(),
+            deployment_ids.owned_token_2_deployment.into(),
         ]),
     )?;
     Ok(())
@@ -899,7 +909,8 @@ fn test_amm_pool_swap_tokens_for_exact_no_split() -> Result<()> {
 fn test_amm_pool_swap_tokens_for_exact_1() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -910,23 +921,24 @@ fn test_amm_pool_swap_tokens_for_exact_1() -> Result<()> {
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
         ],
         5000,
         10000,
         &mut swap_block,
         input_outpoint,
+        &deployment_ids,
     );
     index_block(&swap_block, block_height)?;
 
     let sheet = get_last_outpoint_sheet(&swap_block)?;
     assert_eq!(
-        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_2_deployment.into()),
+        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
         5000
     );
     assert_eq!(
-        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_1_deployment.into()),
+        sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
         4924
     );
     Ok(())
@@ -936,7 +948,8 @@ fn test_amm_pool_swap_tokens_for_exact_1() -> Result<()> {
 fn test_amm_pool_swap_tokens_for_exact_2() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -947,23 +960,24 @@ fn test_amm_pool_swap_tokens_for_exact_2() -> Result<()> {
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
         ],
         5000,
         5076,
         &mut swap_block,
         input_outpoint,
+        &deployment_ids,
     );
     index_block(&swap_block, block_height)?;
 
     let sheet = get_last_outpoint_sheet(&swap_block)?;
     assert_eq!(
-        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_2_deployment.into()),
+        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
         5000
     );
     assert_eq!(
-        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_1_deployment.into()),
+        sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
         4924
     );
     Ok(())
@@ -973,7 +987,8 @@ fn test_amm_pool_swap_tokens_for_exact_2() -> Result<()> {
 fn test_amm_pool_swap_tokens_for_exact_3() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -984,13 +999,14 @@ fn test_amm_pool_swap_tokens_for_exact_3() -> Result<()> {
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
         ],
         5000,
         5075,
         &mut swap_block,
         input_outpoint,
+        &deployment_ids,
     );
     index_block(&swap_block, block_height)?;
 
@@ -1009,7 +1025,8 @@ fn test_amm_pool_swap_tokens_for_exact_3() -> Result<()> {
 fn test_amm_pool_swap_tokens_for_exact_4() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -1020,23 +1037,24 @@ fn test_amm_pool_swap_tokens_for_exact_4() -> Result<()> {
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
         ],
         5000,
         10001,
         &mut swap_block,
         input_outpoint,
+        &deployment_ids,
     );
     index_block(&swap_block, block_height)?;
 
     let sheet = get_last_outpoint_sheet(&swap_block)?;
     assert_eq!(
-        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_2_deployment.into()),
+        sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
         5000
     );
     assert_eq!(
-        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_1_deployment.into()),
+        sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
         4924
     );
 
@@ -1047,7 +1065,8 @@ fn test_amm_pool_swap_tokens_for_exact_4() -> Result<()> {
 fn test_amm_pool_swap_tokens_for_exact_5() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -1058,13 +1077,14 @@ fn test_amm_pool_swap_tokens_for_exact_5() -> Result<()> {
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
         ],
         10000,
         10256,
         &mut swap_block,
         input_outpoint,
+        &deployment_ids,
     );
     index_block(&swap_block, block_height)?;
 
@@ -1076,7 +1096,14 @@ fn test_amm_pool_swap_tokens_for_exact_5() -> Result<()> {
 
     assert_revert_context(
         &outpoint,
-        "Extcall failed: balance underflow, transferring(AlkaneTransfer { id: AlkaneId { block: 2, tx: 3 }, value: 10256 }), from(AlkaneId { block: 2, tx: 1 }), balance(10000)",
+        &format!(
+            "Extcall failed: balance underflow, transferring({:?}), from({:?}), balance(10000)",
+            AlkaneTransfer {
+                id: deployment_ids.owned_token_1_deployment,
+                value: 10256
+            },
+            deployment_ids.amm_factory_proxy,
+        ),
     )?;
 
     Ok(())
@@ -1086,7 +1113,8 @@ fn test_amm_pool_swap_tokens_for_exact_5() -> Result<()> {
 fn test_amm_pool_swap_tokens_for_exact_middle() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
-    let (init_block, mut runtime_balances) = test_amm_pool_init_fixture(amount1, amount2)?;
+    let (init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
     let block_height = 840_001;
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
@@ -1097,24 +1125,25 @@ fn test_amm_pool_swap_tokens_for_exact_middle() -> Result<()> {
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
-            DEPLOYMENT_IDS.owned_token_3_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
+            deployment_ids.owned_token_3_deployment,
         ],
         5000,
         7000,
         &mut swap_block,
         input_outpoint,
+        &deployment_ids,
     );
     index_block(&swap_block, block_height)?;
 
     let sheet = get_last_outpoint_sheet(&swap_block)?;
     assert_eq!(
-        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_3_deployment.into()),
+        sheet.get_cached(&deployment_ids.owned_token_3_deployment.into()),
         5000
     );
     assert_eq!(
-        sheet.get_cached(&DEPLOYMENT_IDS.owned_token_1_deployment.into()),
+        sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
         4846
     );
     Ok(())
@@ -1124,7 +1153,7 @@ fn test_amm_pool_swap_tokens_for_exact_middle() -> Result<()> {
 fn test_amm_price_swap() -> Result<()> {
     clear();
     // Initialize a pool
-    let (init_block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     // Create a new block for testing the pool details
     let block_height = 840_001;
@@ -1139,12 +1168,13 @@ fn test_amm_price_swap() -> Result<()> {
     insert_swap_exact_tokens_for_tokens(
         amount_to_swap,
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
         ],
         0,
         &mut swap_block,
         input_outpoint,
+        &deployment_ids,
     );
     index_block(&swap_block, block_height)?;
 
@@ -1155,7 +1185,7 @@ fn test_amm_price_swap() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_pool_1_deployment,
+                target: deployment_ids.amm_pool_1_deployment,
                 inputs: vec![98],
             }],
             OutPoint {
@@ -1207,7 +1237,7 @@ fn test_amm_price_swap() -> Result<()> {
 fn test_amm_price_swap_2() -> Result<()> {
     clear();
     // Initialize a pool
-    let (init_block, _) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let (init_block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
 
     // Create a new block for testing the pool details
     let block_height = 840_001;
@@ -1222,12 +1252,13 @@ fn test_amm_price_swap_2() -> Result<()> {
     insert_swap_exact_tokens_for_tokens(
         amount_to_swap,
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
         ],
         0,
         &mut swap_block,
         input_outpoint,
+        &deployment_ids,
     );
     index_block(&swap_block, block_height)?;
 
@@ -1242,12 +1273,13 @@ fn test_amm_price_swap_2() -> Result<()> {
     insert_swap_exact_tokens_for_tokens(
         amount_to_swap,
         vec![
-            DEPLOYMENT_IDS.owned_token_1_deployment,
-            DEPLOYMENT_IDS.owned_token_2_deployment,
+            deployment_ids.owned_token_1_deployment,
+            deployment_ids.owned_token_2_deployment,
         ],
         0,
         &mut swap_block2,
         input_outpoint,
+        &deployment_ids,
     );
     index_block(&swap_block2, block_height + 1)?;
 
@@ -1258,7 +1290,7 @@ fn test_amm_price_swap_2() -> Result<()> {
         alkane_helpers::create_multiple_cellpack_with_witness_and_in(
             Witness::new(),
             vec![Cellpack {
-                target: DEPLOYMENT_IDS.amm_pool_1_deployment,
+                target: deployment_ids.amm_pool_1_deployment,
                 inputs: vec![98],
             }],
             OutPoint {

@@ -15,10 +15,9 @@ use protorune_support::protostone::ProtostoneEdict;
 use ruint::Uint;
 use std::fmt::Write;
 
-use crate::tests::helper::common::DEPLOYMENT_IDS;
-
 use super::common::{
-    create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers, CellpackOrEdict,
+    create_multiple_cellpack_with_witness_and_in_with_edicts_and_leftovers, AmmTestDeploymentIds,
+    CellpackOrEdict,
 };
 
 fn _insert_swap_txs(
@@ -85,12 +84,13 @@ pub fn _prepare_swap_tokens_for_exact_tokens_cellpack(
     amount_out: u128,
     amount_in_max: u128,
     test_block: &mut Block,
+    deployment_ids: &AmmTestDeploymentIds,
 ) -> Cellpack {
     if swap_path.len() < 2 {
         panic!("Swap path must be at least two alkanes long");
     }
     let mut cellpack = Cellpack {
-        target: DEPLOYMENT_IDS.amm_factory_deployment,
+        target: deployment_ids.amm_factory_proxy,
         inputs: vec![14, swap_path.len() as u128],
     };
     cellpack
@@ -109,12 +109,14 @@ pub fn insert_swap_tokens_for_exact_tokens_txs(
     amount_in_max: u128,
     test_block: &mut Block,
     input_outpoint: OutPoint,
+    deployment_ids: &AmmTestDeploymentIds,
 ) {
     let cellpack = _prepare_swap_tokens_for_exact_tokens_cellpack(
         swap_path.clone(),
         amount_out,
         amount_in_max,
         test_block,
+        deployment_ids,
     );
 
     _insert_swap_txs(
@@ -135,12 +137,14 @@ pub fn insert_swap_tokens_for_exact_tokens_txs_no_split(
     amount_in_max: u128,
     test_block: &mut Block,
     input_outpoint: OutPoint,
+    deployment_ids: &AmmTestDeploymentIds,
 ) {
     let cellpack = _prepare_swap_tokens_for_exact_tokens_cellpack(
         swap_path,
         amount_out,
         amount_in_max,
         test_block,
+        deployment_ids,
     );
 
     _insert_swap_txs_no_split(test_block, input_outpoint, cellpack)
@@ -151,12 +155,13 @@ fn _prepare_swap_exact_tokens_for_tokens_cellpack(
     swap_path: Vec<AlkaneId>,
     min_out: u128,
     deadline: u128,
+    deployment_ids: &AmmTestDeploymentIds,
 ) -> Cellpack {
     if swap_path.len() < 2 {
         panic!("Swap path must be at least two alkanes long");
     }
     let mut cellpack = Cellpack {
-        target: DEPLOYMENT_IDS.amm_factory_deployment,
+        target: deployment_ids.amm_factory_proxy,
         inputs: vec![13, amount, swap_path.len() as u128],
     };
     cellpack
@@ -174,12 +179,14 @@ pub fn insert_swap_exact_tokens_for_tokens_deadline(
     test_block: &mut Block,
     input_outpoint: OutPoint,
     deadline: u128,
+    deployment_ids: &AmmTestDeploymentIds,
 ) {
     let cellpack = _prepare_swap_exact_tokens_for_tokens_cellpack(
         amount,
         swap_path.clone(),
         min_out,
         deadline,
+        deployment_ids,
     );
 
     _insert_swap_txs(
@@ -200,12 +207,14 @@ pub fn insert_swap_exact_tokens_for_tokens_no_split(
     min_out: u128,
     test_block: &mut Block,
     input_outpoint: OutPoint,
+    deployment_ids: &AmmTestDeploymentIds,
 ) {
     let cellpack = _prepare_swap_exact_tokens_for_tokens_cellpack(
         amount,
         swap_path.clone(),
         min_out,
         u128::MAX,
+        deployment_ids,
     );
 
     _insert_swap_txs_no_split(test_block, input_outpoint, cellpack)
@@ -217,6 +226,7 @@ pub fn insert_swap_exact_tokens_for_tokens(
     min_out: u128,
     test_block: &mut Block,
     input_outpoint: OutPoint,
+    deployment_ids: &AmmTestDeploymentIds,
 ) {
     insert_swap_exact_tokens_for_tokens_deadline(
         amount,
@@ -225,6 +235,7 @@ pub fn insert_swap_exact_tokens_for_tokens(
         test_block,
         input_outpoint,
         test_block.header.time as u128,
+        deployment_ids,
     )
 }
 

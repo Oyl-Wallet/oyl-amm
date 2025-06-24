@@ -21,44 +21,85 @@ use std::collections::BTreeSet;
 use std::str::FromStr;
 
 pub struct AmmTestDeploymentIds {
-    pub amm_pool_factory: AlkaneId,
+    pub amm_pool_logic_impl: AlkaneId,
     pub auth_token_factory: AlkaneId,
-    pub amm_factory_deployment: AlkaneId,
-    pub amm_factory_auth_token: AlkaneId,
+    pub amm_factory_logic_impl: AlkaneId,
+    pub amm_factory_proxy: AlkaneId,
+    pub pool_beacon_proxy: AlkaneId,
+    pub pool_upgradeable_beacon: AlkaneId,
     pub owned_token_1_deployment: AlkaneId,
-    pub auth_token_1_deployment: AlkaneId,
     pub owned_token_2_deployment: AlkaneId,
-    pub auth_token_2_deployment: AlkaneId,
     pub owned_token_3_deployment: AlkaneId,
-    pub auth_token_3_deployment: AlkaneId,
     pub oyl_token_deployment: AlkaneId,
+    pub example_flashswap: AlkaneId,
+    // below are modified once init
+    pub amm_factory_auth_token: AlkaneId,
     pub amm_pool_1_deployment: AlkaneId,
     pub amm_pool_2_deployment: AlkaneId,
-    pub example_flashswap: AlkaneId,
 }
 
-pub const DEPLOYMENT_IDS: AmmTestDeploymentIds = AmmTestDeploymentIds {
-    amm_pool_factory: AlkaneId {
-        block: 4,
-        tx: AMM_FACTORY_ID,
-    },
-    auth_token_factory: AlkaneId {
-        block: 4,
-        tx: AUTH_TOKEN_FACTORY_ID,
-    },
-    amm_factory_deployment: AlkaneId { block: 2, tx: 1 },
-    amm_factory_auth_token: AlkaneId { block: 2, tx: 2 },
-    owned_token_1_deployment: AlkaneId { block: 2, tx: 3 },
-    auth_token_1_deployment: AlkaneId { block: 2, tx: 4 },
-    owned_token_2_deployment: AlkaneId { block: 2, tx: 5 },
-    auth_token_2_deployment: AlkaneId { block: 2, tx: 6 },
-    owned_token_3_deployment: AlkaneId { block: 2, tx: 7 },
-    auth_token_3_deployment: AlkaneId { block: 2, tx: 8 },
-    oyl_token_deployment: AlkaneId { block: 2, tx: 9 },
-    example_flashswap: AlkaneId { block: 2, tx: 10 },
-    amm_pool_1_deployment: AlkaneId { block: 2, tx: 11 },
-    amm_pool_2_deployment: AlkaneId { block: 2, tx: 12 },
-};
+// Deployment tx constants
+pub const AMM_FACTORY_PROXY_TX: u128 = 1;
+pub const AMM_FACTORY_LOGIC_IMPL_TX: u128 = 2;
+pub const POOL_BEACON_PROXY_TX: u128 = 0xbeac1;
+pub const POOL_UPGRADEABLE_BEACON_TX: u128 = 0xbeac0;
+pub const OWNED_TOKEN_1_DEPLOYMENT_TX: u128 = 3;
+pub const OWNED_TOKEN_2_DEPLOYMENT_TX: u128 = 5;
+pub const OWNED_TOKEN_3_DEPLOYMENT_TX: u128 = 7;
+pub const OYL_TOKEN_DEPLOYMENT_TX: u128 = 9;
+pub const EXAMPLE_FLASHSWAP_TX: u128 = 10;
+
+pub fn create_deployment_ids() -> AmmTestDeploymentIds {
+    AmmTestDeploymentIds {
+        amm_pool_logic_impl: AlkaneId {
+            block: 4,
+            tx: AMM_FACTORY_ID,
+        },
+        auth_token_factory: AlkaneId {
+            block: 4,
+            tx: AUTH_TOKEN_FACTORY_ID,
+        },
+        amm_factory_proxy: AlkaneId {
+            block: 4,
+            tx: AMM_FACTORY_PROXY_TX,
+        }, // proxy auth token gets deployed to 2,1
+        amm_factory_logic_impl: AlkaneId {
+            block: 4,
+            tx: AMM_FACTORY_LOGIC_IMPL_TX,
+        },
+        pool_beacon_proxy: AlkaneId {
+            block: 4,
+            tx: POOL_BEACON_PROXY_TX,
+        },
+        pool_upgradeable_beacon: AlkaneId {
+            block: 4,
+            tx: POOL_UPGRADEABLE_BEACON_TX,
+        },
+        amm_factory_auth_token: AlkaneId { block: 0, tx: 0 },
+        owned_token_1_deployment: AlkaneId {
+            block: 4,
+            tx: OWNED_TOKEN_1_DEPLOYMENT_TX,
+        },
+        owned_token_2_deployment: AlkaneId {
+            block: 4,
+            tx: OWNED_TOKEN_2_DEPLOYMENT_TX,
+        },
+        owned_token_3_deployment: AlkaneId {
+            block: 4,
+            tx: OWNED_TOKEN_3_DEPLOYMENT_TX,
+        },
+        oyl_token_deployment: AlkaneId {
+            block: 4,
+            tx: OYL_TOKEN_DEPLOYMENT_TX,
+        },
+        example_flashswap: AlkaneId {
+            block: 4,
+            tx: EXAMPLE_FLASHSWAP_TX,
+        },
+        amm_pool_1_deployment: AlkaneId { block: 0, tx: 0 },
+        amm_pool_2_deployment: AlkaneId { block: 0, tx: 0 },
+    }
+}
 
 pub enum CellpackOrEdict {
     Cellpack(Cellpack),
