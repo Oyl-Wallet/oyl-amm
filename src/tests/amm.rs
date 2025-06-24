@@ -16,6 +16,8 @@ use protorune_support::protostone::ProtostoneEdict;
 use remove_liquidity::test_amm_burn_fixture;
 
 use crate::tests::helper::add_liquidity::insert_add_liquidity_checked_txs;
+use crate::tests::helper::common::create_deployment_ids;
+use crate::tests::helper::init_pools::{init_factories, init_factory_proxy};
 use crate::tests::helper::*;
 use alkane_helpers::clear;
 use alkanes::indexer::index_block;
@@ -263,9 +265,16 @@ fn test_amm_pool_zero_init() -> Result<()> {
 fn test_amm_pool_bad_init() -> Result<()> {
     clear();
     let block_height = 840_000;
-    let (mut test_block, _, deployment_ids) = test_amm_pool_init_fixture(1000000, 1000000)?;
+    let mut deployment_ids = create_deployment_ids();
+    let (test_block) = init_factories(&deployment_ids)?;
     let previous_outpoint = OutPoint {
         txid: test_block.txdata.last().unwrap().compute_txid(),
+        vout: 0,
+    };
+    let init_factory_proxy = init_factory_proxy(previous_outpoint, &mut deployment_ids)?;
+
+    let previous_outpoint = OutPoint {
+        txid: init_factory_proxy.txdata.last().unwrap().compute_txid(),
         vout: 0,
     };
     let (pool_block, _) = init_pool_liquidity_txs(
@@ -276,17 +285,16 @@ fn test_amm_pool_bad_init() -> Result<()> {
         previous_outpoint,
         &deployment_ids,
     )?;
-    test_block = pool_block;
-    index_block(&test_block, block_height)?;
+    index_block(&pool_block, block_height)?;
     assert_token_id_has_no_deployment(deployment_ids.amm_pool_1_deployment)?;
-    let sheet = get_last_outpoint_sheet(&test_block)?;
+    let sheet = get_last_outpoint_sheet(&pool_block)?;
     assert_eq!(
         sheet.get_cached(&deployment_ids.amm_pool_1_deployment.into()),
         0
     );
 
     let outpoint = OutPoint {
-        txid: test_block.txdata[test_block.txdata.len() - 1].compute_txid(),
+        txid: pool_block.txdata[pool_block.txdata.len() - 1].compute_txid(),
         vout: 3,
     };
 
