@@ -6,6 +6,7 @@ use alkanes::view;
 use alkanes_runtime_pool::PRECISION;
 use alkanes_support::cellpack::Cellpack;
 use alkanes_support::id::AlkaneId;
+use alkanes_support::parcel::AlkaneTransfer;
 use alkanes_support::trace::{Trace, TraceEvent};
 use anyhow::Result;
 use bitcoin::blockdata::transaction::OutPoint;
@@ -1095,7 +1096,14 @@ fn test_amm_pool_swap_tokens_for_exact_5() -> Result<()> {
 
     assert_revert_context(
         &outpoint,
-        "Extcall failed: balance underflow, transferring(AlkaneTransfer { id: AlkaneId { block: 2, tx: 3 }, value: 10256 }), from(AlkaneId { block: 4, tx: 1 }), balance(10000)",
+        &format!(
+            "Extcall failed: balance underflow, transferring({:?}), from({:?}), balance(10000)",
+            AlkaneTransfer {
+                id: deployment_ids.owned_token_1_deployment,
+                value: 10256
+            },
+            deployment_ids.amm_factory_proxy,
+        ),
     )?;
 
     Ok(())

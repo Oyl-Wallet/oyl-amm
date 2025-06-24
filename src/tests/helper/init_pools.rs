@@ -360,10 +360,7 @@ pub fn check_and_get_init_liquidity_runtime_balance(
     Ok(initial_runtime_balances)
 }
 
-pub fn test_amm_pool_init_fixture(
-    amount1: u128,
-    amount2: u128,
-) -> Result<(Block, BalanceSheet<IndexPointer>, AmmTestDeploymentIds)> {
+pub fn amm_pool_init_setup() -> Result<(Block, AmmTestDeploymentIds)> {
     let mut deployment_ids = create_deployment_ids();
 
     let test_block = init_factories(&deployment_ids)?;
@@ -373,6 +370,14 @@ pub fn test_amm_pool_init_fixture(
         vout: 0,
     };
     let init_factory_proxy = init_factory_proxy(previous_outpoint, &mut deployment_ids)?;
+    Ok((init_factory_proxy, deployment_ids))
+}
+
+pub fn test_amm_pool_init_fixture(
+    amount1: u128,
+    amount2: u128,
+) -> Result<(Block, BalanceSheet<IndexPointer>, AmmTestDeploymentIds)> {
+    let (init_factory_proxy, mut deployment_ids) = amm_pool_init_setup()?;
 
     println!("Init amm factory proxy complete");
 

@@ -96,9 +96,9 @@ pub fn insert_add_liquidity_checked_txs(
                 target: deployment_ids.amm_factory_proxy,
                 inputs: vec![
                     11,
-                    2,
+                    token1_address.block,
                     token1_address.tx,
-                    2,
+                    token2_address.block,
                     token2_address.tx,
                     amount_a_desired,
                     amount_b_desired,

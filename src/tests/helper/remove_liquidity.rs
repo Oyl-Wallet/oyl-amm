@@ -68,9 +68,9 @@ pub fn insert_remove_liquidity_checked_txs(
                 target: deployment_ids.amm_factory_proxy,
                 inputs: vec![
                     12,
-                    2,
+                    token1_address.block,
                     token1_address.tx,
-                    2,
+                    token2_address.block,
                     token2_address.tx,
                     liquidity,
                     amount_a_min,
