@@ -285,7 +285,6 @@ fn test_amm_pool_bad_init() -> Result<()> {
         previous_outpoint,
         &deployment_ids,
     )?;
-    index_block(&pool_block, block_height)?;
     assert_token_id_has_no_deployment(deployment_ids.amm_pool_1_deployment)?;
     let sheet = get_last_outpoint_sheet(&pool_block)?;
     assert_eq!(
