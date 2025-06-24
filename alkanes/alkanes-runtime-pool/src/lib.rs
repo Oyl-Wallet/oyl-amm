@@ -309,18 +309,21 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             );
             self._mint_fee(previous_a.value, previous_b.value)?;
             let total_supply = self.total_supply(); // must be defined here since totalSupply can update in _mintFee
-            let liquidity;
+            let liquidity: u128;
             if total_supply == 0 {
-                let root_k = checked_expr!(amount_a_in.checked_mul(amount_b_in))?.sqrt();
-                liquidity = checked_expr!(root_k.checked_sub(MINIMUM_LIQUIDITY))?;
+                let root_k = (U256::from(amount_a_in) * U256::from(amount_b_in)).sqrt();
+                liquidity = checked_expr!(
+                    <U256 as TryInto<u128>>::try_into(root_k)?.checked_sub(MINIMUM_LIQUIDITY)
+                )?;
                 self.set_total_supply(MINIMUM_LIQUIDITY);
             } else {
-                let liquidity_a = checked_expr!(amount_a_in.checked_mul(total_supply))?;
-                let liquidity_b = checked_expr!(amount_b_in.checked_mul(total_supply))?;
+                let liquidity_a = U256::from(amount_a_in) * U256::from(total_supply);
+                let liquidity_b = U256::from(amount_b_in) * U256::from(total_supply);
                 liquidity = min(
-                    liquidity_a / previous_a.value,
-                    liquidity_b / previous_b.value,
-                );
+                    liquidity_a / U256::from(previous_a.value),
+                    liquidity_b / U256::from(previous_b.value),
+                )
+                .try_into()?;
             }
             if liquidity == 0 {
                 return Err(anyhow!("INSUFFICIENT_LIQUIDITY_MINTED"));
@@ -349,8 +352,12 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             let (reserve_a, reserve_b) = self.reserves()?;
             let total_supply = self.total_supply();
             let mut response = CallResponse::default();
-            let amount_a = checked_expr!(liquidity.checked_mul(reserve_a.value))? / total_supply;
-            let amount_b = checked_expr!(liquidity.checked_mul(reserve_b.value))? / total_supply;
+            let amount_a: u128 = (U256::from(liquidity) * U256::from(reserve_a.value)
+                / U256::from(total_supply))
+            .try_into()?;
+            let amount_b: u128 = (U256::from(liquidity) * U256::from(reserve_b.value)
+                / U256::from(total_supply))
+            .try_into()?;
             if amount_a == 0 || amount_b == 0 {
                 return Err(anyhow!("INSUFFICIENT_LIQUIDITY_BURNED"));
             }
