@@ -162,11 +162,12 @@ fn _prepare_swap_exact_tokens_for_tokens_cellpack(
     }
     let mut cellpack = Cellpack {
         target: deployment_ids.amm_factory_proxy,
-        inputs: vec![13, amount, swap_path.len() as u128],
+        inputs: vec![13, swap_path.len() as u128],
     };
     cellpack
         .inputs
         .extend(swap_path.iter().flat_map(|s| vec![s.block, s.tx]));
+    cellpack.inputs.push(amount);
     cellpack.inputs.push(min_out);
     cellpack.inputs.push(deadline);
     cellpack

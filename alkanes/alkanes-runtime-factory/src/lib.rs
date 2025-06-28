@@ -540,8 +540,8 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
 
     fn swap_exact_tokens_for_tokens(
         &self,
-        amount_in: u128,
         path: Vec<AlkaneId>,
+        amount_in: u128,
         amount_out_min: u128,
         deadline: u128,
     ) -> Result<CallResponse> {
