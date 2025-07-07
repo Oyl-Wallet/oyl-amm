@@ -18,7 +18,6 @@ pub enum AMMFactoryMessage {
     InitFactory {
         pool_factory_id: u128,
         beacon_id: AlkaneId,
-        auth_token_units: u128,
     },
 
     #[opcode(1)]
