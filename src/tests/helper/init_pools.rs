@@ -70,22 +70,6 @@ pub fn init_factories(deployment_ids: &AmmTestDeploymentIds) -> Result<Block> {
                 inputs: vec![50],
             },
         },
-        // deploy the proxy and point to factory logic impl
-        BinaryAndCellpack {
-            binary: alkanes_std_upgradeable_build::get_bytes(),
-            cellpack: Cellpack {
-                target: AlkaneId {
-                    block: 3,
-                    tx: deployment_ids.amm_factory_proxy.tx,
-                },
-                inputs: vec![
-                    0x7fff,
-                    deployment_ids.amm_factory_logic_impl.block,
-                    deployment_ids.amm_factory_logic_impl.tx,
-                    1,
-                ],
-            },
-        },
         // token 1 init 1 auth token and mint 1000000 owned tokens. Also deploys owned token contract at {2,2}
         BinaryAndCellpack {
             binary: alkanes_std_owned_token_build::get_bytes(),
@@ -182,27 +166,40 @@ pub fn init_factory_proxy(
     deployment_ids: &mut AmmTestDeploymentIds,
 ) -> Result<Block> {
     let block_height = 840_000;
-    let mut test_block = create_block_with_coinbase_tx(block_height);
     let mut next_sequence_pointer = sequence_pointer(&mut AtomicPointer::default());
     let auth_sequence = next_sequence_pointer.get_value::<u128>();
 
-    test_block.txdata.push(
-        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
-            Witness::new(),
-            vec![Cellpack {
-                target: deployment_ids.amm_factory_proxy,
+    let cellpack_pairs: Vec<BinaryAndCellpack> = [
+        BinaryAndCellpack {
+            binary: alkanes_std_upgradeable_build::get_bytes(),
+            cellpack: Cellpack {
+                target: AlkaneId {
+                    block: 3,
+                    tx: deployment_ids.amm_factory_proxy.tx,
+                },
                 inputs: vec![
-                    0,
-                    POOL_BEACON_PROXY_TX,
-                    deployment_ids.pool_upgradeable_beacon.block,
-                    deployment_ids.pool_upgradeable_beacon.tx,
-                    10, // 10 auth tokens
+                    0x7fff,
+                    deployment_ids.amm_factory_logic_impl.block,
+                    deployment_ids.amm_factory_logic_impl.tx,
+                    1,
                 ],
-            }],
-            input_outpoint,
-            false,
-        ),
-    );
+            },
+        },
+        BinaryAndCellpack::cellpack_only(Cellpack {
+            target: deployment_ids.amm_factory_proxy,
+            inputs: vec![
+                0,
+                POOL_BEACON_PROXY_TX,
+                deployment_ids.pool_upgradeable_beacon.block,
+                deployment_ids.pool_upgradeable_beacon.tx,
+                10, // 10 auth tokens
+            ],
+        }),
+    ]
+    .into();
+
+    let test_block =
+        alkane_helpers::init_with_cellpack_pairs_w_input(cellpack_pairs, input_outpoint);
 
     index_block(&test_block, block_height)?;
 
