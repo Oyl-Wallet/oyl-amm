@@ -77,34 +77,13 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
             .position(|v| v.id == context.myself)?;
         Some(context.incoming_alkanes.0.remove(i))
     }
-    fn _only_owner(&self, v: Option<AlkaneTransfer>) -> Result<()> {
-        if let Some(auth) = v {
-            if auth.value < 1 {
-                Err(anyhow!(
-                    "must spend a balance of this alkane to the alkane to use as a proxy"
-                ))
-            } else {
-                Ok(())
-            }
-        } else {
-            Err(anyhow!(
-                "must spend a balance of this alkane to the alkane to use as a proxy"
-            ))
-        }
-    }
-    fn init_factory(
-        &self,
-        pool_factory_id: u128,
-        beacon_id: AlkaneId,
-        auth_token_units: u128,
-    ) -> Result<CallResponse> {
+    fn init_factory(&self, pool_factory_id: u128, beacon_id: AlkaneId) -> Result<CallResponse> {
         self.observe_initialization()?;
         let context = self.context()?;
         self.set_pool_id(pool_factory_id);
         self.set_beacon_id(beacon_id);
-        let auth_token = self.deploy_auth_token(auth_token_units)?;
-        let mut response = CallResponse::forward(&context.incoming_alkanes.clone());
-        response.alkanes.pay(auth_token);
+        // Note: do not deploy auth token again here since the proxy for the factory already deploys one
+        let response = CallResponse::forward(&context.incoming_alkanes.clone());
         Ok(response)
     }
     fn set_pool_factory_id(&self, pool_factory_id: u128) -> Result<CallResponse> {
