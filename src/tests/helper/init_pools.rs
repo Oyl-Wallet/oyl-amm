@@ -192,7 +192,6 @@ pub fn init_factory_proxy(
                 POOL_BEACON_PROXY_TX,
                 deployment_ids.pool_upgradeable_beacon.block,
                 deployment_ids.pool_upgradeable_beacon.tx,
-                10, // 10 auth tokens
             ],
         }),
     ]
