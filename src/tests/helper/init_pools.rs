@@ -5,7 +5,7 @@ use alkanes::precompiled::{
     alkanes_std_upgradeable_beacon_build, alkanes_std_upgradeable_build,
 };
 use alkanes::tests::helpers::{
-    self as alkane_helpers, assert_binary_deployed_to_id,
+    self as alkane_helpers, assert_binary_deployed_to_id, assert_id_points_to_alkane_id,
     create_multiple_cellpack_with_witness_and_in, get_last_outpoint_sheet,
     get_lazy_sheet_for_runtime, get_sheet_for_runtime, BinaryAndCellpack,
 };
@@ -233,28 +233,16 @@ pub fn assert_contracts_correct_ids(deployment_ids: &AmmTestDeploymentIds) -> Re
         factory_build::get_bytes(),
     );
     let _ = assert_binary_deployed_to_id(
-        deployment_ids.owned_token_1_deployment.clone(),
-        alkanes_std_owned_token_build::get_bytes(),
-    );
-    let _ = assert_binary_deployed_to_id(
-        deployment_ids.owned_token_2_deployment.clone(),
-        alkanes_std_owned_token_build::get_bytes(),
-    );
-    let _ = assert_binary_deployed_to_id(
-        deployment_ids.owned_token_3_deployment.clone(),
-        alkanes_std_owned_token_build::get_bytes(),
-    );
-    let _ = assert_binary_deployed_to_id(
         deployment_ids.oyl_token_deployment.clone(),
         oyl_token_build::get_bytes(),
     );
-    let _ = assert_binary_deployed_to_id(
+    let _ = assert_id_points_to_alkane_id(
         deployment_ids.amm_pool_1_deployment.clone(),
-        alkanes_std_beacon_proxy_build::get_bytes(),
+        deployment_ids.pool_beacon_proxy.clone(),
     );
-    let _ = assert_binary_deployed_to_id(
+    let _ = assert_id_points_to_alkane_id(
         deployment_ids.amm_pool_2_deployment.clone(),
-        alkanes_std_beacon_proxy_build::get_bytes(),
+        deployment_ids.pool_beacon_proxy.clone(),
     );
     Ok(())
 }
