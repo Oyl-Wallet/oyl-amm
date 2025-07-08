@@ -78,6 +78,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         Some(context.incoming_alkanes.0.remove(i))
     }
     fn init_factory(&self, pool_factory_id: u128, beacon_id: AlkaneId) -> Result<CallResponse> {
+        self.only_owner()?;
         self.observe_initialization()?;
         let context = self.context()?;
         self.set_pool_id(pool_factory_id);
