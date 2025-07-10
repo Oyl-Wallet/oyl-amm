@@ -19,13 +19,14 @@ PROVIDER="regtest"
 SANDSHREW_RPC_URL=""
 BITCOIN_RPC_URL=""
 DEEZEL_BINARY="deezel"
-CONTRACT_DIRS="target/wasm32-unknown-unknown/release"
+ALKANES_DIRECTORY=""
+OYL_PROTOCOL_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Contract deployment constants (matching test suite)
-AMM_FACTORY_ID=3
-AUTH_TOKEN_FACTORY_ID=4
+AMM_FACTORY_ID=65522
+AUTH_TOKEN_FACTORY_ID=65517
 AMM_FACTORY_PROXY_TX=1
-AMM_FACTORY_LOGIC_IMPL_TX=2
+AMM_FACTORY_LOGIC_IMPL_TX=0xf3ff
 POOL_BEACON_PROXY_TX=0xbeac1
 POOL_UPGRADEABLE_BEACON_TX=0xbeac0
 OWNED_TOKEN_1_DEPLOYMENT_TX=3
@@ -79,8 +80,7 @@ REQUIRED ARGUMENTS:
 OPTIONAL ARGUMENTS:
     --bitcoin-rpc-url URL               Bitcoin RPC endpoint URL
     --deezel-binary PATH                Path to deezel binary (default: deezel)
-    --contract-dirs DIRS                Comma-separated directories to search for WASM files
-                                        (default: target/wasm32-unknown-unknown/release)
+    --alkanes-directory PATH            Path to alkanes-rs directory for building standard contracts
     --wallet-file PATH                  Path to wallet file (default: ~/.deezel/regtest.json.asc)
     --passphrase PASS                   Wallet passphrase (default: testtesttest)
     --fee-rate RATE                     Transaction fee rate in sat/vB (default: 1)
@@ -96,9 +96,9 @@ EXAMPLES:
     $0 -p regtest --sandshrew-rpc-url http://localhost:18888 \\
        --deezel-binary /data/deezel-old/target/release/deezel
 
-    # Deploy with custom contract directories
+    # Deploy with custom alkanes directory
     $0 -p regtest --sandshrew-rpc-url http://localhost:18888 \\
-       --contract-dirs "/path/to/contracts,/another/path/contracts"
+       --alkanes-directory /home/ubuntu/alkanes-rs
 
     # Deploy to testnet with custom settings
     $0 -p testnet --sandshrew-rpc-url https://testnet.sandshrew.io \\
@@ -142,8 +142,8 @@ parse_args() {
                 DEEZEL_BINARY="$2"
                 shift 2
                 ;;
-            --contract-dirs)
-                CONTRACT_DIRS="$2"
+            --alkanes-directory)
+                ALKANES_DIRECTORY="$2"
                 shift 2
                 ;;
             --wallet-file)
@@ -268,20 +268,40 @@ deploy_contract() {
     
     log_info "Deploying $contract_name..."
     
-    # Find the contract file in the search directories
+    # Find the contract file in the appropriate directories
     local contract_file=""
-    IFS=',' read -ra SEARCH_DIRS <<< "$CONTRACT_DIRS"
     
-    for dir in "${SEARCH_DIRS[@]}"; do
-        local potential_gz="${dir}/${contract_base_name}.wasm.gz"
-        if [[ -f "$potential_gz" ]]; then
-            contract_file="$potential_gz"
-            break
+    # Check OYL Protocol contracts first
+    local oyl_target="${OYL_PROTOCOL_DIRECTORY}/target/wasm32-unknown-unknown/release"
+    local oyl_deps="${oyl_target}/deps"
+    
+    if [[ -f "${oyl_target}/${contract_base_name}.wasm" ]]; then
+        contract_file="${oyl_target}/${contract_base_name}.wasm"
+    elif [[ -f "${oyl_deps}/${contract_base_name}.wasm" ]]; then
+        contract_file="${oyl_deps}/${contract_base_name}.wasm"
+    fi
+    
+    # If not found in OYL Protocol, check Alkanes directory
+    if [[ -z "$contract_file" && -n "$ALKANES_DIRECTORY" && -d "$ALKANES_DIRECTORY" ]]; then
+        local alkanes_target="${ALKANES_DIRECTORY}/target/wasm32-unknown-unknown/release"
+        local alkanes_deps="${alkanes_target}/deps"
+        
+        if [[ -f "${alkanes_target}/${contract_base_name}.wasm" ]]; then
+            contract_file="${alkanes_target}/${contract_base_name}.wasm"
+        elif [[ -f "${alkanes_deps}/${contract_base_name}.wasm" ]]; then
+            contract_file="${alkanes_deps}/${contract_base_name}.wasm"
         fi
-    done
+    fi
     
     if [[ -z "$contract_file" ]]; then
-        log_error "Contract file not found: ${contract_base_name}.wasm.gz in directories: $CONTRACT_DIRS"
+        log_error "Contract file not found: ${contract_base_name}.wasm"
+        log_error "Searched in:"
+        log_error "  - OYL Protocol: ${oyl_target}"
+        log_error "  - OYL Protocol deps: ${oyl_deps}"
+        if [[ -n "$ALKANES_DIRECTORY" ]]; then
+            log_error "  - Alkanes: ${alkanes_target}"
+            log_error "  - Alkanes deps: ${alkanes_deps}"
+        fi
         exit 1
     fi
     
@@ -350,105 +370,47 @@ deploy_cellpack() {
 build_contracts() {
     log_info "Building contracts..."
     
-    # Convert comma-separated directories to array
-    IFS=',' read -ra SEARCH_DIRS <<< "$CONTRACT_DIRS"
+    # Build OYL Protocol contracts
+    log_info "Building OYL Protocol contracts in: $OYL_PROTOCOL_DIRECTORY"
+    cd "$OYL_PROTOCOL_DIRECTORY"
     
-    # Check if any of the search directories exist, if not try to build
-    local dirs_exist=false
-    for dir in "${SEARCH_DIRS[@]}"; do
-        if [[ -d "$dir" ]]; then
-            dirs_exist=true
-            break
-        fi
-    done
+    log_info "Building pool contract..."
+    cargo build --release -p pool
     
-    if [[ "$dirs_exist" == "false" ]]; then
-        log_info "No contract directories found, building WASM contracts..."
-        cargo build --release --target wasm32-unknown-unknown
+    log_info "Building factory contract..."
+    cargo build --release -p factory
+    
+    log_info "Building all OYL Protocol contracts..."
+    cargo build --release
+    
+    # Build Alkanes standard contracts if directory is provided
+    if [[ -n "$ALKANES_DIRECTORY" && -d "$ALKANES_DIRECTORY" ]]; then
+        log_info "Building Alkanes standard contracts in: $ALKANES_DIRECTORY"
+        cd "$ALKANES_DIRECTORY"
+        
+        log_info "Building alkanes-std-auth-token..."
+        cargo build -p alkanes-std-auth-token --release
+        
+        log_info "Building alkanes-std-owned-token..."
+        cargo build -p alkanes-std-owned-token --release
+        
+        log_info "Building alkanes-std-beacon-proxy..."
+        cargo build -p alkanes-std-beacon-proxy --release
+        
+        log_info "Building alkanes-std-upgradeable-beacon..."
+        cargo build -p alkanes-std-upgradeable-beacon --release
+        
+        log_info "Building alkanes-std-upgradeable..."
+        cargo build -p alkanes-std-upgradeable --release
+    else
+        log_warning "Alkanes directory not provided or doesn't exist. Standard contracts may not be available."
+        log_info "Use --alkanes-directory to specify the path to alkanes-rs"
     fi
     
-    # Check for required contract files and compress if needed
-    local contracts=(
-        "pool"
-        "factory"
-        "oyl_token"
-        "example_flashswap"
-        "alkanes_std_auth_token"
-        "alkanes_std_owned_token"
-        "alkanes_std_beacon_proxy"
-        "alkanes_std_upgradeable_beacon"
-        "alkanes_std_upgradeable"
-    )
+    # Return to original directory
+    cd "$OYL_PROTOCOL_DIRECTORY"
     
-    for contract in "${contracts[@]}"; do
-        local gz_file=""
-        local source_file=""
-        
-        # Search through all specified directories
-        for dir in "${SEARCH_DIRS[@]}"; do
-            # Check for .gz file first
-            local potential_gz="${dir}/${contract}.wasm.gz"
-            if [[ -f "$potential_gz" ]]; then
-                gz_file="$potential_gz"
-                break
-            fi
-            
-            # Check for .wasm file in main directory
-            local potential_wasm="${dir}/${contract}.wasm"
-            if [[ -f "$potential_wasm" ]]; then
-                source_file="$potential_wasm"
-                gz_file="${dir}/${contract}.wasm.gz"
-                break
-            fi
-            
-            # Check for .wasm file in deps subdirectory
-            local potential_deps="${dir}/deps/${contract}.wasm"
-            if [[ -f "$potential_deps" ]]; then
-                source_file="$potential_deps"
-                gz_file="${dir}/${contract}.wasm.gz"
-                break
-            fi
-        done
-        
-        # If we found a .gz file, we're done with this contract
-        if [[ -n "$gz_file" && -f "$gz_file" && -z "$source_file" ]]; then
-            log_info "Found compressed contract: $gz_file"
-            continue
-        fi
-        
-        # If we found a .wasm file, compress it
-        if [[ -n "$source_file" && -f "$source_file" ]]; then
-            log_info "Compressing $source_file to $gz_file"
-            gzip -c "$source_file" > "$gz_file"
-        else
-            log_warning "Contract file not found: $contract.wasm (searched in: ${CONTRACT_DIRS})"
-            log_info "Attempting to build contracts..."
-            cargo build --release --target wasm32-unknown-unknown
-            
-            # Search again after build
-            for dir in "${SEARCH_DIRS[@]}"; do
-                local potential_wasm="${dir}/${contract}.wasm"
-                local potential_deps="${dir}/deps/${contract}.wasm"
-                
-                if [[ -f "$potential_wasm" ]]; then
-                    source_file="$potential_wasm"
-                    gz_file="${dir}/${contract}.wasm.gz"
-                    break
-                elif [[ -f "$potential_deps" ]]; then
-                    source_file="$potential_deps"
-                    gz_file="${dir}/${contract}.wasm.gz"
-                    break
-                fi
-            done
-            
-            if [[ -n "$source_file" && -f "$source_file" ]]; then
-                log_info "Compressing $source_file to $gz_file"
-                gzip -c "$source_file" > "$gz_file"
-            fi
-        fi
-    done
-    
-    log_success "Contract build check complete"
+    log_success "Contract build complete"
 }
 
 # Deploy the complete AMM system
@@ -596,7 +558,8 @@ main() {
     log_info "  Sandshrew RPC: $SANDSHREW_RPC_URL"
     log_info "  Bitcoin RPC: ${BITCOIN_RPC_URL:-"(default)"}"
     log_info "  Deezel Binary: $DEEZEL_BINARY"
-    log_info "  Contract Dirs: $CONTRACT_DIRS"
+    log_info "  OYL Protocol Directory: $OYL_PROTOCOL_DIRECTORY"
+    log_info "  Alkanes Directory: ${ALKANES_DIRECTORY:-"(not specified)"}"
     log_info "  Wallet File: $WALLET_FILE"
     log_info "  Fee Rate: $FEE_RATE sat/vB"
     log_info "  Mine Blocks: $MINE_BLOCKS"
@@ -618,3 +581,4 @@ main() {
 
 # Run main function with all arguments
 main "$@"
+
