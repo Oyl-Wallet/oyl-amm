@@ -13,12 +13,14 @@ PASSPHRASE="testtesttest"
 FEE_RATE=1
 MINE_BLOCKS=true
 AUTO_CONFIRM=true
+USE_OYL_SDK=false
 
 # Default values
 PROVIDER="regtest"
 SANDSHREW_RPC_URL=""
 BITCOIN_RPC_URL=""
 DEEZEL_BINARY="deezel"
+OYL_BINARY="oyl"
 ALKANES_DIRECTORY=""
 OYL_PROTOCOL_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -80,6 +82,8 @@ REQUIRED ARGUMENTS:
 OPTIONAL ARGUMENTS:
     --bitcoin-rpc-url URL               Bitcoin RPC endpoint URL
     --deezel-binary PATH                Path to deezel binary (default: deezel)
+    --oyl-binary PATH                   Path to oyl binary (default: oyl)
+    --use-oyl-sdk                       Use the oyl-sdk CLI instead of deezel
     --alkanes-directory PATH            Path to alkanes-rs directory for building standard contracts
     --wallet-file PATH                  Path to wallet file (default: ~/.deezel/regtest.json.asc)
     --passphrase PASS                   Wallet passphrase (default: testtesttest)
@@ -141,6 +145,14 @@ parse_args() {
             --deezel-binary)
                 DEEZEL_BINARY="$2"
                 shift 2
+                ;;
+            --oyl-binary)
+                OYL_BINARY="$2"
+                shift 2
+                ;;
+            --use-oyl-sdk)
+                USE_OYL_SDK=true
+                shift
                 ;;
             --alkanes-directory)
                 ALKANES_DIRECTORY="$2"
@@ -213,48 +225,95 @@ build_deezel_cmd() {
     echo "$cmd"
 }
 
-# Check if deezel is available
-check_deezel() {
-    if ! command -v "$DEEZEL_BINARY" &> /dev/null; then
-        log_error "deezel binary not found: $DEEZEL_BINARY"
-        log_error "Please ensure deezel is installed or use --deezel-binary to specify the path."
-        exit 1
-    fi
+build_oyl_cmd() {
+    local cmd="$OYL_BINARY"
     
-    log_info "Found deezel: $(which "$DEEZEL_BINARY")"
+    if [[ -n "$PROVIDER" ]]; then
+        cmd="$cmd --provider $PROVIDER"
+    fi
+
+    # oyl-sdk uses metashrew-rpc-url which is equivalent to sandshrew-rpc-url
+    if [[ -n "$SANDSHREW_RPC_URL" ]]; then
+        cmd="$cmd --metashrew-rpc-url $SANDSHREW_RPC_URL"
+    fi
+
+    # oyl-sdk uses a default mnemonic, so no wallet file/passphrase needed
+    
+    echo "$cmd"
+}
+
+mine_blocks() {
+    log_info "Mining 1 block..."
+    local oyl_cmd=$(build_oyl_cmd)
+    $oyl_cmd regtest gen-blocks --blocks 1
+    sleep 3 # Give time for sync
+}
+
+# Check if dependencies are available
+check_dependencies() {
+    if [[ "$USE_OYL_SDK" == "true" ]]; then
+        if ! command -v "$OYL_BINARY" &> /dev/null; then
+            log_error "oyl binary not found: $OYL_BINARY"
+            log_error "Please ensure oyl-sdk is installed or use --oyl-binary to specify the path."
+            exit 1
+        fi
+        log_info "Found oyl: $(which "$OYL_BINARY")"
+    else
+        if ! command -v "$DEEZEL_BINARY" &> /dev/null; then
+            log_error "deezel binary not found: $DEEZEL_BINARY"
+            log_error "Please ensure deezel is installed or use --deezel-binary to specify the path."
+            exit 1
+        fi
+        log_info "Found deezel: $(which "$DEEZEL_BINARY")"
+    fi
 }
 
 # Setup wallet and fund it
 setup_wallet() {
-    local deezel_cmd=$(build_deezel_cmd)
-    
     log_info "Setting up wallet..."
-    
-    # Remove existing wallet to ensure clean state
-    if [[ -f "$WALLET_FILE" ]]; then
-        log_warning "Removing existing wallet file: $WALLET_FILE"
-        rm -f "$WALLET_FILE"
+
+    if [[ "$USE_OYL_SDK" == "true" ]]; then
+        local oyl_cmd=$(build_oyl_cmd)
+        
+        log_info "Initializing regtest environment for oyl-sdk..."
+        $oyl_cmd regtest init
+        
+        log_info "Funding wallet..."
+        $oyl_cmd regtest send-from-faucet
+        
+        mine_blocks
+        
+        log_info "Checking wallet balance..."
+        $oyl_cmd utxo balance
+    else
+        local deezel_cmd=$(build_deezel_cmd)
+        
+        # Remove existing wallet to ensure clean state
+        if [[ -f "$WALLET_FILE" ]]; then
+            log_warning "Removing existing wallet file: $WALLET_FILE"
+            rm -f "$WALLET_FILE"
+        fi
+        
+        # Create new wallet
+        log_info "Creating new GPG-encrypted wallet..."
+        $deezel_cmd wallet create
+        
+        # Check initial UTXOs
+        log_info "Checking initial UTXOs..."
+        $deezel_cmd wallet utxos --addresses p2tr:0 || true
+        
+        # Generate blocks to fund wallet
+        log_info "Generating 201 blocks to P2TR address for funding..."
+        $deezel_cmd bitcoind generatetoaddress 201 [self:p2tr:0]
+        
+        # Wait for blockchain sync
+        log_info "Waiting for blockchain sync..."
+        sleep 6
+        
+        # Check UTXOs after funding
+        log_info "Checking UTXOs after block generation..."
+        $deezel_cmd wallet utxos --addresses p2tr:0
     fi
-    
-    # Create new wallet
-    log_info "Creating new GPG-encrypted wallet..."
-    $deezel_cmd wallet create
-    
-    # Check initial UTXOs
-    log_info "Checking initial UTXOs..."
-    $deezel_cmd wallet utxos --addresses p2tr:0 || true
-    
-    # Generate blocks to fund wallet
-    log_info "Generating 201 blocks to P2TR address for funding..."
-    $deezel_cmd bitcoind generatetoaddress 201 [self:p2tr:0]
-    
-    # Wait for blockchain sync
-    log_info "Waiting for blockchain sync..."
-    sleep 6
-    
-    # Check UTXOs after funding
-    log_info "Checking UTXOs after block generation..."
-    $deezel_cmd wallet utxos --addresses p2tr:0
     
     log_success "Wallet setup complete"
 }
@@ -307,30 +366,41 @@ deploy_contract() {
     
     log_info "Using contract file: $contract_file"
     
-    local deezel_cmd=$(build_deezel_cmd)
-    local confirm_flag=""
-    if [[ "$AUTO_CONFIRM" == "true" ]]; then
-        confirm_flag="-y"
+    if [[ "$USE_OYL_SDK" == "true" ]]; then
+        local oyl_cmd=$(build_oyl_cmd)
+        local calldata="3,${target_tx},${cellpack_inputs}"
+        
+        $oyl_cmd alkane new-contract --contract "$contract_file" --calldata "$calldata" --feeRate $FEE_RATE
+        
+        if [[ "$MINE_BLOCKS" == "true" ]]; then
+            mine_blocks
+        fi
+    else
+        local deezel_cmd=$(build_deezel_cmd)
+        local confirm_flag=""
+        if [[ "$AUTO_CONFIRM" == "true" ]]; then
+            confirm_flag="-y"
+        fi
+        
+        local mine_flag=""
+        if [[ "$MINE_BLOCKS" == "true" ]]; then
+            mine_flag="--mine"
+        fi
+        
+        # Build the cellpack notation: [3, target_tx, inputs...]
+        local cellpack="[3,$target_tx,$cellpack_inputs]"
+        
+        $deezel_cmd alkanes execute \
+            --inputs B:10000 \
+            --change [self:p2tr:2] \
+            --to [self:p2tr:1] \
+            --envelope "$contract_file" \
+            $mine_flag \
+            --fee-rate $FEE_RATE \
+    	--trace \
+            $confirm_flag \
+            "$cellpack:v0:v0"
     fi
-    
-    local mine_flag=""
-    if [[ "$MINE_BLOCKS" == "true" ]]; then
-        mine_flag="--mine"
-    fi
-    
-    # Build the cellpack notation: [3, target_tx, inputs...]
-    local cellpack="[3,$target_tx,$cellpack_inputs]"
-    
-    $deezel_cmd alkanes execute \
-        --inputs B:10000 \
-        --change [self:p2tr:2] \
-        --to [self:p2tr:1] \
-        --envelope "$contract_file" \
-        $mine_flag \
-        --fee-rate $FEE_RATE \
-	--trace \
-        $confirm_flag \
-        "$cellpack:v0:v0"
     
     log_success "$contract_name deployed successfully"
 }
@@ -342,26 +412,38 @@ deploy_cellpack() {
     
     log_info "Executing $operation_name..."
     
-    local deezel_cmd=$(build_deezel_cmd)
-    local confirm_flag=""
-    if [[ "$AUTO_CONFIRM" == "true" ]]; then
-        confirm_flag="-y"
+    if [[ "$USE_OYL_SDK" == "true" ]]; then
+        local oyl_cmd=$(build_oyl_cmd)
+        # Extract calldata from cellpack notation (e.g., "[3,1,0,65521,4,65520]")
+        local calldata=$(echo "$cellpack_notation" | sed 's/\[//g' | sed 's/\]//g')
+        
+        $oyl_cmd alkane execute --calldata "$calldata" --feeRate $FEE_RATE
+        
+        if [[ "$MINE_BLOCKS" == "true" ]]; then
+            mine_blocks
+        fi
+    else
+        local deezel_cmd=$(build_deezel_cmd)
+        local confirm_flag=""
+        if [[ "$AUTO_CONFIRM" == "true" ]]; then
+            confirm_flag="-y"
+        fi
+        
+        local mine_flag=""
+        if [[ "$MINE_BLOCKS" == "true" ]]; then
+            mine_flag="--mine"
+        fi
+        
+        $deezel_cmd alkanes execute \
+            --inputs B:10000 \
+            --change [self:p2tr:2] \
+            --to [self:p2tr:1] \
+            $mine_flag \
+            --fee-rate $FEE_RATE \
+    	--trace \
+            $confirm_flag \
+            "$cellpack_notation:v0:v0"
     fi
-    
-    local mine_flag=""
-    if [[ "$MINE_BLOCKS" == "true" ]]; then
-        mine_flag="--mine"
-    fi
-    
-    $deezel_cmd alkanes execute \
-        --inputs B:10000 \
-        --change [self:p2tr:2] \
-        --to [self:p2tr:1] \
-        $mine_flag \
-        --fee-rate $FEE_RATE \
-	--trace \
-        $confirm_flag \
-        "$cellpack_notation:v0:v0"
     
     log_success "$operation_name completed successfully"
 }
@@ -529,19 +611,29 @@ create_initial_pools() {
 verify_deployment() {
     log_info "Verifying deployment..."
     
-    local deezel_cmd=$(build_deezel_cmd)
-    
-    # Check wallet balance
-    log_info "Checking wallet balance..."
-    $deezel_cmd wallet balance --addresses p2tr:0-5
-    
-    # Check alkanes balances
-    log_info "Checking alkanes token balances..."
-    $deezel_cmd alkanes balance --address [self:p2tr:0] || true
-    
-    # Get factory info (number of pools)
-    log_info "Checking factory status..."
-    deploy_cellpack "Get Pool Count" "[3,$AMM_FACTORY_PROXY_TX,4]"
+    if [[ "$USE_OYL_SDK" == "true" ]]; then
+        local oyl_cmd=$(build_oyl_cmd)
+        
+        log_info "Checking wallet balance..."
+        $oyl_cmd utxo balance
+        
+        log_info "Checking factory status..."
+        $oyl_cmd alkane get-all-pools-details --target "4:$AMM_FACTORY_PROXY_TX"
+    else
+        local deezel_cmd=$(build_deezel_cmd)
+        
+        # Check wallet balance
+        log_info "Checking wallet balance..."
+        $deezel_cmd wallet balance --addresses p2tr:0-5
+        
+        # Check alkanes balances
+        log_info "Checking alkanes token balances..."
+        $deezel_cmd alkanes balance --address [self:p2tr:0] || true
+        
+        # Get factory info (number of pools)
+        log_info "Checking factory status..."
+        deploy_cellpack "Get Pool Count" "[3,$AMM_FACTORY_PROXY_TX,4]"
+    fi
     
     log_success "Deployment verification complete!"
 }
@@ -557,7 +649,13 @@ main() {
     log_info "  Provider: $PROVIDER"
     log_info "  Sandshrew RPC: $SANDSHREW_RPC_URL"
     log_info "  Bitcoin RPC: ${BITCOIN_RPC_URL:-"(default)"}"
-    log_info "  Deezel Binary: $DEEZEL_BINARY"
+    if [[ "$USE_OYL_SDK" == "true" ]]; then
+        log_info "  Backend: oyl-sdk"
+        log_info "  OYL Binary: $OYL_BINARY"
+    else
+        log_info "  Backend: deezel"
+        log_info "  Deezel Binary: $DEEZEL_BINARY"
+    fi
     log_info "  OYL Protocol Directory: $OYL_PROTOCOL_DIRECTORY"
     log_info "  Alkanes Directory: ${ALKANES_DIRECTORY:-"(not specified)"}"
     log_info "  Wallet File: $WALLET_FILE"
@@ -565,7 +663,7 @@ main() {
     log_info "  Mine Blocks: $MINE_BLOCKS"
     log_info "  Auto Confirm: $AUTO_CONFIRM"
     
-    check_deezel
+    check_dependencies
     build_contracts
     setup_wallet
     deploy_amm_system
