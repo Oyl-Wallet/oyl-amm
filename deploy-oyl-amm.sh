@@ -26,9 +26,9 @@ OYL_PROTOCOL_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AMM_FACTORY_ID=65522
 AUTH_TOKEN_FACTORY_ID=65517
 AMM_FACTORY_PROXY_TX=1
-AMM_FACTORY_LOGIC_IMPL_TX=0xf3ff
-POOL_BEACON_PROXY_TX=0xbeac1
-POOL_UPGRADEABLE_BEACON_TX=0xbeac0
+AMM_FACTORY_LOGIC_IMPL_TX=$((0xf3ff))
+POOL_BEACON_PROXY_TX=$((0xbeac1))
+POOL_UPGRADEABLE_BEACON_TX=$((0xbeac0))
 OWNED_TOKEN_1_DEPLOYMENT_TX=3
 OWNED_TOKEN_2_DEPLOYMENT_TX=5
 OWNED_TOKEN_3_DEPLOYMENT_TX=7
@@ -483,13 +483,13 @@ deploy_amm_system() {
     # Deploy beacon proxy
     deploy_contract "Beacon Proxy" \
         "alkanes_std_beacon_proxy" \
-        "0x8fff" \
+        "$((0x8fff))" \
         "$POOL_BEACON_PROXY_TX"
     
     # Deploy upgradeable beacon
     deploy_contract "Upgradeable Beacon" \
         "alkanes_std_upgradeable_beacon" \
-        "0x7fff,4,$AMM_FACTORY_ID,1" \
+        "$((0x7fff)),4,$AMM_FACTORY_ID,1" \
         "$POOL_UPGRADEABLE_BEACON_TX"
     
     # Phase 4: Deploy and initialize factory proxy
@@ -498,7 +498,7 @@ deploy_amm_system() {
     # Deploy factory proxy
     deploy_contract "Factory Proxy" \
         "alkanes_std_upgradeable" \
-        "0x7fff,4,$AMM_FACTORY_LOGIC_IMPL_TX,1" \
+        "$((0x7fff)),4,$AMM_FACTORY_LOGIC_IMPL_TX,1" \
         "$AMM_FACTORY_PROXY_TX"
     
     # Initialize factory proxy
