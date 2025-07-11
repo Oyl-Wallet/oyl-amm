@@ -20,9 +20,9 @@ PROVIDER="regtest"
 SANDSHREW_RPC_URL=""
 BITCOIN_RPC_URL=""
 DEEZEL_BINARY="deezel"
+OYL_PROTOCOL_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OYL_BINARY="oyl"
 ALKANES_DIRECTORY=""
-OYL_PROTOCOL_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Contract deployment constants (matching test suite)
 AMM_FACTORY_ID=65522
@@ -226,38 +226,74 @@ build_deezel_cmd() {
 }
 
 build_oyl_cmd() {
-    local cmd="$OYL_BINARY"
-    
-    if [[ -n "$PROVIDER" ]]; then
-        cmd="$cmd --provider $PROVIDER"
-    fi
+    local sub_command="$1"
+    local cmd="$OYL_BINARY $sub_command"
 
-    # oyl-sdk uses metashrew-rpc-url which is equivalent to sandshrew-rpc-url
-    if [[ -n "$SANDSHREW_RPC_URL" ]]; then
-        cmd="$cmd --metashrew-rpc-url $SANDSHREW_RPC_URL"
-    fi
-
-    # oyl-sdk uses a default mnemonic, so no wallet file/passphrase needed
+    # Add flags based on the subcommand
+    case $sub_command in
+        "alkane")
+            if [[ -n "$PROVIDER" ]]; then
+                cmd="$cmd --provider $PROVIDER"
+            fi
+            if [[ -n "$SANDSHREW_RPC_URL" ]]; then
+                cmd="$cmd --metashrew-rpc-url $SANDSHREW_RPC_URL"
+            fi
+            ;;
+        "regtest"|"utxo")
+            # These commands are called with explicit flags in their respective functions
+            ;;
+    esac
     
     echo "$cmd"
 }
 
 mine_blocks() {
     log_info "Mining 1 block..."
-    local oyl_cmd=$(build_oyl_cmd)
-    $oyl_cmd regtest gen-blocks --blocks 1
+    local oyl_cmd="$OYL_BINARY"
+    $oyl_cmd regtest genBlocks --blocks 1 --provider $PROVIDER
     sleep 3 # Give time for sync
 }
 
 # Check if dependencies are available
 check_dependencies() {
     if [[ "$USE_OYL_SDK" == "true" ]]; then
-        if ! command -v "$OYL_BINARY" &> /dev/null; then
-            log_error "oyl binary not found: $OYL_BINARY"
-            log_error "Please ensure oyl-sdk is installed or use --oyl-binary to specify the path."
+        if ! command -v "jq" &> /dev/null; then
+            log_error "jq is not installed. Please install jq to use the oyl-sdk backend."
             exit 1
         fi
-        log_info "Found oyl: $(which "$OYL_BINARY")"
+        log_info "Found jq: $(which jq)"
+
+        # If OYL_BINARY is not a full path, try to find it
+        if ! [[ "$OYL_BINARY" == /* ]]; then
+            if command -v "$OYL_BINARY" &> /dev/null; then
+                OYL_BINARY=$(command -v "$OYL_BINARY")
+                log_info "Found oyl in PATH: $OYL_BINARY"
+            else
+                local local_path="${OYL_PROTOCOL_DIRECTORY}/reference/oyl-sdk/bin/oyl.js"
+                if [[ -f "$local_path" ]]; then
+                    OYL_BINARY="$local_path"
+                    log_info "Found oyl in reference directory: $OYL_BINARY"
+                else
+                    log_error "oyl binary not found: $OYL_BINARY"
+                    log_error "Please ensure oyl-sdk is installed, in your PATH, or specify the path with --oyl-binary."
+                    exit 1
+                fi
+            fi
+        fi
+
+        if [[ ! -f "$OYL_BINARY" ]]; then
+            log_error "oyl binary not found at path: $OYL_BINARY"
+            exit 1
+        fi
+
+        if [[ ! -x "$OYL_BINARY" ]]; then
+            log_warning "oyl binary is not executable. Attempting to set permissions..."
+            chmod +x "$OYL_BINARY"
+            if [[ ! -x "$OYL_BINARY" ]]; then
+                log_error "Failed to make oyl binary executable. Please check permissions."
+                exit 1
+            fi
+        fi
     else
         if ! command -v "$DEEZEL_BINARY" &> /dev/null; then
             log_error "deezel binary not found: $DEEZEL_BINARY"
@@ -273,18 +309,43 @@ setup_wallet() {
     log_info "Setting up wallet..."
 
     if [[ "$USE_OYL_SDK" == "true" ]]; then
-        local oyl_cmd=$(build_oyl_cmd)
+        local oyl_cmd="$OYL_BINARY"
+        local faucet_address="bcrt1qzr9vhs60g6qlmk7x3dd7g3ja30wyts48sxuemv"
+        local test_wallet_address="bcrt1qcr8te4kr609gcawutmrza0j4xv80jy8zeqchgx"
+
+        log_info "Ensuring regtest faucet is funded..."
+        $oyl_cmd regtest genBlocks --count 101 --address "$faucet_address" --provider $PROVIDER
         
-        log_info "Initializing regtest environment for oyl-sdk..."
-        $oyl_cmd regtest init
+        log_info "Maturing faucet funds..."
+        $oyl_cmd regtest genBlocks --count 100 --provider $PROVIDER
+
+        log_info "Waiting for faucet UTXOs to be indexed..."
+        local attempts=0
+        local max_attempts=20
+        local utxos_json=""
+        while [[ $attempts -lt $max_attempts ]]; do
+            utxos_json=$($oyl_cmd utxo addressUtxos --address "$faucet_address" --provider "$PROVIDER" 2>/dev/null)
+            if [[ -n "$utxos_json" && "$utxos_json" != "[]" && $(echo "$utxos_json" | jq 'length') -gt 0 ]]; then
+                log_info "Faucet has spendable UTXOs."
+                break
+            fi
+            log_warning "Faucet has no spendable UTXOs yet. Waiting... (Attempt $((attempts+1))/$max_attempts)"
+            sleep 3
+            attempts=$((attempts+1))
+        done
+
+        if [[ -z "$utxos_json" || "$utxos_json" == "[]" || $(echo "$utxos_json" | jq 'length') -eq 0 ]]; then
+            log_error "Faucet funding failed. No UTXOs found after $max_attempts attempts."
+            exit 1
+        fi
+
+        log_info "Funding test wallet from faucet..."
+        $oyl_cmd regtest sendFromFaucet --to "$test_wallet_address" --provider $PROVIDER
         
-        log_info "Funding wallet..."
-        $oyl_cmd regtest send-from-faucet
-        
-        mine_blocks
+        mine_blocks # Mine one more block to confirm the funding transaction
         
         log_info "Checking wallet balance..."
-        $oyl_cmd utxo balance
+        $oyl_cmd utxo balance --provider $PROVIDER
     else
         local deezel_cmd=$(build_deezel_cmd)
         
@@ -367,7 +428,7 @@ deploy_contract() {
     log_info "Using contract file: $contract_file"
     
     if [[ "$USE_OYL_SDK" == "true" ]]; then
-        local oyl_cmd=$(build_oyl_cmd)
+        local oyl_cmd=$(build_oyl_cmd "alkane")
         local calldata="3,${target_tx},${cellpack_inputs}"
         
         $oyl_cmd alkane new-contract --contract "$contract_file" --calldata "$calldata" --feeRate $FEE_RATE
@@ -413,7 +474,7 @@ deploy_cellpack() {
     log_info "Executing $operation_name..."
     
     if [[ "$USE_OYL_SDK" == "true" ]]; then
-        local oyl_cmd=$(build_oyl_cmd)
+        local oyl_cmd=$(build_oyl_cmd "alkane")
         # Extract calldata from cellpack notation (e.g., "[3,1,0,65521,4,65520]")
         local calldata=$(echo "$cellpack_notation" | sed 's/\[//g' | sed 's/\]//g')
         
@@ -612,13 +673,13 @@ verify_deployment() {
     log_info "Verifying deployment..."
     
     if [[ "$USE_OYL_SDK" == "true" ]]; then
-        local oyl_cmd=$(build_oyl_cmd)
-        
+        local oyl_cmd="$OYL_BINARY"
         log_info "Checking wallet balance..."
-        $oyl_cmd utxo balance
+        $oyl_cmd utxo balance --provider $PROVIDER
         
+        local factory_cmd=$(build_oyl_cmd "alkane")
         log_info "Checking factory status..."
-        $oyl_cmd alkane get-all-pools-details --target "4:$AMM_FACTORY_PROXY_TX"
+        $factory_cmd alkane get-all-pools-details --target "4:$AMM_FACTORY_PROXY_TX"
     else
         local deezel_cmd=$(build_deezel_cmd)
         
