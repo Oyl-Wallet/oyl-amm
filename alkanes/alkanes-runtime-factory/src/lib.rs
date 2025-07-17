@@ -322,15 +322,6 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         }
     }
 
-    fn _get_pool_info(&self, pool: AlkaneId) -> Result<PoolInfo> {
-        let cellpack = Cellpack {
-            target: pool,
-            inputs: vec![999],
-        };
-        let response = self.call(&cellpack, &AlkaneTransferParcel(vec![]), self.fuel())?;
-        Ok(PoolInfo::from_vec(&response.data)?)
-    }
-
     fn _return_leftovers(
         &self,
         myself: AlkaneId,
