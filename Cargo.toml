@@ -6,11 +6,6 @@ edition = "2021"
 [features]
 test = []
 testnet = []
-dogecoin = []
-luckycoin = []
-bellscoin = []
-fractal = []
-mainnet = []
 debug-log = ["alkanes/debug-log"]
 
 [lib]
