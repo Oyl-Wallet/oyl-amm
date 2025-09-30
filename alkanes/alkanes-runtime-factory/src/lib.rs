@@ -359,7 +359,7 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         let context = self.context()?;
         self._check_deadline(self.height(), deadline)?;
         let pool = self._find_existing_pool_id(token_a, token_b)?;
-        let (previous_a, previous_b) = self._get_reserves(pool)?;
+        let (previous_a, previous_b) = self._get_reserves_ordered(token_a, token_b)?;
         let (amount_a, amount_b) = if previous_a == 0 && previous_b == 0 {
             (amount_a_desired, amount_b_desired)
         } else {
