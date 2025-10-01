@@ -130,6 +130,57 @@ fn test_amm_pool_add_more_liquidity_checked() -> Result<()> {
 }
 
 #[wasm_bindgen_test]
+fn test_amm_pool_add_more_liquidity_checked_ordering() -> Result<()> {
+    clear();
+    let (amount1, amount2) = (500000, 50000000);
+    let total_supply = (amount1 * amount2).sqrt();
+    let init_lp_tokens = total_supply - 1000;
+    let (init_block, mut runtime_balances, deployment_ids) =
+        test_amm_pool_init_fixture(amount1, amount2)?;
+    let block_height = 840_001;
+    let mut add_liquidity_block = create_block_with_coinbase_tx(block_height);
+    let input_outpoint = OutPoint {
+        txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
+    };
+    let deadline = add_liquidity_block.header.time as u128;
+    insert_add_liquidity_checked_txs(
+        deployment_ids.owned_token_2_deployment,
+        deployment_ids.owned_token_1_deployment,
+        amount2,
+        amount1,
+        amount2,
+        amount1,
+        deadline,
+        &mut add_liquidity_block,
+        input_outpoint,
+        &deployment_ids,
+    );
+    index_block(&add_liquidity_block, block_height)?;
+
+    check_add_liquidity_lp_balance(
+        amount1,
+        amount2,
+        init_lp_tokens,
+        amount1,
+        amount2,
+        total_supply,
+        &add_liquidity_block,
+        deployment_ids.amm_pool_1_deployment,
+    )?;
+
+    check_add_liquidity_runtime_balance(
+        &mut runtime_balances,
+        amount1,
+        amount2,
+        0,
+        &deployment_ids,
+    )?;
+
+    Ok(())
+}
+
+#[wasm_bindgen_test]
 fn test_amm_pool_add_more_liquidity_one_sided() -> Result<()> {
     clear();
     let (amount1, amount2) = (500000, 500000);
