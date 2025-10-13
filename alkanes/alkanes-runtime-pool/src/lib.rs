@@ -71,6 +71,20 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
     fn set_block_timestamp_last(&self, v: u32) {
         self.block_timestamp_last_pointer().set_value::<u32>(v);
     }
+    fn total_fee_pointer(&self) -> StoragePointer {
+        StoragePointer::from_keyword("/totalfeeper1000")
+    }
+    fn total_fee_per_1000(&self) -> u128 {
+        let ptr = self.total_fee_pointer();
+        if ptr.get().len() == 0 {
+            DEFAULT_TOTAL_FEE_AMOUNT_PER_1000
+        } else {
+            ptr.get_value::<u128>()
+        }
+    }
+    fn set_total_fee_per_1000(&self, v: u128) {
+        self.total_fee_pointer().set_value::<u128>(v);
+    }
     fn price_cumulative_pointers(&self) -> (StoragePointer, StoragePointer) {
         (
             StoragePointer::from_keyword("/price0CumLast"),
@@ -241,7 +255,7 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             if root_k > root_k_last {
                 let numerator = U256::from(total_supply) * (root_k - root_k_last);
                 let root_k_fee_adj = root_k
-                    * U256::from(DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 - PROTOCOL_FEE_AMOUNT_PER_1000)
+                    * U256::from(self.total_fee_per_1000() - PROTOCOL_FEE_AMOUNT_PER_1000)
                     / U256::from(PROTOCOL_FEE_AMOUNT_PER_1000);
                 let denominator = root_k_fee_adj + root_k_last;
                 let liquidity: u128 = (numerator / denominator).try_into()?; // guaranteed to be storable in u128
@@ -471,10 +485,11 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
 
             // Check K value (constant product formula)
             // In Uniswap: balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2)
+            let total_fee = self.total_fee_per_1000();
             let balance_0_adjusted = U256::from(balance_0.value) * U256::from(1000)
-                - U256::from(amount_0_in) * U256::from(DEFAULT_TOTAL_FEE_AMOUNT_PER_1000);
+                - U256::from(amount_0_in) * U256::from(total_fee);
             let balance_1_adjusted = U256::from(balance_1.value) * U256::from(1000)
-                - U256::from(amount_1_in) * U256::from(DEFAULT_TOTAL_FEE_AMOUNT_PER_1000);
+                - U256::from(amount_1_in) * U256::from(total_fee);
 
             if balance_0_adjusted * balance_1_adjusted
                 < U256::from(reserve_0.value)
@@ -489,6 +504,23 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             // Return response with transfers
             Ok(response)
         })
+    }
+
+    fn get_total_fee(&self) -> Result<CallResponse> {
+        let context = self.context()?;
+        let mut response = CallResponse::forward(&context.incoming_alkanes);
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&self.total_fee_per_1000().to_le_bytes());
+        response.data = bytes;
+        Ok(response)
+    }
+
+    fn set_total_fee(&self, total_fee_per_1000: u128) -> Result<CallResponse> {
+        self._only_factory_caller()?;
+        let context = self.context()?;
+        self.set_total_fee_per_1000(total_fee_per_1000);
+        let response = CallResponse::forward(&context.incoming_alkanes);
+        Ok(response)
     }
 
     fn get_price_cumulative_last(&self) -> Result<CallResponse> {

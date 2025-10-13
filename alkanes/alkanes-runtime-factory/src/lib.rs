@@ -472,6 +472,19 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         Ok(response)
     }
 
+    fn _get_total_fee_for_pool(&self, token_a: AlkaneId, token_b: AlkaneId) -> Result<u128> {
+        let pool_id = self._find_existing_pool_id(token_a, token_b)?;
+        let response = self.call(
+            &Cellpack {
+                target: pool_id,
+                inputs: vec![20],
+            },
+            &AlkaneTransferParcel::default(),
+            self.fuel(),
+        )?;
+        Ok(u128::from_le_bytes(response.data[..16].try_into()?))
+    }
+
     fn get_amounts_out(&self, amount_in: u128, path: &Vec<AlkaneId>) -> Result<Vec<u128>> {
         let n = path.len();
         if n < 2 {
@@ -481,7 +494,13 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         amounts[0] = amount_in;
         for i in 1..n {
             let (reserve_in, reserve_out) = self._get_reserves_ordered(path[i - 1], path[i])?;
-            amounts[i] = oylswap_library::get_amount_out(amounts[i - 1], reserve_in, reserve_out)?;
+            let total_fee = self._get_total_fee_for_pool(path[i - 1], path[i])?;
+            amounts[i] = oylswap_library::get_amount_out(
+                amounts[i - 1],
+                reserve_in,
+                reserve_out,
+                total_fee,
+            )?;
         }
         Ok(amounts)
     }
@@ -539,8 +558,9 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
         for i in 1..n {
             let (reserve_in, reserve_out) =
                 self._get_reserves_ordered(path[n - i - 1], path[n - i])?;
+            let total_fee = self._get_total_fee_for_pool(path[n - i - 1], path[n - i])?;
             amounts[n - i - 1] =
-                oylswap_library::get_amount_in(amounts[n - i], reserve_in, reserve_out)?;
+                oylswap_library::get_amount_in(amounts[n - i], reserve_in, reserve_out, total_fee)?;
         }
         Ok(amounts)
     }
@@ -566,6 +586,23 @@ pub trait AMMFactoryBase: AuthenticatedResponder {
 
         let result = self._swap(&amounts, &path)?;
         self._return_leftovers(context.myself, result, parcel)
+    }
+
+    fn set_total_fee_for_pool(
+        &self,
+        pool_id: AlkaneId,
+        total_fee_per_1000: u128,
+    ) -> Result<CallResponse> {
+        self.only_owner()?;
+        let context = self.context()?;
+        self.call(
+            &Cellpack {
+                target: pool_id,
+                inputs: vec![21, total_fee_per_1000],
+            },
+            &context.incoming_alkanes.clone(),
+            self.fuel(),
+        )
     }
 
     fn forward(&self) -> Result<CallResponse> {

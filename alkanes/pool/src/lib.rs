@@ -37,6 +37,13 @@ pub enum AMMPoolMessage {
     #[opcode(10)]
     CollectFees {},
 
+    #[opcode(20)]
+    #[returns(u128)]
+    GetTotalFee {},
+
+    #[opcode(21)]
+    SetTotalFee { total_fee_per_1000: u128 },
+
     #[opcode(50)]
     ForwardIncoming,
 
