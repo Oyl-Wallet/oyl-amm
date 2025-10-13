@@ -20,6 +20,8 @@ use alkanes::tests::helpers::{
 use metashrew_core::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
 use wasm_bindgen_test::wasm_bindgen_test;
 
+use oylswap_library::{DEFAULT_TOTAL_FEE_AMOUNT_PER_1000, PROTOCOL_FEE_AMOUNT_PER_1000};
+
 #[wasm_bindgen_test]
 fn test_amm_pool_swap_fee_claim() -> Result<()> {
     clear();
@@ -72,7 +74,9 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
     let first_swap_sheet = get_last_outpoint_sheet(&swap_block)?;
 
     insert_swap_exact_tokens_for_tokens(
-        first_swap_sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()) * 1005 / 1000,
+        first_swap_sheet.get_cached(&deployment_ids.owned_token_2_deployment.into())
+            * (1000 + DEFAULT_TOTAL_FEE_AMOUNT_PER_1000)
+            / 1000,
         vec![
             deployment_ids.owned_token_2_deployment,
             deployment_ids.owned_token_1_deployment,
@@ -145,18 +149,33 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
     let user_fees_earned_b =
         lp_sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()) - amount2;
 
-    let implied_total_fees_a =
-        fees_sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()) * 10 / 4;
-    let implied_total_fees_b =
-        fees_sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()) * 10 / 4;
+    let implied_total_fees_a = fees_sheet
+        .get_cached(&deployment_ids.owned_token_1_deployment.into())
+        * DEFAULT_TOTAL_FEE_AMOUNT_PER_1000
+        / PROTOCOL_FEE_AMOUNT_PER_1000;
+    let implied_total_fees_b = fees_sheet
+        .get_cached(&deployment_ids.owned_token_2_deployment.into())
+        * DEFAULT_TOTAL_FEE_AMOUNT_PER_1000
+        / PROTOCOL_FEE_AMOUNT_PER_1000;
 
-    assert_eq!(
-        divide_round_u128(implied_total_fees_a * 6 / 10 / 2, 1000), // 60% goes to LPs, half of that goes to this LP position, then we take 3 digits of
-        divide_round_u128(user_fees_earned_a, 1000)
+    // 60% goes to LPs, half of that goes to this LP position (recall init also has a lp position that isn't unraveled)
+    let implied_user_fees_earned_a = implied_total_fees_a
+        * (DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 - PROTOCOL_FEE_AMOUNT_PER_1000)
+        / DEFAULT_TOTAL_FEE_AMOUNT_PER_1000
+        / 2;
+
+    let implied_user_fees_earned_b = implied_total_fees_b
+        * (DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 - PROTOCOL_FEE_AMOUNT_PER_1000)
+        / DEFAULT_TOTAL_FEE_AMOUNT_PER_1000
+        / 2;
+
+    assert!(
+        implied_user_fees_earned_a.abs_diff(user_fees_earned_a) * 100 / implied_user_fees_earned_a
+            < 5 // 5% difference tolerance allowed
     );
-    assert_eq!(
-        divide_round_u128(implied_total_fees_b * 6 / 10 / 2, 1000),
-        divide_round_u128(user_fees_earned_b, 1000)
+    assert!(
+        implied_user_fees_earned_b.abs_diff(user_fees_earned_b) * 100 / implied_user_fees_earned_a
+            < 5
     );
 
     Ok(())

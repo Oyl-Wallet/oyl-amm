@@ -10,7 +10,7 @@ use anyhow::{anyhow, Result};
 use metashrew_support::{byte_view::ByteView, index_pointer::KeyValuePointer};
 use ruint::Uint;
 
-pub const DEFAULT_TOTAL_FEE_AMOUNT_PER_1000: u128 = 5;
+pub const DEFAULT_TOTAL_FEE_AMOUNT_PER_1000: u128 = 10;
 pub const PROTOCOL_FEE_AMOUNT_PER_1000: u128 = 2;
 
 pub type U256 = Uint<256, 4>;
