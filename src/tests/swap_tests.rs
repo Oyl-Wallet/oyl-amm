@@ -13,7 +13,7 @@ use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::Witness;
 use init_pools::{calc_lp_balance_from_pool_init, test_amm_pool_init_fixture};
 use metashrew_support::byte_view::ByteView;
-use oylswap_library::{StorableU256, DEFAULT_FEE_AMOUNT_PER_1000, U256};
+use oylswap_library::{StorableU256, DEFAULT_TOTAL_FEE_AMOUNT_PER_1000, U256};
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::balance_sheet::BalanceSheetOperations;
 use protorune_support::protostone::ProtostoneEdict;
@@ -446,7 +446,7 @@ fn test_amm_pool_swap_insufficient_input_3() -> Result<()> {
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
             id: deployment_ids.owned_token_1_deployment.into(),
-            amount: (1000 + DEFAULT_FEE_AMOUNT_PER_1000) * 500000 * 10000 / (500000 - 10000) / 1000, // barely doesn't satisfy the K equation with fees
+            amount: (1000 + DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * 500000 * 10000 / (500000 - 10000) / 1000, // barely doesn't satisfy the K equation with fees
             output: 0,
         }],
         &mut swap_block,
@@ -485,7 +485,7 @@ fn test_amm_pool_swap_sufficient_input() -> Result<()> {
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
             id: deployment_ids.owned_token_1_deployment.into(),
-            amount: (1000 + DEFAULT_FEE_AMOUNT_PER_1000) * 500000 * 10000 / (500000 - 10000) / 1000
+            amount: (1000 + DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * 500000 * 10000 / (500000 - 10000) / 1000
                 + 1,
             output: 0,
         }],
@@ -523,7 +523,7 @@ fn test_amm_pool_swap_zero_to() -> Result<()> {
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
             id: deployment_ids.owned_token_1_deployment.into(),
-            amount: (1000 + DEFAULT_FEE_AMOUNT_PER_1000) * 500000 * 10000 / (500000 - 10000) / 1000
+            amount: (1000 + DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * 500000 * 10000 / (500000 - 10000) / 1000
                 + 1,
             output: 0,
         }],
@@ -641,9 +641,9 @@ fn test_amm_pool_swap_with_data_3() -> Result<()> {
     };
 
     let swap_out = 10000;
-    let amount_fee_cover = DEFAULT_FEE_AMOUNT_PER_1000 * amount1 * swap_out
-        / ((1000 - DEFAULT_FEE_AMOUNT_PER_1000) * amount2
-            - (1000 - DEFAULT_FEE_AMOUNT_PER_1000) * DEFAULT_FEE_AMOUNT_PER_1000 * swap_out / 1000);
+    let amount_fee_cover = DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * amount1 * swap_out
+        / ((1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * amount2
+            - (1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * swap_out / 1000);
 
     println!("amount needed to cover fee: {}", amount_fee_cover);
 
@@ -688,9 +688,9 @@ fn test_amm_pool_swap_with_data_4() -> Result<()> {
     };
 
     let swap_out = 10000;
-    let amount_fee_cover = DEFAULT_FEE_AMOUNT_PER_1000 * amount1 * swap_out
-        / ((1000 - DEFAULT_FEE_AMOUNT_PER_1000) * amount2
-            - (1000 - DEFAULT_FEE_AMOUNT_PER_1000) * DEFAULT_FEE_AMOUNT_PER_1000 * swap_out / 1000)
+    let amount_fee_cover = DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * amount1 * swap_out
+        / ((1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * amount2
+            - (1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * swap_out / 1000)
         + 1;
 
     println!("amount needed to cover fee: {}", amount_fee_cover);
@@ -730,9 +730,9 @@ fn test_amm_pool_swap_with_reentrancy_add_liquidity() -> Result<()> {
     };
 
     let swap_out = 10000;
-    let amount_fee_cover = DEFAULT_FEE_AMOUNT_PER_1000 * amount1 * swap_out
-        / ((1000 - DEFAULT_FEE_AMOUNT_PER_1000) * amount2
-            - (1000 - DEFAULT_FEE_AMOUNT_PER_1000) * DEFAULT_FEE_AMOUNT_PER_1000 * swap_out / 1000)
+    let amount_fee_cover = DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * amount1 * swap_out
+        / ((1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * amount2
+            - (1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * swap_out / 1000)
         + 1;
 
     println!("amount needed to cover fee: {}", amount_fee_cover);
@@ -777,9 +777,9 @@ fn test_amm_pool_swap_with_reentrancy_burn() -> Result<()> {
     };
 
     let swap_out = 10000;
-    let amount_fee_cover = DEFAULT_FEE_AMOUNT_PER_1000 * amount1 * swap_out
-        / ((1000 - DEFAULT_FEE_AMOUNT_PER_1000) * amount2
-            - (1000 - DEFAULT_FEE_AMOUNT_PER_1000) * DEFAULT_FEE_AMOUNT_PER_1000 * swap_out / 1000)
+    let amount_fee_cover = DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * amount1 * swap_out
+        / ((1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * amount2
+            - (1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * swap_out / 1000)
         + 1;
 
     println!("amount needed to cover fee: {}", amount_fee_cover);
@@ -824,9 +824,9 @@ fn test_amm_pool_swap_with_reentrancy_swap() -> Result<()> {
     };
 
     let swap_out = 10000;
-    let amount_fee_cover = DEFAULT_FEE_AMOUNT_PER_1000 * amount1 * swap_out
-        / ((1000 - DEFAULT_FEE_AMOUNT_PER_1000) * amount2
-            - (1000 - DEFAULT_FEE_AMOUNT_PER_1000) * DEFAULT_FEE_AMOUNT_PER_1000 * swap_out / 1000)
+    let amount_fee_cover = DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * amount1 * swap_out
+        / ((1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * amount2
+            - (1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * swap_out / 1000)
         + 1;
 
     println!("amount needed to cover fee: {}", amount_fee_cover);

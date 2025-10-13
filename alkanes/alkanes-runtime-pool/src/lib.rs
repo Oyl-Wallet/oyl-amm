@@ -1,6 +1,4 @@
-use alkanes_runtime::{
-    message::MessageDispatch, runtime::AlkaneResponder, storage::StoragePointer,
-};
+use alkanes_runtime::{runtime::AlkaneResponder, storage::StoragePointer};
 
 #[allow(unused_imports)]
 use alkanes_runtime::{
@@ -11,19 +9,18 @@ use alkanes_std_factory_support::MintableToken;
 use alkanes_support::{
     cellpack::Cellpack,
     checked_expr,
-    context::Context,
     id::AlkaneId,
     parcel::{AlkaneTransfer, AlkaneTransferParcel},
     response::CallResponse,
-    utils::{overflow_error, shift, shift_or_err},
+    utils::shift,
 };
 use anyhow::{anyhow, Result};
-use bitcoin::Block;
-use metashrew_support::{byte_view::ByteView, index_pointer::KeyValuePointer, utils::consume_u128};
-use num::integer::Roots;
-use oylswap_library::{Lock, PoolInfo, Sqrt, StorableU256, DEFAULT_FEE_AMOUNT_PER_1000, U256};
+use metashrew_support::{index_pointer::KeyValuePointer, utils::consume_u128};
+use oylswap_library::{
+    Lock, PoolInfo, Sqrt, StorableU256, DEFAULT_TOTAL_FEE_AMOUNT_PER_1000,
+    PROTOCOL_FEE_AMOUNT_PER_1000, U256,
+};
 use protorune_support::balance_sheet::{BalanceSheetOperations, CachedBalanceSheet};
-use protorune_support::utils::consensus_decode;
 use std::{cmp::min, sync::Arc};
 
 // per uniswap docs, the first 1e3 wei of lp token minted are burned to mitigate attacks where the value of a lp token is raised too high easily
@@ -241,9 +238,11 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
         if !k_last.is_zero() {
             let root_k_last = k_last.sqrt();
             let root_k = (U256::from(previous_a) * U256::from(previous_b)).sqrt();
-            if (root_k > root_k_last) {
+            if root_k > root_k_last {
                 let numerator = U256::from(total_supply) * (root_k - root_k_last);
-                let root_k_fee_adj = root_k * U256::from(3) / U256::from(2); // assuming 2/5 of 0.5% fee goes to protocol
+                let root_k_fee_adj = root_k
+                    * U256::from(DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 - PROTOCOL_FEE_AMOUNT_PER_1000)
+                    / U256::from(PROTOCOL_FEE_AMOUNT_PER_1000);
                 let denominator = root_k_fee_adj + root_k_last;
                 let liquidity: u128 = (numerator / denominator).try_into()?; // guaranteed to be storable in u128
                 self.increase_total_supply(liquidity)?;
@@ -453,13 +452,13 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             }
 
             // Calculate input amounts.
-            let mut amount_0_in = if balance_0.value > reserve_0.value - amount_0_out {
+            let amount_0_in = if balance_0.value > reserve_0.value - amount_0_out {
                 balance_0.value - (reserve_0.value - amount_0_out)
             } else {
                 0
             };
 
-            let mut amount_1_in = if balance_1.value > reserve_1.value - amount_1_out {
+            let amount_1_in = if balance_1.value > reserve_1.value - amount_1_out {
                 balance_1.value - (reserve_1.value - amount_1_out)
             } else {
                 0
@@ -473,9 +472,9 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             // Check K value (constant product formula)
             // In Uniswap: balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2)
             let balance_0_adjusted = U256::from(balance_0.value) * U256::from(1000)
-                - U256::from(amount_0_in) * U256::from(DEFAULT_FEE_AMOUNT_PER_1000);
+                - U256::from(amount_0_in) * U256::from(DEFAULT_TOTAL_FEE_AMOUNT_PER_1000);
             let balance_1_adjusted = U256::from(balance_1.value) * U256::from(1000)
-                - U256::from(amount_1_in) * U256::from(DEFAULT_FEE_AMOUNT_PER_1000);
+                - U256::from(amount_1_in) * U256::from(DEFAULT_TOTAL_FEE_AMOUNT_PER_1000);
 
             if balance_0_adjusted * balance_1_adjusted
                 < U256::from(reserve_0.value)

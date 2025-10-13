@@ -9,7 +9,7 @@ use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::{Block, Witness};
 #[allow(unused_imports)]
 use metashrew_core::{get_cache, index_pointer::IndexPointer, println, stdio::stdout};
-use oylswap_library::DEFAULT_FEE_AMOUNT_PER_1000;
+use oylswap_library::DEFAULT_TOTAL_FEE_AMOUNT_PER_1000;
 use protorune_support::balance_sheet::{BalanceSheet, BalanceSheetOperations};
 use protorune_support::protostone::ProtostoneEdict;
 use ruint::Uint;
@@ -241,7 +241,7 @@ pub fn insert_swap_exact_tokens_for_tokens(
 }
 
 fn calc_swapped_balance(amount: u128, reserve_from: u128, reserve_to: u128) -> Result<u128> {
-    let amount_in_with_fee = (1000 - DEFAULT_FEE_AMOUNT_PER_1000) * amount;
+    let amount_in_with_fee = (1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * amount;
     Ok((amount_in_with_fee * reserve_to) / (1000 * reserve_from + amount_in_with_fee))
 }
 

@@ -10,7 +10,8 @@ use anyhow::{anyhow, Result};
 use metashrew_support::{byte_view::ByteView, index_pointer::KeyValuePointer};
 use ruint::Uint;
 
-pub const DEFAULT_FEE_AMOUNT_PER_1000: u128 = 5;
+pub const DEFAULT_TOTAL_FEE_AMOUNT_PER_1000: u128 = 5;
+pub const PROTOCOL_FEE_AMOUNT_PER_1000: u128 = 2;
 
 pub type U256 = Uint<256, 4>;
 pub trait Sqrt {
@@ -203,7 +204,8 @@ impl PoolInfo {
 }
 
 pub fn get_amount_out(amount_in: u128, reserve_in: u128, reserve_out: u128) -> Result<u128> {
-    let amount_in_with_fee = U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(amount_in);
+    let amount_in_with_fee =
+        U256::from(1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * U256::from(amount_in);
 
     let numerator = amount_in_with_fee * U256::from(reserve_out);
     let denominator = U256::from(1000) * U256::from(reserve_in) + amount_in_with_fee;
@@ -219,7 +221,7 @@ pub fn get_amount_in(amount_out: u128, reserve_in: u128, reserve_out: u128) -> R
     }
     let numerator = U256::from(1000) * U256::from(reserve_in) * U256::from(amount_out);
     let denominator =
-        U256::from(1000 - DEFAULT_FEE_AMOUNT_PER_1000) * U256::from(reserve_out - amount_out);
+        U256::from(1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * U256::from(reserve_out - amount_out);
     Ok((numerator / denominator + U256::from(1)).try_into()?)
 }
 
