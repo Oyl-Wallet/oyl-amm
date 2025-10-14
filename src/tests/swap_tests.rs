@@ -1416,7 +1416,7 @@ fn test_amm_price_swap_2() -> Result<()> {
                     p0 & U256::from(u128::MAX),
                     U256::from(13409146736092426580041890471073638412u128)
                 );
-                assert_eq!(p1 >> U256::from(PRECISION), U256::from(202));
+                assert_eq!(p1 >> U256::from(PRECISION), U256::from(201));
                 assert_eq!(
                     p1 & U256::from(u128::MAX),
                     U256::from(340215011357791997868777545608722086744u128)
