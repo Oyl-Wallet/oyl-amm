@@ -13,7 +13,7 @@ use bitcoin::blockdata::transaction::OutPoint;
 use bitcoin::Witness;
 use init_pools::{calc_lp_balance_from_pool_init, test_amm_pool_init_fixture};
 use metashrew_support::byte_view::ByteView;
-use oylswap_library::{StorableU256, DEFAULT_FEE_AMOUNT_PER_1000, U256};
+use oylswap_library::{get_amount_in, StorableU256, DEFAULT_TOTAL_FEE_AMOUNT_PER_1000, U256};
 use protorune::test_helpers::create_block_with_coinbase_tx;
 use protorune_support::balance_sheet::BalanceSheetOperations;
 use protorune_support::protostone::ProtostoneEdict;
@@ -443,10 +443,17 @@ fn test_amm_pool_swap_insufficient_input_3() -> Result<()> {
         vout: 0,
     };
 
+    let amount_out = 10000;
+    let amount_in_required = get_amount_in(
+        amount_out,
+        amount1,
+        amount2,
+        DEFAULT_TOTAL_FEE_AMOUNT_PER_1000,
+    )?;
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
             id: deployment_ids.owned_token_1_deployment.into(),
-            amount: (1000 + DEFAULT_FEE_AMOUNT_PER_1000) * 500000 * 10000 / (500000 - 10000) / 1000, // barely doesn't satisfy the K equation with fees
+            amount: amount_in_required - 1, // barely doesn't satisfy the K equation with fees
             output: 0,
         }],
         &mut swap_block,
@@ -482,11 +489,17 @@ fn test_amm_pool_swap_sufficient_input() -> Result<()> {
         vout: 0,
     };
 
+    let amount_out = 10000;
+    let amount_in_required = get_amount_in(
+        amount_out,
+        amount1,
+        amount2,
+        DEFAULT_TOTAL_FEE_AMOUNT_PER_1000,
+    )?;
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
             id: deployment_ids.owned_token_1_deployment.into(),
-            amount: (1000 + DEFAULT_FEE_AMOUNT_PER_1000) * 500000 * 10000 / (500000 - 10000) / 1000
-                + 1,
+            amount: amount_in_required,
             output: 0,
         }],
         &mut swap_block,
@@ -520,11 +533,17 @@ fn test_amm_pool_swap_zero_to() -> Result<()> {
         vout: 0,
     };
 
+    let amount_out = 10000;
+    let amount_in_required = get_amount_in(
+        amount_out,
+        amount1,
+        amount2,
+        DEFAULT_TOTAL_FEE_AMOUNT_PER_1000,
+    )?;
     insert_low_level_swap_txs(
         vec![ProtostoneEdict {
             id: deployment_ids.owned_token_1_deployment.into(),
-            amount: (1000 + DEFAULT_FEE_AMOUNT_PER_1000) * 500000 * 10000 / (500000 - 10000) / 1000
-                + 1,
+            amount: amount_in_required,
             output: 0,
         }],
         &mut swap_block,
@@ -641,9 +660,12 @@ fn test_amm_pool_swap_with_data_3() -> Result<()> {
     };
 
     let swap_out = 10000;
-    let amount_fee_cover = DEFAULT_FEE_AMOUNT_PER_1000 * amount1 * swap_out
-        / ((1000 - DEFAULT_FEE_AMOUNT_PER_1000) * amount2
-            - (1000 - DEFAULT_FEE_AMOUNT_PER_1000) * DEFAULT_FEE_AMOUNT_PER_1000 * swap_out / 1000);
+    let amount_fee_cover = DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * amount1 * swap_out
+        / ((1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * amount2
+            - (1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000)
+                * DEFAULT_TOTAL_FEE_AMOUNT_PER_1000
+                * swap_out
+                / 1000);
 
     println!("amount needed to cover fee: {}", amount_fee_cover);
 
@@ -688,9 +710,12 @@ fn test_amm_pool_swap_with_data_4() -> Result<()> {
     };
 
     let swap_out = 10000;
-    let amount_fee_cover = DEFAULT_FEE_AMOUNT_PER_1000 * amount1 * swap_out
-        / ((1000 - DEFAULT_FEE_AMOUNT_PER_1000) * amount2
-            - (1000 - DEFAULT_FEE_AMOUNT_PER_1000) * DEFAULT_FEE_AMOUNT_PER_1000 * swap_out / 1000)
+    let amount_fee_cover = DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * amount1 * swap_out
+        / ((1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * amount2
+            - (1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000)
+                * DEFAULT_TOTAL_FEE_AMOUNT_PER_1000
+                * swap_out
+                / 1000)
         + 1;
 
     println!("amount needed to cover fee: {}", amount_fee_cover);
@@ -730,9 +755,12 @@ fn test_amm_pool_swap_with_reentrancy_add_liquidity() -> Result<()> {
     };
 
     let swap_out = 10000;
-    let amount_fee_cover = DEFAULT_FEE_AMOUNT_PER_1000 * amount1 * swap_out
-        / ((1000 - DEFAULT_FEE_AMOUNT_PER_1000) * amount2
-            - (1000 - DEFAULT_FEE_AMOUNT_PER_1000) * DEFAULT_FEE_AMOUNT_PER_1000 * swap_out / 1000)
+    let amount_fee_cover = DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * amount1 * swap_out
+        / ((1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * amount2
+            - (1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000)
+                * DEFAULT_TOTAL_FEE_AMOUNT_PER_1000
+                * swap_out
+                / 1000)
         + 1;
 
     println!("amount needed to cover fee: {}", amount_fee_cover);
@@ -777,9 +805,12 @@ fn test_amm_pool_swap_with_reentrancy_burn() -> Result<()> {
     };
 
     let swap_out = 10000;
-    let amount_fee_cover = DEFAULT_FEE_AMOUNT_PER_1000 * amount1 * swap_out
-        / ((1000 - DEFAULT_FEE_AMOUNT_PER_1000) * amount2
-            - (1000 - DEFAULT_FEE_AMOUNT_PER_1000) * DEFAULT_FEE_AMOUNT_PER_1000 * swap_out / 1000)
+    let amount_fee_cover = DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * amount1 * swap_out
+        / ((1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * amount2
+            - (1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000)
+                * DEFAULT_TOTAL_FEE_AMOUNT_PER_1000
+                * swap_out
+                / 1000)
         + 1;
 
     println!("amount needed to cover fee: {}", amount_fee_cover);
@@ -824,9 +855,12 @@ fn test_amm_pool_swap_with_reentrancy_swap() -> Result<()> {
     };
 
     let swap_out = 10000;
-    let amount_fee_cover = DEFAULT_FEE_AMOUNT_PER_1000 * amount1 * swap_out
-        / ((1000 - DEFAULT_FEE_AMOUNT_PER_1000) * amount2
-            - (1000 - DEFAULT_FEE_AMOUNT_PER_1000) * DEFAULT_FEE_AMOUNT_PER_1000 * swap_out / 1000)
+    let amount_fee_cover = DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 * amount1 * swap_out
+        / ((1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000) * amount2
+            - (1000 - DEFAULT_TOTAL_FEE_AMOUNT_PER_1000)
+                * DEFAULT_TOTAL_FEE_AMOUNT_PER_1000
+                * swap_out
+                / 1000)
         + 1;
 
     println!("amount needed to cover fee: {}", amount_fee_cover);
@@ -870,12 +904,19 @@ fn test_amm_pool_swap_tokens_for_exact_no_split() -> Result<()> {
         txid: init_block.txdata[init_block.txdata.len() - 1].compute_txid(),
         vout: 0,
     };
+    let amount_out = 5000;
+    let amount_in_required = get_amount_in(
+        amount_out,
+        amount1,
+        amount2,
+        DEFAULT_TOTAL_FEE_AMOUNT_PER_1000,
+    )?;
     insert_swap_tokens_for_exact_tokens_txs_no_split(
         vec![
             deployment_ids.owned_token_1_deployment,
             deployment_ids.owned_token_2_deployment,
         ],
-        5000,
+        amount_out,
         10000,
         &mut swap_block,
         input_outpoint,
@@ -892,7 +933,7 @@ fn test_amm_pool_swap_tokens_for_exact_no_split() -> Result<()> {
     assert_eq!(
         init_balances.get_cached(&deployment_ids.owned_token_1_deployment.into())
             - sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
-        5076
+        amount_in_required
     );
     check_input_tokens_refunded(
         init_balances,
@@ -918,13 +959,20 @@ fn test_amm_pool_swap_tokens_for_exact_1() -> Result<()> {
         vout: 0,
     };
     let amount_to_swap = 10000;
+    let amount_out = 5000;
+    let amount_in_required = get_amount_in(
+        amount_out,
+        amount1,
+        amount2,
+        DEFAULT_TOTAL_FEE_AMOUNT_PER_1000,
+    )?;
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
         vec![
             deployment_ids.owned_token_1_deployment,
             deployment_ids.owned_token_2_deployment,
         ],
-        5000,
+        amount_out,
         10000,
         &mut swap_block,
         input_outpoint,
@@ -935,11 +983,11 @@ fn test_amm_pool_swap_tokens_for_exact_1() -> Result<()> {
     let sheet = get_last_outpoint_sheet(&swap_block)?;
     assert_eq!(
         sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
-        5000
+        amount_out
     );
     assert_eq!(
         sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
-        4924
+        amount_to_swap - amount_in_required
     );
     Ok(())
 }
@@ -957,14 +1005,21 @@ fn test_amm_pool_swap_tokens_for_exact_2() -> Result<()> {
         vout: 0,
     };
     let amount_to_swap = 10000;
+    let amount_out = 5000;
+    let amount_in_required = get_amount_in(
+        amount_out,
+        amount1,
+        amount2,
+        DEFAULT_TOTAL_FEE_AMOUNT_PER_1000,
+    )?;
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
         vec![
             deployment_ids.owned_token_1_deployment,
             deployment_ids.owned_token_2_deployment,
         ],
-        5000,
-        5076,
+        amount_out,
+        amount_in_required,
         &mut swap_block,
         input_outpoint,
         &deployment_ids,
@@ -974,11 +1029,11 @@ fn test_amm_pool_swap_tokens_for_exact_2() -> Result<()> {
     let sheet = get_last_outpoint_sheet(&swap_block)?;
     assert_eq!(
         sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
-        5000
+        amount_out
     );
     assert_eq!(
         sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
-        4924
+        amount_to_swap - amount_in_required
     );
     Ok(())
 }
@@ -996,14 +1051,21 @@ fn test_amm_pool_swap_tokens_for_exact_3() -> Result<()> {
         vout: 0,
     };
     let amount_to_swap = 10000;
+    let amount_out = 5000;
+    let amount_in_required = get_amount_in(
+        amount_out,
+        amount1,
+        amount2,
+        DEFAULT_TOTAL_FEE_AMOUNT_PER_1000,
+    )?;
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
         vec![
             deployment_ids.owned_token_1_deployment,
             deployment_ids.owned_token_2_deployment,
         ],
-        5000,
-        5075,
+        amount_out,
+        amount_in_required - 1,
         &mut swap_block,
         input_outpoint,
         &deployment_ids,
@@ -1034,13 +1096,20 @@ fn test_amm_pool_swap_tokens_for_exact_4() -> Result<()> {
         vout: 0,
     };
     let amount_to_swap = 10000;
+    let amount_out = 5000;
+    let amount_in_required = get_amount_in(
+        amount_out,
+        amount1,
+        amount2,
+        DEFAULT_TOTAL_FEE_AMOUNT_PER_1000,
+    )?;
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
         vec![
             deployment_ids.owned_token_1_deployment,
             deployment_ids.owned_token_2_deployment,
         ],
-        5000,
+        amount_out,
         10001,
         &mut swap_block,
         input_outpoint,
@@ -1051,11 +1120,11 @@ fn test_amm_pool_swap_tokens_for_exact_4() -> Result<()> {
     let sheet = get_last_outpoint_sheet(&swap_block)?;
     assert_eq!(
         sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()),
-        5000
+        amount_out
     );
     assert_eq!(
         sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
-        4924
+        amount_to_swap - amount_in_required
     );
 
     Ok(())
@@ -1074,14 +1143,21 @@ fn test_amm_pool_swap_tokens_for_exact_5() -> Result<()> {
         vout: 0,
     };
     let amount_to_swap = 10000;
+    let amount_out = 10000;
+    let amount_in_required = get_amount_in(
+        amount_out,
+        amount1,
+        amount2,
+        DEFAULT_TOTAL_FEE_AMOUNT_PER_1000,
+    )?;
     insert_swap_tokens_for_exact_tokens_txs(
         amount_to_swap,
         vec![
             deployment_ids.owned_token_1_deployment,
             deployment_ids.owned_token_2_deployment,
         ],
-        10000,
-        10256,
+        amount_out,
+        amount_in_required,
         &mut swap_block,
         input_outpoint,
         &deployment_ids,
@@ -1100,7 +1176,7 @@ fn test_amm_pool_swap_tokens_for_exact_5() -> Result<()> {
             "Extcall failed: balance underflow, transferring({:?}), from({:?}), balance(10000)",
             AlkaneTransfer {
                 id: deployment_ids.owned_token_1_deployment,
-                value: 10256
+                value: amount_in_required
             },
             deployment_ids.amm_factory_proxy,
         ),
@@ -1144,7 +1220,7 @@ fn test_amm_pool_swap_tokens_for_exact_middle() -> Result<()> {
     );
     assert_eq!(
         sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()),
-        4846
+        4793
     );
     Ok(())
 }
@@ -1338,12 +1414,12 @@ fn test_amm_price_swap_2() -> Result<()> {
                 assert_eq!(p0 >> U256::from(PRECISION), U256::from(198));
                 assert_eq!(
                     p0 & U256::from(u128::MAX),
-                    U256::from(11758271886674012252348290890464069812u128)
+                    U256::from(13409146736092426580041890471073638412u128)
                 );
-                assert_eq!(p1 >> U256::from(PRECISION), U256::from(202));
+                assert_eq!(p1 >> U256::from(PRECISION), U256::from(201));
                 assert_eq!(
                     p1 & U256::from(u128::MAX),
-                    U256::from(1650292961922242512542177858976124688u128)
+                    U256::from(340215011357791997868777545608722086744u128)
                 );
             }
             _ => panic!("Expected ReturnContext variant, but got a different variant"),

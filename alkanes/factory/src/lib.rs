@@ -83,6 +83,13 @@ pub enum AMMFactoryMessage {
         amount_in_max: u128,
         deadline: u128,
     },
+
+    #[opcode(21)]
+    SetTotalFeeForPool {
+        pool_id: AlkaneId,
+        total_fee_per_1000: u128,
+    },
+
     #[opcode(29)]
     SwapExactTokensForTokensImplicit {
         path: Vec<AlkaneId>,
