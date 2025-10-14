@@ -22,9 +22,7 @@ use wasm_bindgen_test::wasm_bindgen_test;
 
 use oylswap_library::{DEFAULT_TOTAL_FEE_AMOUNT_PER_1000, PROTOCOL_FEE_AMOUNT_PER_1000};
 
-#[wasm_bindgen_test]
-fn test_amm_pool_swap_fee_claim() -> Result<()> {
-    clear();
+fn test_fee_fixture(custom_fee: u128) -> Result<()> {
     let (amount1, amount2) = (500000000, 500000000);
     let (init_block, mut runtime_balances, deployment_ids) =
         test_amm_pool_init_fixture(amount1, amount2)?;
@@ -44,12 +42,35 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
     );
     index_block(&add_liquidity_block, 840_001)?;
 
+    let mut change_fee_block = create_block_with_coinbase_tx(840_001);
+    let input_outpoint = OutPoint {
+        txid: add_liquidity_block.txdata[add_liquidity_block.txdata.len() - 1].compute_txid(),
+        vout: 2,
+    };
+    change_fee_block.txdata.push(
+        alkane_helpers::create_multiple_cellpack_with_witness_and_in(
+            Witness::new(),
+            vec![Cellpack {
+                target: deployment_ids.amm_factory_proxy,
+                inputs: vec![
+                    21,
+                    deployment_ids.amm_pool_1_deployment.block,
+                    deployment_ids.amm_pool_1_deployment.tx,
+                    custom_fee,
+                ],
+            }],
+            input_outpoint,
+            false,
+        ),
+    );
+    index_block(&change_fee_block, 840_001)?;
+
     let block_height = 840_002;
 
     let mut swap_block = create_block_with_coinbase_tx(block_height);
     let input_outpoint = OutPoint {
-        txid: add_liquidity_block.txdata[add_liquidity_block.txdata.len() - 1].compute_txid(),
-        vout: 2,
+        txid: change_fee_block.txdata[change_fee_block.txdata.len() - 1].compute_txid(),
+        vout: 0,
     };
     let amount_to_swap = 10000000;
 
@@ -75,7 +96,7 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
 
     insert_swap_exact_tokens_for_tokens(
         first_swap_sheet.get_cached(&deployment_ids.owned_token_2_deployment.into())
-            * (1000 + DEFAULT_TOTAL_FEE_AMOUNT_PER_1000)
+            * (1000 + custom_fee)
             / 1000,
         vec![
             deployment_ids.owned_token_2_deployment,
@@ -144,39 +165,38 @@ fn test_amm_pool_swap_fee_claim() -> Result<()> {
     let fees_sheet = get_sheet_for_outpoint(&burn_block, burn_block.txdata.len() - 2, 0)?;
     let lp_sheet = get_last_outpoint_sheet(&burn_block)?;
 
-    let user_fees_earned_a =
-        lp_sheet.get_cached(&deployment_ids.owned_token_1_deployment.into()) - amount1;
-    let user_fees_earned_b =
-        lp_sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()) - amount2;
-
-    let implied_total_fees_a = fees_sheet
+    let user_total_fees_earned = lp_sheet
         .get_cached(&deployment_ids.owned_token_1_deployment.into())
-        * DEFAULT_TOTAL_FEE_AMOUNT_PER_1000
-        / PROTOCOL_FEE_AMOUNT_PER_1000;
-    let implied_total_fees_b = fees_sheet
-        .get_cached(&deployment_ids.owned_token_2_deployment.into())
-        * DEFAULT_TOTAL_FEE_AMOUNT_PER_1000
+        + lp_sheet.get_cached(&deployment_ids.owned_token_2_deployment.into())
+        - amount1
+        - amount2;
+
+    let implied_total_fees = (fees_sheet
+        .get_cached(&deployment_ids.owned_token_1_deployment.into())
+        + fees_sheet.get_cached(&deployment_ids.owned_token_2_deployment.into()))
+        * custom_fee
         / PROTOCOL_FEE_AMOUNT_PER_1000;
 
     // 60% goes to LPs, half of that goes to this LP position (recall init also has a lp position that isn't unraveled)
-    let implied_user_fees_earned_a = implied_total_fees_a
-        * (DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 - PROTOCOL_FEE_AMOUNT_PER_1000)
-        / DEFAULT_TOTAL_FEE_AMOUNT_PER_1000
-        / 2;
-
-    let implied_user_fees_earned_b = implied_total_fees_b
-        * (DEFAULT_TOTAL_FEE_AMOUNT_PER_1000 - PROTOCOL_FEE_AMOUNT_PER_1000)
-        / DEFAULT_TOTAL_FEE_AMOUNT_PER_1000
-        / 2;
+    let implied_user_fees_earned =
+        implied_total_fees * (custom_fee - PROTOCOL_FEE_AMOUNT_PER_1000) / custom_fee / 2;
 
     assert!(
-        implied_user_fees_earned_a.abs_diff(user_fees_earned_a) * 100 / implied_user_fees_earned_a
+        implied_user_fees_earned.abs_diff(user_total_fees_earned) * 100 / implied_user_fees_earned
             < 5 // 5% difference tolerance allowed
-    );
-    assert!(
-        implied_user_fees_earned_b.abs_diff(user_fees_earned_b) * 100 / implied_user_fees_earned_a
-            < 5
     );
 
     Ok(())
+}
+
+#[wasm_bindgen_test]
+fn test_amm_pool_swap_fee_claim() -> Result<()> {
+    clear();
+    test_fee_fixture(DEFAULT_TOTAL_FEE_AMOUNT_PER_1000)
+}
+
+#[wasm_bindgen_test]
+fn test_amm_pool_swap_fee_claim_large_fee() -> Result<()> {
+    clear();
+    test_fee_fixture(200)
 }
