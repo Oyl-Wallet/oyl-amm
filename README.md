@@ -1,3 +1,3 @@
-# swap.oyl.io
+# OYL AMM
 
-Contracts for generic AMM pools and Oylswap
+Contracts for AMM pools, modeled like Uniswap V2
