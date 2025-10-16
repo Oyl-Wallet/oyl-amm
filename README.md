@@ -1,10 +1,10 @@
 # OYL AMM
 
-This repository contains the smart contracts for `swap.oyl.io`, a decentralized exchange (DEX) that implements an Automated Market Maker (AMM) model, similar to Uniswap, but designed for Bitcoin-based blockchains using the Alkanes framework.
+This repository contains the smart contracts for the OYL AMM, a decentralized exchange (DEX) that implements an Automated Market Maker (AMM) model, similar to Uniswap, but designed for Bitcoin-based blockchains using the Alkanes framework.
 
 ## High-Level Overview
 
-`swap.oyl.io` enables users to trade tokens and provide liquidity in a decentralized and permissionless manner. The core of the protocol is a set of smart contracts that allow for the creation of liquidity pools, swapping of tokens, and earning fees for liquidity providers.
+The OYL AMM enables users to trade tokens and provide liquidity in a decentralized and permissionless manner. The core of the protocol is a set of smart contracts that allow for the creation of liquidity pools, swapping of tokens, and earning fees for liquidity providers.
 
 The system is built on the following key principles:
 - **Decentralization**: No central party controls the exchange or user funds.
