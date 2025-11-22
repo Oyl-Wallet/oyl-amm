@@ -23,7 +23,7 @@ pub enum AMMPoolMessage {
     AddLiquidity,
 
     #[opcode(2)]
-    Burn,
+    WithdrawAndBurn,
 
     // this low level function should generally not be called directly unless the user is experienced with alkanes contracts
     #[opcode(3)]

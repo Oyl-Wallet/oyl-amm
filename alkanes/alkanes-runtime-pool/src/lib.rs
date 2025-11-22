@@ -349,7 +349,7 @@ pub trait AMMPoolBase: MintableToken + AlkaneResponder {
             Ok(response)
         })
     }
-    fn burn(&self) -> Result<CallResponse> {
+    fn withdraw_and_burn(&self) -> Result<CallResponse> {
         Lock::lock(|| {
             let context = self.context()?;
             let myself = context.myself;
